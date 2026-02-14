@@ -26,7 +26,10 @@ export function Navbar() {
         .from("user_roles")
         .select("roles(name)")
         .eq("user_id", userId);
-      const hasAdmin = roles?.some((row) => row.roles?.name === "admin") ?? false;
+      const hasAdmin = roles?.some((row: any) => {
+        const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
+        return role?.name === "admin";
+      }) ?? false;
       if (mounted) setIsAdmin(hasAdmin);
     };
 

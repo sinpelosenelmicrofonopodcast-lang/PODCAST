@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 export type PostCardProps = {
   title: string;
   excerpt: string;
@@ -23,9 +21,9 @@ export function PostCard({ title, excerpt, platform, href, stats }: PostCardProp
           {stats}
         </span>
         {href ? (
-          <Link className="button secondary" href={href}>
+          <a className="button secondary" href={href}>
             Ver
-          </Link>
+          </a>
         ) : null}
       </div>
     </div>

@@ -9,6 +9,8 @@ import { ShareButtons } from "@/components/ShareButtons";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
+
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const supabase = supabaseServer();
   const { data: item } = await supabase
@@ -113,21 +115,24 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
             <h3>Comentarios</h3>
             {comments && comments.length > 0 ? (
               <div style={{ display: "grid", gap: 10 }}>
-                {comments.map((comment) => (
-                  <div key={comment.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <img
-                      src={comment.users?.avatar_url ?? "/logo.png"}
-                      alt={comment.users?.nickname ?? "avatar"}
-                      width={24}
-                      height={24}
-                      style={{ borderRadius: "50%", objectFit: "cover" }}
-                    />
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{comment.users?.nickname ?? "Anónimo"}</div>
-                      <div className="muted" style={{ fontSize: 13 }}>{comment.body}</div>
+                {comments.map((comment) => {
+                  const user = pickUser(comment.users);
+                  return (
+                    <div key={comment.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <img
+                        src={user?.avatar_url ?? "/logo.png"}
+                        alt={user?.nickname ?? "avatar"}
+                        width={24}
+                        height={24}
+                        style={{ borderRadius: "50%", objectFit: "cover" }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.nickname ?? "Anónimo"}</div>
+                        <div className="muted" style={{ fontSize: 13 }}>{comment.body}</div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="muted">Sé el primero en comentar.</p>

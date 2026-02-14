@@ -41,6 +41,13 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
   }
 
   const tabClass = (active: boolean) => (active ? "news-tab active" : "news-tab");
+  const buildNewsHref = (nextSort: string) => ({
+    pathname: "/noticias",
+    query: {
+      ...(category ? { cat: category } : {}),
+      sort: nextSort
+    }
+  });
 
   return (
     <main>
@@ -62,10 +69,10 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
           </div>
 
           <div className="news-tabs" style={{ marginTop: 12 }}>
-            <Link className={tabClass(sort === "all" || sort === "latest")} href={`/noticias${category ? `?cat=${encodeURIComponent(category)}` : ""}&sort=latest`}>
+            <Link className={tabClass(sort === "all" || sort === "latest")} href={buildNewsHref("latest")}>
               Últimas
             </Link>
-            <Link className={tabClass(sort === "comments")} href={`/noticias${category ? `?cat=${encodeURIComponent(category)}` : ""}&sort=comments`}>
+            <Link className={tabClass(sort === "comments")} href={buildNewsHref("comments")}>
               Más comentadas
             </Link>
           </div>
@@ -100,7 +107,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                   <div style={{ display: "grid", gap: 8 }}>
                     <div>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {(item.categories ?? []).map((cat) => (
+                        {(item.categories ?? []).map((cat: string) => (
                           <span key={cat} className="news-badge">
                             {cat}
                           </span>

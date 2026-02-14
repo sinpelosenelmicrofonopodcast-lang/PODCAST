@@ -8,6 +8,8 @@ import { AdminDeleteButton } from "@/components/AdminDeleteButton";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
+
 export default async function TeoriasPage() {
   const supabase = supabaseServer();
   const { data } = await supabase
@@ -58,21 +60,24 @@ export default async function TeoriasPage() {
                       </div>
                       {replies.length > 0 ? (
                         <div style={{ display: "grid", gap: 8 }}>
-                          {replies.map((reply) => (
-                            <div key={reply.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                              <img
-                                src={reply.users?.avatar_url ?? "/logo.png"}
-                                alt={reply.users?.nickname ?? "avatar"}
-                                width={24}
-                                height={24}
-                                style={{ borderRadius: "50%", objectFit: "cover" }}
-                              />
-                              <div>
-                                <div style={{ fontSize: 13, fontWeight: 600 }}>{reply.users?.nickname ?? "Anónimo"}</div>
-                                <div className="muted" style={{ fontSize: 13 }}>{reply.body}</div>
+                          {replies.map((reply) => {
+                            const user = pickUser(reply.users);
+                            return (
+                              <div key={reply.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                <img
+                                  src={user?.avatar_url ?? "/logo.png"}
+                                  alt={user?.nickname ?? "avatar"}
+                                  width={24}
+                                  height={24}
+                                  style={{ borderRadius: "50%", objectFit: "cover" }}
+                                />
+                                <div>
+                                  <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.nickname ?? "Anónimo"}</div>
+                                  <div className="muted" style={{ fontSize: 13 }}>{reply.body}</div>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : null}
                       <CommentComposer contentId={item.id} contentType="theory" />
