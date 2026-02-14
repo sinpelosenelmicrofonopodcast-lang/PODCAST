@@ -77,33 +77,25 @@ export function Navbar() {
             <span>Sin Pelos</span>
           </div>
         </Link>
-        <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <Link href="/feed">{t.feed}</Link>
-          <Link href="/community">{t.community}</Link>
-          <Link href="/foro">{t.forum}</Link>
-          <Link href="/noticias">{t.news}</Link>
-          <Link href="/blog">{t.blog}</Link>
-          <Link href="/quiero-salir">{t.guest}</Link>
-          <Link href="/zona-cruda">{t.rawZone}</Link>
+        <div className="nav-actions">
+          <Link className="nav-link" href="/feed">{t.feed}</Link>
+          <Link className="nav-link" href="/community">{t.community}</Link>
+          <Link className="nav-link" href="/foro">{t.forum}</Link>
+          <Link className="nav-link" href="/noticias">{t.news}</Link>
+          <Link className="nav-link" href="/blog">{t.blog}</Link>
+          <Link className="nav-link" href="/quiero-salir">{t.guest}</Link>
+          <Link className="nav-link" href="/zona-cruda">{t.rawZone}</Link>
           <LanguageToggle />
-          {isAdmin ? <Link href="/admin">{t.dashboard}</Link> : null}
+          {isAdmin ? <Link className="nav-link" href="/admin">{t.dashboard}</Link> : null}
           {nickname ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="nav-user">
               <Link href="/perfil" className="muted">
                 {t.profile}
               </Link>
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  border: "1px solid rgba(255,255,255,0.2)"
-                }}
-              >
+              <div className="nav-avatar">
                 <Image src={avatarUrl ?? "/logo.png"} alt={nickname} width={28} height={28} style={{ objectFit: "cover" }} />
               </div>
-              <span className="muted">{t.hello}, {nickname}</span>
+              <span className="muted nav-hello">{t.hello}, {nickname}</span>
               <button className="button secondary" type="button" onClick={handleSignOut}>
                 {t.logout}
               </button>
