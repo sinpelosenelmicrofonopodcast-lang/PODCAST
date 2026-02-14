@@ -99,15 +99,15 @@ export default function PerfilPage() {
   return (
     <main className="app-enter">
       <Navbar />
-      <section className="section">
-        <div className="container" style={{ maxWidth: 620 }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+      <section className="section form-screen">
+        <div className="container form-container">
+          <div className="form-logo-wrap">
             <Logo size={84} animated />
           </div>
-          <h1 className="section-title" style={{ textAlign: "center" }}>
+          <h1 className="section-title form-title-center">
             Mi Perfil
           </h1>
-          <form className="card" onSubmit={handleSave}>
+          <form className="card form-stack" onSubmit={handleSave}>
             <label>
               Nickname
               <input className="input" value={nickname} onChange={(e) => setNickname(e.target.value)} required />
@@ -137,10 +137,12 @@ export default function PerfilPage() {
                 }}
               />
             </label>
-            <button className="button" type="submit" disabled={loading || uploading}>
-              Guardar cambios
-            </button>
-            {status ? <p className="muted">{status}</p> : null}
+            {status ? <p className="muted" style={{ margin: 0 }}>{status}</p> : null}
+            <div className="form-submit-bar">
+              <button className="button form-submit" type="submit" disabled={loading || uploading}>
+                Guardar cambios
+              </button>
+            </div>
           </form>
         </div>
       </section>

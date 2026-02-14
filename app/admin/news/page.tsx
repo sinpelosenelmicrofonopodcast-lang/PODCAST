@@ -168,7 +168,7 @@ export default function AdminNewsPage() {
     <main>
       <h1 className="section-title">Curaduría de Noticias</h1>
       <p className="muted">Resumen + análisis propio + tags.</p>
-      <form className="card" style={{ marginTop: 20 }} onSubmit={handleSubmit}>
+      <form className="card form-stack" style={{ marginTop: 20 }} onSubmit={handleSubmit}>
         <label>
           Título
           <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required />
@@ -203,9 +203,9 @@ export default function AdminNewsPage() {
         </label>
         <label>
           Categorías
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
+          <div className="check-grid">
             {newsCategories.map((cat) => (
-              <label key={cat} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <label key={cat} className="check-row compact">
                 <input type="checkbox" checked={categories.includes(cat)} onChange={() => toggleCategory(cat)} />
                 {cat}
               </label>
@@ -216,7 +216,7 @@ export default function AdminNewsPage() {
           Tags (separados por coma)
           <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="medios, pr, politica" />
         </label>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div className="form-submit-bar">
           <button className="button" type="submit" disabled={loading || uploading}>
             {loading ? "Guardando..." : uploading ? "Subiendo portada..." : editingId ? "Actualizar noticia" : "Publicar noticia"}
           </button>
@@ -225,8 +225,8 @@ export default function AdminNewsPage() {
               Cancelar edición
             </button>
           ) : null}
-          {status ? <p className="muted">{status}</p> : null}
         </div>
+        {status ? <p className="muted" style={{ margin: 0 }}>{status}</p> : null}
       </form>
 
       <div className="card" style={{ marginTop: 24 }}>
@@ -239,7 +239,7 @@ export default function AdminNewsPage() {
                 <span className="muted" style={{ fontSize: 12 }}>
                   {(item.categories ?? []).join(" · ")} · {item.published_at ? new Date(item.published_at).toLocaleDateString("es-PR") : ""}
                 </span>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <div className="admin-item-actions">
                   <button className="button secondary" type="button" onClick={() => handleEdit(item)}>
                     Editar
                   </button>

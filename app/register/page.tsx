@@ -46,15 +46,15 @@ export default function RegisterPage() {
   return (
     <main className="app-enter">
       <Navbar />
-      <section className="section">
-        <div className="container" style={{ maxWidth: 560 }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+      <section className="section form-screen">
+        <div className="container form-container">
+          <div className="form-logo-wrap">
             <Logo size={96} animated />
           </div>
-          <h1 className="section-title" style={{ textAlign: "center" }}>
+          <h1 className="section-title form-title-center">
             Crear cuenta
           </h1>
-          <form className="card" onSubmit={handleRegister}>
+          <form className="card form-stack" onSubmit={handleRegister}>
             <label>
               Nickname único
               <input className="input" value={nickname} onChange={(e) => setNickname(e.target.value)} required />
@@ -77,18 +77,20 @@ export default function RegisterPage() {
               Fecha de nacimiento
               <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} required />
             </label>
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label className="check-row">
               <input type="checkbox" checked={confirm21} onChange={(e) => setConfirm21(e.target.checked)} />
               Certifico que tengo 21 años o más
             </label>
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label className="check-row">
               <input type="checkbox" checked={legalAck} onChange={(e) => setLegalAck(e.target.checked)} />
               Acepto términos de contenido adulto y lenguaje fuerte
             </label>
-            <button className="button" type="submit">
-              Crear cuenta
-            </button>
-            {status ? <p className="muted">{status}</p> : null}
+            {status ? <p className="muted" style={{ margin: 0 }}>{status}</p> : null}
+            <div className="form-submit-bar">
+              <button className="button form-submit" type="submit">
+                Crear cuenta
+              </button>
+            </div>
           </form>
         </div>
       </section>

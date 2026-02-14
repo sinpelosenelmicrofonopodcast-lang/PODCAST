@@ -136,7 +136,7 @@ export default function AdminBlogPage() {
     <main>
       <h1 className="section-title">Blog (Admin)</h1>
       <p className="muted">Publica artículos largos y análisis.</p>
-      <form className="card" style={{ marginTop: 20 }} onSubmit={handleSubmit}>
+      <form className="card form-stack" style={{ marginTop: 20 }} onSubmit={handleSubmit}>
         <label>
           Título
           <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required />
@@ -165,7 +165,7 @@ export default function AdminBlogPage() {
             }}
           />
         </label>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div className="form-submit-bar">
           <button className="button" type="submit" disabled={loading || uploading}>
             {loading ? "Guardando..." : uploading ? "Subiendo portada..." : editingId ? "Actualizar" : "Publicar"}
           </button>
@@ -174,8 +174,8 @@ export default function AdminBlogPage() {
               Cancelar edición
             </button>
           ) : null}
-          {status ? <p className="muted">{status}</p> : null}
         </div>
+        {status ? <p className="muted" style={{ margin: 0 }}>{status}</p> : null}
       </form>
 
       <div className="card" style={{ marginTop: 24 }}>
@@ -188,7 +188,7 @@ export default function AdminBlogPage() {
                 <span className="muted" style={{ fontSize: 12 }}>
                   {item.created_at ? new Date(item.created_at).toLocaleDateString("es-PR") : ""}
                 </span>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <div className="admin-item-actions">
                   <button className="button secondary" type="button" onClick={() => handleEdit(item)}>
                     Editar
                   </button>
