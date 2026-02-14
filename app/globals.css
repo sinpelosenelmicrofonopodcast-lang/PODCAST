@@ -278,6 +278,46 @@ main {
   margin-bottom: 6px;
 }
 
+.lang-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.lang-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lang-toggle button.active {
+  background: linear-gradient(120deg, #ff2a2a, #ff7a18, #ffd23b);
+  color: #0b0b0f;
+}
+
+.lang-toggle button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Hide default Google Translate UI; we control language via custom toggle. */
+.skiptranslate,
+.goog-te-banner-frame,
+#goog-gt-tt,
+.goog-te-balloon-frame {
+  display: none !important;
+}
+
+body {
+  top: 0 !important;
+}
+
 .sidebar a.active,
 .sidebar a:hover {
   color: var(--text);
@@ -437,4 +477,185 @@ main {
     height: auto;
     position: relative;
   }
+}
+
+.home-v2 {
+  background: radial-gradient(circle at 82% 12%, rgba(255, 58, 58, 0.16), transparent 36%),
+    radial-gradient(circle at 18% 0%, rgba(255, 204, 51, 0.12), transparent 28%),
+    var(--bg);
+}
+
+.home-hero {
+  padding-top: 70px;
+}
+
+.home-hero-top {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 20px;
+  align-items: center;
+}
+
+.home-cta-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.home-grid-wrap {
+  padding-top: 20px;
+}
+
+.home-grid-2x2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.home-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.home-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.cover-wide {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.cover-news {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.metrics-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.shorts-strip {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.short-card {
+  min-width: 240px;
+  max-width: 240px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.short-thumb {
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  background: #101016;
+}
+
+.short-meta {
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.short-meta strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ad-zone-wrap {
+  padding-top: 20px;
+}
+
+.home-grid-ads {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr;
+  gap: 22px;
+}
+
+.ad-slot {
+  border-style: dashed;
+  border-color: rgba(255, 204, 51, 0.35);
+  background:
+    linear-gradient(180deg, rgba(255, 122, 24, 0.08), rgba(255, 59, 59, 0.04)),
+    var(--panel);
+}
+
+.hero-ad {
+  min-height: 180px;
+}
+
+@media (max-width: 1024px) {
+  .home-grid-2x2,
+  .home-grid-3,
+  .home-grid-ads {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .home-hero-top {
+    grid-template-columns: 1fr;
+  }
+
+  .home-section-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.guest-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.66);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.guest-popup-card {
+  width: min(560px, 96vw);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 122, 24, 0.35);
+  background: linear-gradient(180deg, rgba(255, 122, 24, 0.1), rgba(255, 59, 59, 0.06)), var(--panel);
+  box-shadow: var(--shadow);
+  padding: 22px;
+  display: grid;
+  gap: 12px;
+}
+
+.guest-popup-card h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 38px;
+  line-height: 0.95;
+}
+
+.guest-popup-card p {
+  margin: 0;
 }

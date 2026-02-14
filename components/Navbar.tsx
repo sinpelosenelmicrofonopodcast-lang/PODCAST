@@ -4,15 +4,29 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { navTexts } from "@/lib/i18n";
+import { APP_LANG_EVENT, readStoredLang, type AppLang } from "@/lib/language";
 import { supabase } from "@/lib/supabaseClient";
 
 export function Navbar() {
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [lang, setLang] = useState<AppLang>("es");
 
   useEffect(() => {
     let mounted = true;
+    const initialLang = readStoredLang();
+    if (initialLang) setLang(initialLang);
+
+    const onLangChange = (event: Event) => {
+      const custom = event as CustomEvent<{ lang?: AppLang }>;
+      const nextLang = custom.detail?.lang;
+      if (nextLang) setLang(nextLang);
+    };
+    window.addEventListener(APP_LANG_EVENT, onLangChange);
+
     const loadProfile = async () => {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
@@ -41,8 +55,11 @@ export function Navbar() {
     return () => {
       mounted = false;
       authListener?.subscription.unsubscribe();
+      window.removeEventListener(APP_LANG_EVENT, onLangChange);
     };
   }, []);
+
+  const t = navTexts[lang];
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -61,17 +78,19 @@ export function Navbar() {
           </div>
         </Link>
         <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <Link href="/feed">Feed</Link>
-          <Link href="/community">Comunidad</Link>
-          <Link href="/foro">Foro</Link>
-          <Link href="/noticias">Noticias</Link>
-          <Link href="/blog">Blog</Link>
-          <Link href="/zona-cruda">Zona Cruda</Link>
-          {isAdmin ? <Link href="/admin">Dashboard</Link> : null}
+          <Link href="/feed">{t.feed}</Link>
+          <Link href="/community">{t.community}</Link>
+          <Link href="/foro">{t.forum}</Link>
+          <Link href="/noticias">{t.news}</Link>
+          <Link href="/blog">{t.blog}</Link>
+          <Link href="/quiero-salir">{t.guest}</Link>
+          <Link href="/zona-cruda">{t.rawZone}</Link>
+          <LanguageToggle />
+          {isAdmin ? <Link href="/admin">{t.dashboard}</Link> : null}
           {nickname ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <Link href="/perfil" className="muted">
-                Mi perfil
+                {t.profile}
               </Link>
               <div
                 style={{
@@ -84,18 +103,18 @@ export function Navbar() {
               >
                 <Image src={avatarUrl ?? "/logo.png"} alt={nickname} width={28} height={28} style={{ objectFit: "cover" }} />
               </div>
-              <span className="muted">Hola, {nickname}</span>
+              <span className="muted">{t.hello}, {nickname}</span>
               <button className="button secondary" type="button" onClick={handleSignOut}>
-                Salir
+                {t.logout}
               </button>
             </div>
           ) : (
             <>
               <Link className="button secondary" href="/login">
-                Ingresar
+                {t.login}
               </Link>
               <Link className="button" href="/register">
-                Unirme
+                {t.join}
               </Link>
             </>
           )}
