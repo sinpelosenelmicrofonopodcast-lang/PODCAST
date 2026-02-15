@@ -68,34 +68,38 @@ export function TopBannerPromo() {
   const title = promo?.title ?? "";
   const imageUrl = promo?.image_url ?? null;
 
+  const Root: any = clickable ? "a" : "div";
+  const rootProps = clickable
+    ? {
+        href: promo?.cta_url ?? "#",
+        target: "_blank",
+        rel: "noreferrer",
+        onClick
+      }
+    : {};
+
   return (
     <div className="promo-top-slot" role="complementary" aria-label="Promoción" data-type={promo?.promo_type ?? "sponsor"}>
       {promo ? (
-        <div className="promo-top-inner">
-          <div className="promo-top-one">
-            <div className="promo-top-media" aria-hidden="true">
-              <img
-                src={imageUrl || "/logo.png"}
-                alt=""
-                width={38}
-                height={38}
-                loading="lazy"
-                decoding="async"
-              />
-            </div>
-            <span className="promo-top-label">
-              {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "RECOMENDADO" : "SPONSOR"}
-            </span>
-            <span className="promo-top-title clamp-2">{title}</span>
+        <Root className="promo-top-inner promo-top-banner" aria-label={title || "Promoción"} {...rootProps}>
+          <div className="promo-top-bg" aria-hidden="true">
+            <img src={imageUrl || "/logo.png"} alt="" loading="lazy" decoding="async" />
+            <div className="promo-top-bg-overlay" aria-hidden="true" />
           </div>
-          {clickable ? (
-            <a className="button promo-top-cta" href={promo.cta_url ?? "#"} target="_blank" rel="noreferrer" onClick={onClick}>
-              {ctaLabel}
-            </a>
-          ) : (
-            <span className="muted" style={{ fontSize: 12 }}>—</span>
-          )}
-        </div>
+
+          <div className="promo-top-content">
+            <div className="promo-top-one">
+              <span className="promo-top-label">
+                {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "RECOMENDADO" : "SPONSOR"}
+              </span>
+              <span className="promo-top-title clamp-2">{title}</span>
+            </div>
+          </div>
+
+          <div className="promo-top-right">
+            <span className="promo-top-cta">{ctaLabel}</span>
+          </div>
+        </Root>
       ) : null}
     </div>
   );
