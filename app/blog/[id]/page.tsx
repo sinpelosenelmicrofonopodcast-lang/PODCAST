@@ -126,9 +126,21 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
       : estimateReadingTimeMinutes(`${data.title}\n\n${data.body ?? ""}`);
 
   const { blocks, toc } = parseBlogBlocks(String(data.body ?? ""));
-  const paragraphBlocks = blocks.filter((b) => b.type === "p") as any[];
-  const hook = paragraphBlocks.slice(0, 3).map((b) => String(b.text));
-  const trio = paragraphBlocks.slice(3, 6).map((b) => String(b.text));
+  // Avoid repeating the same intro paragraphs:
+  // - First 3 paragraphs are rendered inside the Hook callout
+  // - Next 3 paragraphs are used for the "Problema claro" trio
+  // Those paragraphs should NOT render again in the main reading flow.
+  const paragraphIdxs: number[] = [];
+  blocks.forEach((b, idx) => {
+    if (b.type === "p") paragraphIdxs.push(idx);
+  });
+  const hookIdxs = paragraphIdxs.slice(0, 3);
+  const trioIdxs = paragraphIdxs.slice(3, 6);
+  const skipIdxs = new Set<number>([...hookIdxs, ...trioIdxs]);
+
+  const hook = hookIdxs.map((idx) => String((blocks[idx] as any)?.text ?? "")).filter(Boolean);
+  const trio = trioIdxs.map((idx) => String((blocks[idx] as any)?.text ?? "")).filter(Boolean);
+  const readingBlocks = blocks.filter((_, idx) => !skipIdxs.has(idx));
 
   const what = trio[0] ?? "Qué está pasando: contexto directo, sin adornos.";
   const why = trio[1] ?? "Por qué importa: impacto real, no teorías.";
@@ -186,8 +198,19 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
     return <p key={`p-${idx}`}>{b.text}</p>;
   };
 
-  // Insert mid-content promo after a few blocks in the main reading flow.
-  const insertAfter = Math.min(6, Math.max(2, blocks.filter((b) => b.type === "p").length >= 3 ? 4 : 2));
+  // Insert mid-content promo after 2nd or 3rd paragraph in the reading flow (not counting Hook/Trio).
+  const readingParagraphIdxs: number[] = [];
+  readingBlocks.forEach((b, idx) => {
+    if (b.type === "p") readingParagraphIdxs.push(idx);
+  });
+  const insertAfter =
+    readingParagraphIdxs.length >= 3
+      ? readingParagraphIdxs[2] // after 3rd paragraph
+      : readingParagraphIdxs.length >= 2
+        ? readingParagraphIdxs[1] // after 2nd paragraph
+        : readingParagraphIdxs.length >= 1
+          ? readingParagraphIdxs[0] // after 1st paragraph (fallback)
+          : -1;
 
   return (
     <main className="blog-mag blog-mag-post">
@@ -248,10 +271,10 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
               <ProblemTrio what={what} why={why} who={who} />
 
               <div className="mag-reading">
-                {blocks.map((b, idx) => (
+                {readingBlocks.map((b, idx) => (
                   <div key={`${b.type}-${idx}`}>
                     {renderBlock(b, idx)}
-                    {idx === insertAfter ? <MidContentAdSlot /> : null}
+                    {insertAfter >= 0 && idx === insertAfter ? <MidContentAdSlot /> : null}
                   </div>
                 ))}
               </div>
