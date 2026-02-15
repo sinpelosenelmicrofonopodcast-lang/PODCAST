@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { PageViewTracker } from "@/components/PageViewTracker";
 import { PromotionsToast } from "@/components/PromotionsToast";
+import { Toaster } from "@/components/Toaster";
 
 export const metadata: Metadata = {
   title: "Sin Pelos en el Micrófono",
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
         <PageViewTracker />
         <PromotionsToast />
+        <Toaster />
         {children}
       </body>
     </html>

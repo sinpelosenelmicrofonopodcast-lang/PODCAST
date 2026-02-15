@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { toast } from "@/lib/toast";
 
 export function AdminDeleteButton({ table, id, label = "Eliminar" }: { table: string; id: string; label?: string }) {
   const [loading, setLoading] = useState(false);
@@ -24,7 +25,9 @@ export function AdminDeleteButton({ table, id, label = "Eliminar" }: { table: st
     if (error) {
       console.error("Delete error:", error);
       setError(error.message);
+      toast.error(error.message);
     } else {
+      toast.success("Eliminado.");
       router.refresh();
     }
     setLoading(false);

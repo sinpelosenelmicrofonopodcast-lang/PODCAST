@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
 import { newsCategories } from "@/lib/newsCategories";
+import { toast } from "@/lib/toast";
 
 type NewsItem = {
   id: string;
@@ -30,6 +31,7 @@ export default function AdminNewsPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingPublishedAt, setEditingPublishedAt] = useState<string | null>(null);
   const [items, setItems] = useState<NewsItem[]>([]);
   const [postToFacebook, setPostToFacebook] = useState(true);
   const router = useRouter();
@@ -55,6 +57,7 @@ export default function AdminNewsPage() {
     setCategories([newsCategories[0]]);
     setTags("");
     setEditingId(null);
+    setEditingPublishedAt(null);
     setPostToFacebook(true);
   };
 
@@ -79,6 +82,7 @@ export default function AdminNewsPage() {
 
     if (uploadError) {
       setStatus(uploadError.message);
+      toast.error(uploadError.message);
       setUploading(false);
       return;
     }
@@ -87,6 +91,7 @@ export default function AdminNewsPage() {
     if (data?.publicUrl) {
       setCoverUrl(data.publicUrl);
       setStatus("Portada subida.");
+      toast.success("Portada subida.");
     }
     setUploading(false);
   };
@@ -127,32 +132,45 @@ export default function AdminNewsPage() {
       cover_url: coverUrl,
       categories,
       tags: tagList,
-      author_id: userId,
-      published_at: new Date().toISOString()
+      updated_at: new Date().toISOString()
     };
 
     if (editingId) {
-      const { error } = await supabase.from("news_items").update(payload).eq("id", editingId);
+      const updatePayload: any = { ...payload };
+      // Keep original publish time on edit so sorting/feeds remain stable.
+      if (editingPublishedAt) updatePayload.published_at = editingPublishedAt;
+
+      const { error } = await supabase.from("news_items").update(updatePayload).eq("id", editingId);
       if (error) {
         setStatus(error.message);
+        toast.error(error.message);
         setLoading(false);
         return;
       }
       setStatus("Noticia actualizada.");
+      toast.success("Noticia actualizada.");
     } else {
-      const { data: inserted, error } = await supabase.from("news_items").insert(payload).select("id").single();
+      const createPayload = {
+        ...payload,
+        author_id: userId,
+        published_at: new Date().toISOString()
+      };
+      const { data: inserted, error } = await supabase.from("news_items").insert(createPayload).select("id").single();
       if (error || !inserted?.id) {
         setStatus(error?.message ?? "No se pudo publicar la noticia.");
+        toast.error(error?.message ?? "No se pudo publicar la noticia.");
         setLoading(false);
         return;
       }
       setStatus("Noticia publicada.");
+      toast.success("Noticia publicada.");
 
       if (postToFacebook) {
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData.session?.access_token;
         if (!token) {
           setStatus("Noticia publicada, pero no se pudo postear a Facebook (sesión inválida).");
+          toast.error("No se pudo postear a Facebook (sesión inválida).");
         } else {
           const res = await fetch("/api/social/meta/facebook/post-news", {
             method: "POST",
@@ -169,8 +187,10 @@ export default function AdminNewsPage() {
           const json = await res.json().catch(() => ({}));
           if (!res.ok) {
             setStatus(`Noticia publicada, pero Facebook falló: ${json?.error ?? "error"}`);
+            toast.error(`Facebook falló: ${json?.error ?? "error"}`);
           } else {
             setStatus("Noticia publicada y posteada en Facebook.");
+            toast.success("Posteada en Facebook.");
           }
         }
       }
@@ -184,6 +204,7 @@ export default function AdminNewsPage() {
 
   const handleEdit = (item: NewsItem) => {
     setEditingId(item.id);
+    setEditingPublishedAt(item.published_at ?? null);
     setTitle(item.title ?? "");
     setSummary(item.summary ?? "");
     setAnalysis(item.analysis ?? "");
