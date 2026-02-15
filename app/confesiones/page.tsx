@@ -13,6 +13,7 @@ const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
 
 export default async function ConfesionesPage() {
   const supabase = supabaseServer();
+  const bannerUrl = (process.env.NEXT_PUBLIC_CONFESIONARIO_BANNER_URL ?? "").trim();
   const { data } = await supabase
     .from("confessions")
     .select("id, body, created_at, users(nickname, avatar_url)")
@@ -42,7 +43,17 @@ export default async function ConfesionesPage() {
       <section className="section">
         <div className="container">
           <div className="confesionario-hero card">
-            <div className="confesionario-banner" aria-hidden="true" />
+            <div
+              className="confesionario-banner"
+              aria-hidden="true"
+              style={
+                bannerUrl
+                  ? ({
+                      ["--confesionario-banner-layer" as any]: `url("${bannerUrl}")`
+                    } as any)
+                  : undefined
+              }
+            />
             <div className="confesionario-overlay">
               <span className="badge">Sección exclusiva</span>
               <h1 className="section-title" style={{ margin: 0 }}>

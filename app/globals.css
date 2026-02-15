@@ -1499,7 +1499,7 @@ body {
   display: block;
   filter: saturate(1.05) contrast(1.05);
   background-image:
-    url("/confesionario-banner.png"),
+    var(--confesionario-banner-layer, url("/confesionario-banner.png")),
     radial-gradient(circle at 30% 10%, rgba(255, 210, 59, 0.14), transparent 55%),
     radial-gradient(circle at 70% 40%, rgba(255, 42, 42, 0.12), transparent 58%),
     linear-gradient(120deg, rgba(255, 122, 24, 0.14), rgba(8, 8, 10, 0.9));
