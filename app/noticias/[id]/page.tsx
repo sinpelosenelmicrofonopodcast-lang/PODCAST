@@ -9,6 +9,7 @@ import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
 

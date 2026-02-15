@@ -126,13 +126,12 @@ export default function AdminNewsPage() {
 
     const payload = {
       title,
-      summary,
-      analysis,
-      source_url: sourceUrl,
-      cover_url: coverUrl,
-      categories,
+      summary: summary ? summary : null,
+      analysis: analysis ? analysis : null,
+      source_url: sourceUrl ? sourceUrl : null,
+      cover_url: coverUrl ? coverUrl : null,
+      categories: categories && categories.length > 0 ? categories : [newsCategories[0]],
       tags: tagList,
-      updated_at: new Date().toISOString()
     };
 
     if (editingId) {

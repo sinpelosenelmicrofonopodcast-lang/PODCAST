@@ -9,6 +9,7 @@ import { getServerLang } from "@/lib/i18nServer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export default async function NoticiasPage({ searchParams }: { searchParams: { cat?: string; sort?: string } }) {
   const supabase = supabaseServer();
