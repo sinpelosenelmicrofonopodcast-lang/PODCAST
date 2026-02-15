@@ -153,6 +153,16 @@ export default function AdminPromotionsPage() {
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setStatus(null);
+
+    // Requirement: promos must include an image (logo/banner) depending on placement.
+    // Internal promos can fall back to /logo.png, but sponsors/affiliates must provide an image.
+    if (promoType !== "internal" && !imageUrl) {
+      const msg = "Esta promoción requiere imagen (logo/banner). Sube una imagen o pega un URL.";
+      toast.error(msg);
+      setStatus(msg);
+      return;
+    }
+
     const payload = {
       title,
       description: description || null,
@@ -222,6 +232,15 @@ export default function AdminPromotionsPage() {
           Imagen (URL) (opcional)
           <input className="input" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
         </label>
+        {promoType !== "internal" ? (
+          <p className="muted" style={{ margin: "-6px 0 0", fontSize: 12 }}>
+            Sponsor/Affiliate: la imagen es obligatoria (logo o banner).
+          </p>
+        ) : (
+          <p className="muted" style={{ margin: "-6px 0 0", fontSize: 12 }}>
+            Internal: si no subes imagen, se usa el logo del sitio.
+          </p>
+        )}
         <label>
           Subir imagen
           <input
@@ -301,10 +320,24 @@ export default function AdminPromotionsPage() {
         <div className="list" style={{ marginTop: 12 }}>
           {items.map((item) => (
             <div key={item.id} className="card" style={{ display: "grid", gap: 10 }}>
-              <strong>{item.title}</strong>
-              <span className="muted" style={{ fontSize: 12 }}>
-                {item.placement} · order {item.display_order} · {item.is_active ? "activa" : "inactiva"}
-              </span>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <img
+                  src={item.image_url ?? "/logo.png"}
+                  alt=""
+                  width={44}
+                  height={44}
+                  style={{ borderRadius: 12, objectFit: "cover", border: "1px solid rgba(255,255,255,0.12)" }}
+                  loading="lazy"
+                  decoding="async"
+                />
+                <div style={{ display: "grid", gap: 2 }}>
+                  <strong>{item.title}</strong>
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    {(item.promo_type ?? "sponsor").toUpperCase()} · {item.placement} · order {item.display_order} ·{" "}
+                    {item.is_active ? "activa" : "inactiva"}
+                  </span>
+                </div>
+              </div>
               <div className="admin-item-actions">
                 <button className="button secondary" type="button" onClick={() => edit(item)}>
                   Editar
