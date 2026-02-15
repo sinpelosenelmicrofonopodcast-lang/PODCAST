@@ -4,6 +4,7 @@ import { AuthWall } from "@/components/AuthWall";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { YouTubeInlinePlayer } from "@/components/YouTubeInlinePlayer";
 import { getYouTubeVideoId, isShorts } from "@/lib/youtube";
+import { PODCAST_RSS_URL } from "@/lib/podcastRss";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -58,6 +59,9 @@ export default async function PodcastPage() {
         <div className="container">
           <div className="home-section-head">
             <h1 className="section-title" style={{ marginTop: 0 }}>Podcast</h1>
+            <a className="button secondary" href={PODCAST_RSS_URL} target="_blank" rel="noreferrer">
+              RSS (Audio)
+            </a>
           </div>
 
           <article className="card home-lead-card" style={{ marginTop: 12 }}>
@@ -131,4 +135,3 @@ export default async function PodcastPage() {
     </main>
   );
 }
-
