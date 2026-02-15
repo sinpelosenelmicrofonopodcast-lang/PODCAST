@@ -205,9 +205,9 @@ export function Navbar() {
                   <Link className="nav-menu-link" role="menuitem" href="/eventos" onClick={() => setMenuOpen(false)}>
                     {t.events}
                   </Link>
-                  <a className="nav-menu-link" role="menuitem" href="/rss" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}>
+                  <Link className="nav-menu-link" role="menuitem" href="/rss" onClick={() => setMenuOpen(false)}>
                     RSS (Audio)
-                  </a>
+                  </Link>
                   <Link className="nav-menu-link" role="menuitem" href="/publicidad" onClick={() => setMenuOpen(false)}>
                     {t.ads}
                   </Link>
