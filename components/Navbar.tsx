@@ -87,6 +87,7 @@ export function Navbar() {
           <Link className="nav-link" href="/foro">{t.forum}</Link>
           <Link className="nav-link" href="/noticias">{t.news}</Link>
           <Link className="nav-link" href="/blog">{t.blog}</Link>
+          <Link className="nav-link" href="/confesionario">{t.confessional}</Link>
           <Link className="nav-link" href="/publicidad">{t.ads}</Link>
           <Link className="nav-link" href="/quiero-salir">{t.guest}</Link>
           <Link className="nav-link" href="/zona-cruda">{t.rawZone}</Link>

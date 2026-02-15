@@ -8,6 +8,7 @@ export const navTexts: Record<
     forum: string;
     news: string;
     blog: string;
+    confessional: string;
     ads: string;
     guest: string;
     rawZone: string;
@@ -25,6 +26,7 @@ export const navTexts: Record<
     forum: "Foro",
     news: "Noticias",
     blog: "Blog",
+    confessional: "Confesionario",
     ads: "Publicidad",
     guest: "Quiero salir",
     rawZone: "Zona Cruda",
@@ -41,6 +43,7 @@ export const navTexts: Record<
     forum: "Forum",
     news: "News",
     blog: "Blog",
+    confessional: "Confessional",
     ads: "Advertise",
     guest: "Be a guest",
     rawZone: "Raw Zone",
