@@ -79,7 +79,8 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
               const text = String(data.body ?? "").trim();
               if (!text) return <div className="post-body" style={{ whiteSpace: "pre-wrap", lineHeight: 1.65 }} />;
               const parts = text.split(/\n{2,}/g).map((p) => p.trim()).filter(Boolean);
-              const insertAfter = parts.length >= 3 ? 2 : 1;
+              // Insert after 2nd/3rd paragraph when possible; still show even for very short articles.
+              const insertAfter = parts.length >= 3 ? 2 : parts.length === 2 ? 1 : 0;
               return (
                 <div className="post-body article-body">
                   {parts.map((p, idx) => (

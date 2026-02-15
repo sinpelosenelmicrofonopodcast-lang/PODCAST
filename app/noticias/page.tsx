@@ -6,6 +6,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { newsCategories } from "@/lib/newsCategories";
 import { ui } from "@/lib/i18n";
 import { getServerLang } from "@/lib/i18nServer";
+import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -83,11 +84,10 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
 
           {items && items.length > 0 ? (
             <div style={{ display: "grid", gap: 14, marginTop: 20 }}>
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className={item.cover_url ? "card news-item-card" : "card"}
-                >
+              {items.map((item, idx) => (
+                <div key={item.id} style={{ display: "contents" }}>
+                  {idx === 3 ? <MidContentAdSlot /> : null}
+                  <div className={item.cover_url ? "card news-item-card" : "card"}>
                   {item.cover_url ? (
                     <Link href={`/noticias/${item.id}`}>
                       <div className="news-cover-thumb">
@@ -124,6 +124,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                       </Link>
                       <ShareButtons path={`/noticias/${item.id}`} text={item.title} />
                     </div>
+                  </div>
                   </div>
                 </div>
               ))}

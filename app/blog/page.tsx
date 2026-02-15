@@ -5,6 +5,7 @@ import { ShareButtons } from "@/components/ShareButtons";
 import Link from "next/link";
 import { ui } from "@/lib/i18n";
 import { getServerLang } from "@/lib/i18nServer";
+import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -28,8 +29,10 @@ export default async function BlogPage() {
           <p className="muted">{t.blog.subtitle}</p>
           {data && data.length > 0 ? (
             <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", marginTop: 20 }}>
-              {data.map((post) => (
-                <div key={post.id} className="card" style={{ display: "grid", gap: 12 }}>
+              {data.map((post, idx) => (
+                <div key={post.id} style={{ display: "contents" }}>
+                  {idx === 3 ? <MidContentAdSlot /> : null}
+                  <div className="card" style={{ display: "grid", gap: 12 }}>
                   {post.cover_url ? (
                     <img
                       src={post.cover_url}
@@ -52,6 +55,7 @@ export default async function BlogPage() {
                     </Link>
                     <ShareButtons path={`/blog/${post.id}`} text={post.title} />
                   </div>
+                </div>
                 </div>
               ))}
             </div>

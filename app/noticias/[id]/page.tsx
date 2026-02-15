@@ -92,7 +92,8 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                 const text = String(item.analysis ?? "").trim();
                 if (!text) return null;
                 const parts = text.split(/\n{2,}/g).map((p) => p.trim()).filter(Boolean);
-                const insertAfter = parts.length >= 3 ? 2 : 1;
+                // Insert after 2nd/3rd paragraph when possible; still show even for very short articles.
+                const insertAfter = parts.length >= 3 ? 2 : parts.length === 2 ? 1 : 0;
                 return (
                   <div className="article-body">
                     {parts.map((p, idx) => (

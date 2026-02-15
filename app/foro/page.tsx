@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { ForoComposer } from "@/components/ForoComposer";
 import { ReplyComposer } from "@/components/ReplyComposer";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
+import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -41,10 +42,12 @@ export default async function ForoPage() {
           <ForoComposer categories={list} />
           {threads && threads.length > 0 ? (
             <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginTop: 20 }}>
-              {threads.map((thread) => {
+              {threads.map((thread, idx) => {
                 const user = pickUser(thread.users);
                 return (
-                  <div key={thread.id} className="card" style={{ display: "grid", gap: 12 }}>
+                  <div key={thread.id} style={{ display: "contents" }}>
+                    {idx === 2 ? <MidContentAdSlot /> : null}
+                    <div className="card" style={{ display: "grid", gap: 12 }}>
                     <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                       <img
                         src={user?.avatar_url ?? "/logo.png"}
@@ -93,6 +96,7 @@ export default async function ForoPage() {
                       ) : null}
                       <ReplyComposer threadId={thread.id} />
                     </div>
+                  </div>
                   </div>
                 );
               })}
