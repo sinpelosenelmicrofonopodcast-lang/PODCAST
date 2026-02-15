@@ -138,6 +138,7 @@ export default function AdminPromotionsPage() {
               <option value="home">Home</option>
               <option value="home_hero">Home Hero</option>
               <option value="home_mid">Home Mid</option>
+              <option value="toast">Popup (abajo)</option>
             </select>
           </label>
           <label>
@@ -195,4 +196,3 @@ export default function AdminPromotionsPage() {
     </main>
   );
 }
-
