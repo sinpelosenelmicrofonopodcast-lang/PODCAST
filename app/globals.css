@@ -261,6 +261,55 @@ main {
   text-transform: uppercase;
 }
 
+.news-cover-thumb {
+  width: 160px;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #0b0b0c;
+}
+
+.news-cover-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.news-cover-full {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #0b0b0f;
+  max-height: 520px;
+  display: grid;
+  place-items: center;
+}
+
+.news-cover-full img {
+  width: 100%;
+  height: 100%;
+  max-height: 520px;
+  object-fit: contain;
+  display: block;
+}
+
+.news-title-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.news-summary-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .share {
   display: inline-flex;
   gap: 6px;
@@ -637,6 +686,87 @@ body {
     var(--panel);
 }
 
+.ad-banner {
+  display: grid;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+  transform: translateZ(0);
+}
+
+.ad-banner[aria-disabled="true"] {
+  cursor: default;
+}
+
+.ad-banner-media {
+  height: 160px;
+  border-radius: 14px;
+  background-size: cover;
+  background-position: center;
+  filter: saturate(1.1) contrast(1.05);
+  position: relative;
+  overflow: hidden;
+  animation: adFloatIn 520ms ease-out both;
+}
+
+.ad-banner-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.11) 40%, rgba(255, 255, 255, 0) 72%);
+  transform: translateX(-120%);
+  animation: adShimmer 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.ad-banner-fallback {
+  background: radial-gradient(120% 100% at 10% 0%, rgba(255, 62, 32, 0.55), rgba(16, 16, 20, 0.9));
+}
+
+.ad-banner-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 80% at 10% 0%, rgba(255, 62, 32, 0.18), rgba(0, 0, 0, 0));
+  pointer-events: none;
+}
+
+.ad-banner-body {
+  position: relative;
+  display: grid;
+  gap: 6px;
+}
+
+.ad-banner-cta {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  background: linear-gradient(90deg, rgba(255, 62, 32, 0.95), rgba(255, 176, 0, 0.92));
+  color: #0b0b0c;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+
+.ad-banner:hover .ad-banner-media {
+  transform: scale(1.02);
+  transition: transform 180ms ease-out;
+}
+
+@keyframes adShimmer {
+  0% { transform: translateX(-120%); opacity: 0.5; }
+  40% { opacity: 1; }
+  100% { transform: translateX(120%); opacity: 0.5; }
+}
+
+@keyframes adFloatIn {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
 .hero-ad {
   min-height: 180px;
 }
@@ -825,6 +955,41 @@ body {
   width: min(520px, 94vw);
   display: grid;
   gap: 12px;
+}
+
+.confesionario-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  min-height: 260px;
+  border: 1px solid rgba(255, 122, 24, 0.35);
+}
+
+.confesionario-banner {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  min-height: 260px;
+  display: block;
+  filter: saturate(1.05) contrast(1.05);
+}
+
+.confesionario-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: end;
+  gap: 8px;
+  padding: 18px;
+  background: linear-gradient(to top, rgba(8, 8, 10, 0.88), rgba(8, 8, 10, 0.28) 56%, rgba(8, 8, 10, 0.08));
+}
+
+.feed-page .feed-card {
+  min-height: 340px;
+}
+
+.feed-full-grid {
+  align-items: start;
 }
 
 @media (max-width: 720px) {

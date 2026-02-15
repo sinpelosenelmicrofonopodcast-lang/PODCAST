@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { AuthWall } from "@/components/AuthWall";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { CommentComposer } from "@/components/CommentComposer";
 import { ShareButtons } from "@/components/ShareButtons";
@@ -61,7 +60,6 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
 
   return (
     <main>
-      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">
@@ -71,20 +69,8 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
           {item ? (
             <div className="card" style={{ marginTop: 16, display: "grid", gap: 16 }}>
               {item.cover_url ? (
-                <div
-                  style={{
-                    width: "100%",
-                    borderRadius: 12,
-                    overflow: "hidden",
-                    aspectRatio: "16 / 9",
-                    background: "#0b0b0f"
-                  }}
-                >
-                  <img
-                    src={item.cover_url}
-                    alt={item.title}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
+                <div className="news-cover-full">
+                  <img src={item.cover_url} alt={item.title} />
                 </div>
               ) : null}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { AuthWall } from "@/components/AuthWall";
-import { AdminDeleteButton } from "@/components/AdminDeleteButton";
 import { ShareButtons } from "@/components/ShareButtons";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { newsCategories } from "@/lib/newsCategories";
@@ -52,7 +50,6 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
 
   return (
     <main>
-      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">
@@ -87,23 +84,16 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                   className="card"
                   style={{
                     display: "grid",
-                    gridTemplateColumns: item.cover_url ? "96px 1fr" : "1fr",
+                    gridTemplateColumns: item.cover_url ? "160px 1fr" : "1fr",
                     gap: 14,
                     alignItems: "center"
                   }}
                 >
                   {item.cover_url ? (
                     <Link href={`/noticias/${item.id}`}>
-                      <img
-                        src={item.cover_url}
-                        alt={item.title}
-                        style={{
-                          width: 96,
-                          height: 96,
-                          borderRadius: 12,
-                          objectFit: "cover"
-                        }}
-                      />
+                      <div className="news-cover-thumb">
+                        <img src={item.cover_url} alt={item.title} />
+                      </div>
                     </Link>
                   ) : null}
                   <div style={{ display: "grid", gap: 8 }}>
@@ -119,16 +109,21 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                         </span>
                       </div>
                       <Link href={`/noticias/${item.id}`}>
-                        <h3 style={{ margin: "6px 0 0" }}>{item.title}</h3>
+                        <h3 className="news-title-clamp" style={{ margin: "6px 0 0" }}>
+                          {item.title}
+                        </h3>
                       </Link>
                     </div>
-                    {item.summary ? <p className="muted" style={{ margin: 0 }}>{item.summary}</p> : null}
+                    {item.summary ? (
+                      <p className="muted news-summary-clamp" style={{ margin: 0 }}>
+                        {item.summary}
+                      </p>
+                    ) : null}
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                       <Link className="button secondary" href={`/noticias/${item.id}`}>
                         Leer
                       </Link>
                       <ShareButtons path={`/noticias/${item.id}`} text={item.title} />
-                      <AdminDeleteButton table="news_items" id={item.id} label="Eliminar" />
                     </div>
                   </div>
                 </div>
