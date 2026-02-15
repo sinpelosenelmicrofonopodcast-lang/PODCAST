@@ -19,6 +19,8 @@ type NewsItem = {
   published_at: string | null;
 };
 
+type NewsItemFull = NewsItem;
+
 export default function AdminNewsPage() {
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
@@ -139,15 +141,26 @@ export default function AdminNewsPage() {
       // Keep original publish time on edit so sorting/feeds remain stable.
       if (editingPublishedAt) updatePayload.published_at = editingPublishedAt;
 
-      const { error } = await supabase.from("news_items").update(updatePayload).eq("id", editingId);
-      if (error) {
-        setStatus(error.message);
-        toast.error(error.message);
+      const { data: updated, error } = await supabase
+        .from("news_items")
+        .update(updatePayload)
+        .eq("id", editingId)
+        .select("id, title, summary, analysis, source_url, cover_url, categories, tags, published_at")
+        .single();
+
+      if (error || !updated) {
+        const msg = error?.message ?? "No se pudo actualizar (sin respuesta).";
+        setStatus(msg);
+        toast.error(msg);
         setLoading(false);
         return;
       }
-      setStatus("Noticia actualizada.");
-      toast.success("Noticia actualizada.");
+
+      // Update local list immediately so it's obvious whether it truly changed.
+      setItems((prev) => prev.map((it) => (it.id === updated.id ? (updated as NewsItemFull) : it)));
+
+      setStatus("Noticia actualizada (verificada).");
+      toast.success("Noticia actualizada (verificada).");
     } else {
       const createPayload = {
         ...payload,
@@ -298,6 +311,9 @@ export default function AdminNewsPage() {
                   <button className="button secondary" type="button" onClick={() => handleEdit(item)}>
                     Editar
                   </button>
+                  <a className="button secondary" href={`/noticias/${item.id}`} target="_blank" rel="noreferrer">
+                    Ver pública
+                  </a>
                   <AdminDeleteButton table="news_items" id={item.id} label="Eliminar" />
                 </div>
               </div>
