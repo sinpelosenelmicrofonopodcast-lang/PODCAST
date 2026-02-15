@@ -39,23 +39,47 @@ export function Navbar() {
       if (mounted) setAdminCheckError(null);
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
-      if (!userId) return;
+      if (!userId) {
+        if (mounted) {
+          setNickname(null);
+          setAvatarUrl(null);
+          setIsAdmin(false);
+        }
+        return;
+      }
 
       const { data: profile } = await supabase.from("users").select("nickname, avatar_url").eq("id", userId).single();
       if (mounted && profile?.nickname) setNickname(profile.nickname);
       if (mounted) setAvatarUrl(profile?.avatar_url ?? null);
 
-      const { data: roles, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("roles(name)")
-        .eq("user_id", userId);
-      if (mounted && rolesError) setAdminCheckError(rolesError.message);
-      const hasAdmin =
-        roles?.some((row: any) => {
-          const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
-          return role?.name === "admin";
-        }) ?? false;
-      if (mounted) setIsAdmin(hasAdmin);
+      // Admin check must NOT rely on client-side RLS (can fail and hide admin UI).
+      // We validate via server route that uses service role for role lookup.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        if (mounted) setIsAdmin(false);
+        return;
+      }
+      const res = await fetch("/api/admin/me", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+      if (!mounted) return;
+      if (!res) {
+        setIsAdmin(false);
+        setAdminCheckError("No se pudo verificar permisos (sin conexión).");
+        return;
+      }
+      if (res.ok) {
+        setIsAdmin(true);
+        setAdminCheckError(null);
+        return;
+      }
+      if (res.status === 403) {
+        setIsAdmin(false);
+        setAdminCheckError(null);
+        return;
+      }
+      const json = await res.json().catch(() => ({}));
+      setIsAdmin(false);
+      setAdminCheckError(json?.error ?? `No se pudo verificar permisos (HTTP ${res.status}).`);
     };
 
     loadProfile();

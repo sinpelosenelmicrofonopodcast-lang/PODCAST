@@ -503,15 +503,9 @@ main {
   display: flex;
   align-items: center;
   gap: 14px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  white-space: nowrap;
-  padding-bottom: 4px;
-  -webkit-overflow-scrolling: touch;
-}
-
-.nav-tabs::-webkit-scrollbar {
-  display: none;
+  flex-wrap: wrap;
+  overflow: visible;
+  white-space: normal;
 }
 
 .nav-right {
