@@ -32,7 +32,9 @@ export async function POST() {
           isShort: isShorts(video.durationSeconds)
         },
         posted_at: video.publishedAt,
-        source_url: `https://www.youtube.com/watch?v=${video.id}`
+        source_url: isShorts(video.durationSeconds)
+          ? `https://www.youtube.com/shorts/${video.id}`
+          : `https://www.youtube.com/watch?v=${video.id}`
       }));
 
     if (inserts.length > 0) {

@@ -31,40 +31,43 @@ export default async function FeedPage() {
     <main>
       <AuthWall />
       <Navbar />
-      <section className="section">
+      <section className="section feed-page">
         <div className="container">
           <h1 className="section-title">Feed Unificado</h1>
           <p className="muted">Todo el contenido centralizado. Filtro por plataforma en versión completa.</p>
           {data && data.length > 0 ? (
-            <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", marginTop: 20 }}>
+            <div style={{ marginTop: 20, display: "grid", gap: 24 }}>
               {(() => {
                 const isShortPost = (post: any) => {
                   const metrics = (post.metrics as any) ?? {};
                   if (metrics.isShort === true) return true;
                   const duration = Number(metrics.durationSeconds);
                   if (!Number.isNaN(duration) && duration > 0 && duration <= 60) return true;
+                  const sourceUrl = String(post.source_url ?? "");
+                  if (sourceUrl.includes("youtube.com/shorts/")) return true;
+                  const t = `${post.title ?? ""} ${post.caption ?? ""}`.toLowerCase();
+                  if (t.includes("#shorts") || t.includes(" #short ")) return true;
                   return false;
                 };
 
-                const shorts = data.filter((post) => isShortPost(post));
                 const full = data.filter((post) => !isShortPost(post));
 
                 const renderCard = (post: any) => {
                   const metrics = (post.metrics as any) ?? {};
                   const isShort = metrics.isShort === true;
                   return (
-                    <div key={post.id} className="card" style={{ display: "grid", gap: 12 }}>
+                    <article key={post.id} className="card feed-card" style={{ display: "grid", gap: 12 }}>
                       {post.media_url ? (
                         <a href={post.source_url ?? "#"} target="_blank" rel="noreferrer">
                           <img
                             src={post.media_url}
                             alt={post.title ?? "Post"}
-                            style={{ width: "100%", borderRadius: 12, objectFit: "cover" }}
+                            style={{ width: "100%", borderRadius: 12, objectFit: "cover", aspectRatio: "16 / 9" }}
                           />
                         </a>
                       ) : null}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <h3 style={{ margin: 0 }}>{post.title ?? "Post sin título"}</h3>
+                        <h3 style={{ margin: 0, fontSize: 18 }}>{post.title ?? "Post sin título"}</h3>
                         <span className="badge">{post.platform}{isShort ? " · SHORT" : ""}</span>
                       </div>
                       <div className="muted" style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 12 }}>
@@ -73,11 +76,11 @@ export default async function FeedPage() {
                         <span>Comments: {formatNumber(metrics.comments)}</span>
                         <span>Duración: {formatDuration(metrics.durationSeconds)}</span>
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                         <span className="muted" style={{ fontSize: 12 }}>
                           {post.posted_at ? new Date(post.posted_at).toLocaleDateString("es-PR") : ""}
                         </span>
-                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                           {post.source_url ? (
                             <a className="button secondary" href={post.source_url} target="_blank" rel="noreferrer">
                               Ver original
@@ -86,17 +89,17 @@ export default async function FeedPage() {
                           <ShareButtons path="/feed" text={post.title ?? "Sin Pelos"} />
                         </div>
                       </div>
-                    </div>
+                    </article>
                   );
                 };
 
                 return (
                   <>
-                    <div style={{ marginTop: 24 }}>
-                      <h2 className="section-title" style={{ fontSize: 28 }}>Capítulos completos</h2>
+                    <div>
+                      <h2 className="section-title" style={{ fontSize: 30 }}>Capítulos completos</h2>
                       <div
-                        className="grid"
-                        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", marginTop: 12 }}
+                        className="grid feed-full-grid"
+                        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginTop: 14 }}
                       >
                         {full.length > 0 ? full.map(renderCard) : (
                           <div className="card">
@@ -104,29 +107,6 @@ export default async function FeedPage() {
                           </div>
                         )}
                       </div>
-                    </div>
-
-                    <div style={{ marginTop: 32 }}>
-                      <h2 className="section-title" style={{ fontSize: 28 }}>Shorts</h2>
-                      {shorts.length > 0 ? (
-                        <div
-                          style={{
-                            display: "grid",
-                            gridAutoFlow: "column",
-                            gridAutoColumns: "minmax(220px, 1fr)",
-                            gap: 16,
-                            overflowX: "auto",
-                            paddingBottom: 8,
-                            marginTop: 12
-                          }}
-                        >
-                          {shorts.map(renderCard)}
-                        </div>
-                      ) : (
-                        <div className="card">
-                          <p className="muted">No hay shorts todavía.</p>
-                        </div>
-                      )}
                     </div>
                   </>
                 );
