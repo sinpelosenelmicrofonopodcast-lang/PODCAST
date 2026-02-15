@@ -3,12 +3,16 @@ import { Footer } from "@/components/Footer";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { ShareButtons } from "@/components/ShareButtons";
 import Link from "next/link";
+import { ui } from "@/lib/i18n";
+import { getServerLang } from "@/lib/i18nServer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function BlogPage() {
   const supabase = supabaseServer();
+  const lang = getServerLang();
+  const t = ui[lang];
   const { data } = await supabase
     .from("blog_posts")
     .select("id, title, excerpt, created_at, cover_url")
@@ -20,8 +24,8 @@ export default async function BlogPage() {
       <Navbar />
       <section className="section">
         <div className="container">
-          <h1 className="section-title">Blog Sin Pelos</h1>
-          <p className="muted">Artículos largos, análisis y opinión profunda.</p>
+          <h1 className="section-title">{t.blog.title}</h1>
+          <p className="muted">{t.blog.subtitle}</p>
           {data && data.length > 0 ? (
             <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", marginTop: 20 }}>
               {data.map((post) => (
@@ -44,7 +48,7 @@ export default async function BlogPage() {
                   </span>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <Link className="button secondary" href={`/blog/${post.id}`}>
-                      Leer
+                      {t.common.read}
                     </Link>
                     <ShareButtons path={`/blog/${post.id}`} text={post.title} />
                   </div>
@@ -53,7 +57,7 @@ export default async function BlogPage() {
             </div>
           ) : (
             <div className="card" style={{ marginTop: 20 }}>
-              <p className="muted">No hay artículos aún.</p>
+              <p className="muted">{t.blog.noneYet}</p>
             </div>
           )}
         </div>

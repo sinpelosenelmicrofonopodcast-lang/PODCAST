@@ -4,12 +4,16 @@ import { Footer } from "@/components/Footer";
 import { ShareButtons } from "@/components/ShareButtons";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { newsCategories } from "@/lib/newsCategories";
+import { ui } from "@/lib/i18n";
+import { getServerLang } from "@/lib/i18nServer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function NoticiasPage({ searchParams }: { searchParams: { cat?: string; sort?: string } }) {
   const supabase = supabaseServer();
+  const lang = getServerLang();
+  const t = ui[lang];
   const category = searchParams?.cat;
   const sort = searchParams?.sort ?? "latest";
 
@@ -54,11 +58,11 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
       <section className="section">
         <div className="container">
           <h1 className="section-title">Noticias Sin Pelos</h1>
-          <p className="muted">Curaduría manual con análisis propio.</p>
+          <p className="muted">{t.news.subtitle}</p>
 
           <div className="news-tabs">
             <Link className={tabClass(!category)} href="/noticias">
-              Todas
+              {t.news.all}
             </Link>
             {newsCategories.map((cat) => (
               <Link key={cat} className={tabClass(category === cat)} href={`/noticias?cat=${encodeURIComponent(cat)}&sort=${sort}`}>
@@ -69,10 +73,10 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
 
           <div className="news-tabs" style={{ marginTop: 12 }}>
             <Link className={tabClass(sort === "all" || sort === "latest")} href={buildNewsHref("latest")}>
-              Últimas
+              {t.news.latest}
             </Link>
             <Link className={tabClass(sort === "comments")} href={buildNewsHref("comments")}>
-              Más comentadas
+              {t.news.mostCommented}
             </Link>
           </div>
 
@@ -121,7 +125,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                     ) : null}
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                       <Link className="button secondary" href={`/noticias/${item.id}`}>
-                        Leer
+                        {t.common.read}
                       </Link>
                       <ShareButtons path={`/noticias/${item.id}`} text={item.title} />
                     </div>
@@ -131,7 +135,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
             </div>
           ) : (
             <div className="card" style={{ marginTop: 20 }}>
-              <p className="muted">No hay noticias cargadas aún.</p>
+              <p className="muted">{t.news.noneYet}</p>
             </div>
           )}
         </div>

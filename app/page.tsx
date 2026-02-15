@@ -4,6 +4,8 @@ import { Footer } from "@/components/Footer";
 import { Logo } from "@/components/Logo";
 import { GuestInvitePopup } from "@/components/GuestInvitePopup";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { ui } from "@/lib/i18n";
+import { getServerLang } from "@/lib/i18nServer";
 
 export const revalidate = 86400;
 
@@ -85,6 +87,8 @@ const isShort = (post: ExternalPost) => {
 
 export default async function HomePage() {
   const supabase = supabaseServer();
+  const lang = getServerLang();
+  const t = ui[lang];
   const nowIso = new Date().toISOString();
 
   const [
@@ -180,10 +184,10 @@ export default async function HomePage() {
         </div>
         <div className="home-cta-row">
           <Link className="button" href="/register">
-            Entrar ahora
+            {t.home.enterNow}
           </Link>
           <Link className="button secondary" href="/feed">
-            Ver feed unificado
+            {t.home.viewUnifiedFeed}
           </Link>
         </div>
       </section>
@@ -191,9 +195,9 @@ export default async function HomePage() {
       <section className="section home-grid-wrap">
         <div className="container">
           <article className="card home-lead-card">
-            <span className="badge">Último episodio completo</span>
+            <span className="badge">{t.home.latestFullEpisode}</span>
             {latestEpisode?.media_url ? <img className="cover-wide" src={latestEpisode.media_url} alt={latestEpisode.title} /> : null}
-            <h2 style={{ marginTop: 10 }}>{latestEpisode?.title ?? "Aún no hay episodios"}</h2>
+            <h2 style={{ marginTop: 10 }}>{latestEpisode?.title ?? t.home.noEpisodes}</h2>
             <div className="muted metrics-row">
               <span>Views: {formatMetric(latestEpisode?.metrics?.views)}</span>
               <span>Likes: {formatMetric(latestEpisode?.metrics?.likes)}</span>
@@ -201,11 +205,11 @@ export default async function HomePage() {
             </div>
             {latestEpisode?.source_url ? (
               <a className="button secondary" href={latestEpisode.source_url} target="_blank" rel="noreferrer">
-                Ver episodio
+                {t.home.viewEpisode}
               </a>
             ) : (
               <Link className="button secondary" href="/feed">
-                Ver feed
+                {t.home.viewFeed}
               </Link>
             )}
           </article>
@@ -290,10 +294,10 @@ export default async function HomePage() {
               {(!upcomingEvents || upcomingEvents.length === 0) ? (
                 <article className="card">
                   <span className="badge">Sin agenda</span>
-                  <h3>No hay eventos próximos</h3>
-                  <p className="muted">Cuando haya eventos, aparecerán aquí.</p>
+                  <h3>{t.home.noUpcomingEventsTitle}</h3>
+                  <p className="muted">{t.home.noUpcomingEventsBody}</p>
                   <Link className="button secondary" href="/eventos">
-                    Ir a eventos
+                    {t.home.goToEvents}
                   </Link>
                 </article>
               ) : null}
@@ -306,7 +310,7 @@ export default async function HomePage() {
         <section className="section ad-zone-wrap">
           <div className="container">
             <div className="home-section-head">
-              <h2 className="section-title">Promociones y anuncios</h2>
+              <h2 className="section-title">{t.home.promotions}</h2>
             </div>
             <div className="home-grid-ads">
               {(promotions as Promotion[] | null)?.map((promo) => (
@@ -357,10 +361,10 @@ export default async function HomePage() {
               {(!promotions || promotions.length === 0) ? (
                 <article className="card ad-slot hero-ad">
                   <span className="badge">Disponible</span>
-                  <h3>Espacio para marcas</h3>
-                  <p className="muted">Contáctanos para promociones, banners y media kit.</p>
+                  <h3>{t.home.brandSlotTitle}</h3>
+                  <p className="muted">{t.home.brandSlotBody}</p>
                   <Link className="button secondary" href="/publicidad">
-                    Solicitar media kit
+                    {t.home.requestMediaKit}
                   </Link>
                 </article>
               ) : null}
