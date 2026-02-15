@@ -10,6 +10,7 @@ const links: Array<{ href: Route; label: string }> = [
   { href: "/admin/blog", label: "Blog" },
   { href: "/admin/events", label: "Eventos" },
   { href: "/admin/promotions", label: "Promociones" },
+  { href: "/admin/newsletter", label: "Newsletter" },
   { href: "/admin/guest-requests", label: "Invitados" },
   { href: "/admin/users", label: "Usuarios" },
   { href: "/admin/reports", label: "Reportes" },

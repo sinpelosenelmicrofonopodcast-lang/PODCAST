@@ -3,6 +3,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ShareButtons } from "@/components/ShareButtons";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
+import { NewsletterForm } from "@/components/newsletter/NewsletterForm";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { clampMetaDescription, estimateReadingTimeMinutes } from "@/lib/blogSeo";
 import { createClient } from "@supabase/supabase-js";
@@ -313,12 +314,7 @@ export default async function BlogIndexPage({
                 <p className="muted" style={{ marginTop: 8 }}>
                   Sin spam. Solo lo que vale.
                 </p>
-                <form className="blog-subscribe" action="/publicidad" method="get">
-                  <input className="input" placeholder="Tu email" />
-                  <button className="button" type="button">
-                    Suscribirme
-                  </button>
-                </form>
+                <NewsletterForm />
               </div>
             </aside>
           </div>

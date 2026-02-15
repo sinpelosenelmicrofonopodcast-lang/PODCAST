@@ -1468,6 +1468,26 @@ body {
   margin-top: 14px;
 }
 
+.newsletter-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.newsletter-cta {
+  margin-top: 16px;
+  border: 1px solid rgba(255, 122, 24, 0.35);
+  background: radial-gradient(900px 260px at 0% 0%, rgba(255, 122, 24, 0.12), rgba(0, 0, 0, 0) 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.0));
+}
+
+@media (max-width: 640px) {
+  .newsletter-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 1020px) {
   .blog-layout {
     grid-template-columns: 1fr;

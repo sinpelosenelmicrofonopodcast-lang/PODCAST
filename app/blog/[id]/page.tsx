@@ -8,6 +8,7 @@ import { ReadingProgressBar } from "@/components/blog/ReadingProgressBar";
 import { TableOfContents } from "@/components/blog/TableOfContents";
 import { Callout } from "@/components/blog/Callout";
 import { ProblemTrio } from "@/components/blog/ProblemTrio";
+import { NewsletterForm } from "@/components/newsletter/NewsletterForm";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { clampMetaDescription, estimateReadingTimeMinutes } from "@/lib/blogSeo";
 import { parseBlogBlocks } from "@/lib/blogContent";
@@ -249,6 +250,12 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
                   </a>
                 </div>
               </div>
+
+              <NewsletterForm
+                variant="cta"
+                title="Recibe lo nuevo primero"
+                subtitle="Analisis, noticias y cultura. Directo a tu inbox."
+              />
 
               <div className="post-footer-actions">
                 <Link className="button secondary" href="/blog">
