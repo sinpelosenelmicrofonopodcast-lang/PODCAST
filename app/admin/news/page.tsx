@@ -141,10 +141,10 @@ export default function AdminNewsPage() {
       // Keep original publish time on edit so sorting/feeds remain stable.
       if (editingPublishedAt) updatePayload.published_at = editingPublishedAt;
 
-      // Do NOT rely on `.single()` here. Under some RLS / schema-cache states PostgREST can return
-      // 0 rows in the "returning" payload even when the update happened, which triggers:
+      // Do NOT rely on `.single()` / `.maybeSingle()` here.
+      // Under some RLS states PostgREST returns 0 rows (empty array) which triggers:
       // "Cannot coerce the result to a single JSON object".
-      const u = await supabase.from("news_items").update(updatePayload).eq("id", editingId);
+      const u = await supabase.from("news_items").update(updatePayload).eq("id", editingId).select("id");
       if (u.error) {
         const msg = u.error.message ?? "No se pudo actualizar.";
         setStatus(msg);
@@ -152,33 +152,26 @@ export default function AdminNewsPage() {
         setLoading(false);
         return;
       }
-
-      // Try to fetch the updated row to reflect changes immediately.
-      const fetchUpdated = await supabase
-        .from("news_items")
-        .select("id, title, summary, analysis, source_url, cover_url, categories, tags, published_at")
-        .eq("id", editingId)
-        .limit(1)
-        .maybeSingle();
-
-      if (fetchUpdated.data) {
-        const updated = fetchUpdated.data as NewsItemFull;
-        setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)));
-        setStatus("Noticia actualizada.");
-        toast.success("Noticia actualizada.");
-      } else {
-        // Fallback: reload list (best-effort) and still show success.
-        await loadItems();
-        setStatus("Noticia actualizada.");
-        toast.success("Noticia actualizada.");
+      if (!u.data || (Array.isArray(u.data) && u.data.length === 0)) {
+        const msg = "No se pudo actualizar (sin permisos o la noticia no existe).";
+        setStatus(msg);
+        toast.error(msg);
+        setLoading(false);
+        return;
       }
+
+      // Reload list (best-effort) to reflect changes immediately.
+      await loadItems();
+      setStatus("Noticia actualizada.");
+      toast.success("Noticia actualizada.");
     } else {
       const createPayload = {
         ...payload,
         author_id: userId,
         published_at: new Date().toISOString()
       };
-      const { data: inserted, error } = await supabase.from("news_items").insert(createPayload).select("id").single();
+      const { data: insertedRows, error } = await supabase.from("news_items").insert(createPayload).select("id").limit(1);
+      const inserted = Array.isArray(insertedRows) ? insertedRows[0] : null;
       if (error || !inserted?.id) {
         setStatus(error?.message ?? "No se pudo publicar la noticia.");
         toast.error(error?.message ?? "No se pudo publicar la noticia.");

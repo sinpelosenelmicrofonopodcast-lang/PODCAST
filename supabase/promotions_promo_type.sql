@@ -27,3 +27,5 @@ end $$;
 
 commit;
 
+-- Refresh PostgREST schema cache (fixes "schema cache" errors in the API layer).
+select pg_notify('pgrst', 'reload schema');

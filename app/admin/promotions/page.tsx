@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "@/lib/toast";
+import { PROMO_TARGET_SECTIONS } from "@/lib/promoSection";
 
 type Promotion = {
   id: string;
@@ -20,19 +21,6 @@ type Promotion = {
   starts_at: string | null;
   ends_at: string | null;
 };
-
-const SECTION_OPTIONS = [
-  { key: "home", label: "Home" },
-  { key: "blog", label: "Blog" },
-  { key: "noticias", label: "Noticias" },
-  { key: "confesionario", label: "Confesionario" },
-  { key: "confesiones", label: "Confesiones" },
-  { key: "foro", label: "Foro" },
-  { key: "comunidad", label: "Comunidad" },
-  { key: "zona_cruda", label: "Zona Cruda" },
-  { key: "teorias", label: "Teorías" },
-  { key: "feed", label: "Feed" }
-];
 
 export default function AdminPromotionsPage() {
   const [items, setItems] = useState<Promotion[]>([]);
@@ -106,7 +94,9 @@ export default function AdminPromotionsPage() {
     setPlacement(item.placement ?? "home");
     setDisplayOrder(item.display_order ?? 0);
     setIsActive(item.is_active);
-    setTargetSections((((item as any).target_sections ?? []) as any[])?.map((x) => String(x)) ?? []);
+    const loaded = ((((item as any).target_sections ?? []) as any[])?.map((x) => String(x)) ?? []).filter(Boolean);
+    // Back-compat: if DB has NULL/empty, treat as global.
+    setTargetSections(loaded.length ? loaded : ["all"]);
     setStartsAt(item.starts_at ? new Date(item.starts_at).toISOString().slice(0, 16) : "");
     setEndsAt(item.ends_at ? new Date(item.ends_at).toISOString().slice(0, 16) : "");
   };
@@ -189,12 +179,15 @@ export default function AdminPromotionsPage() {
       setStatus(msg);
       return;
     }
-    if (promoType !== "internal" && targetSections.length === 0) {
+    if (promoType !== "internal" && (targetSections.length === 0 || targetSections.includes("all"))) {
       const msg = "Sponsor/Affiliate: selecciona al menos 1 sección (para no molestar en todas).";
       toast.error(msg);
       setStatus(msg);
       return;
     }
+
+    const normalizedSections =
+      targetSections.includes("all") ? ["all"] : Array.from(new Set(targetSections.map((s) => String(s).trim()).filter(Boolean)));
 
     const payloadBase: any = {
       title,
@@ -209,7 +202,7 @@ export default function AdminPromotionsPage() {
       starts_at: startsAt ? new Date(startsAt).toISOString() : null,
       ends_at: endsAt ? new Date(endsAt).toISOString() : null,
       updated_at: new Date().toISOString(),
-      target_sections: targetSections.length ? targetSections : null
+      target_sections: normalizedSections.length ? normalizedSections : null
     };
     // promo_type is optional until migrated.
     payloadBase.promo_type = promoType;
@@ -317,14 +310,19 @@ export default function AdminPromotionsPage() {
           <label>
             Secciones
             <div className="check-grid" style={{ marginTop: 10 }}>
-              {SECTION_OPTIONS.map((s) => (
-                <label key={s.key} className="check-row compact">
+              {PROMO_TARGET_SECTIONS.map((s) => (
+                <label key={s.id} className="check-row compact">
                   <input
                     type="checkbox"
-                    checked={targetSections.includes(s.key)}
+                    checked={targetSections.includes(s.id)}
                     onChange={(e) => {
                       const checked = e.target.checked;
-                      setTargetSections((prev) => (checked ? [...prev, s.key] : prev.filter((x) => x !== s.key)));
+                      setTargetSections((prev) => {
+                        const next = checked ? [...prev, s.id] : prev.filter((x) => x !== s.id);
+                        // If "all" is selected, force it to be the only option.
+                        if (next.includes("all")) return ["all"];
+                        return next.filter((x) => x !== "all");
+                      });
                     }}
                   />
                   {s.label}
@@ -332,7 +330,7 @@ export default function AdminPromotionsPage() {
               ))}
             </div>
             <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-              Sponsor/Affiliate requieren al menos 1 sección. Internal puede ser global.
+              Sponsor/Affiliate: selecciona secciones específicas (no "Global"). Internal puede ser "Global (All)".
             </p>
           </label>
           <label>
@@ -399,7 +397,14 @@ export default function AdminPromotionsPage() {
                       {item.is_active ? "activa" : "inactiva"}
                     </span>
                     <span className="muted" style={{ fontSize: 12 }}>
-                      Secciones: {((item as any).target_sections ?? []).length ? ((item as any).target_sections ?? []).join(", ") : "global"}
+                      Secciones:{" "}
+                      {(() => {
+                        const ts = ((item as any).target_sections ?? []) as any[];
+                        if (!Array.isArray(ts) || ts.length === 0) return "global";
+                        const lower = ts.map((x) => String(x).toLowerCase());
+                        if (lower.includes("all")) return "global";
+                        return ts.join(", ");
+                      })()}
                     </span>
                   </div>
                 </div>
