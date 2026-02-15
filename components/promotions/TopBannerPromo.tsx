@@ -7,9 +7,9 @@ import { trackPromoEvent } from "@/lib/promoTracking";
 type Promo = {
   id: string;
   title: string;
-  description: string | null;
   cta_label: string | null;
   cta_url: string | null;
+  promo_type?: "sponsor" | "internal" | "affiliate" | null;
 };
 
 export function TopBannerPromo() {
@@ -40,12 +40,24 @@ export function TopBannerPromo() {
     if (!promo) return;
     if (sentImpression.current) return;
     sentImpression.current = true;
-    trackPromoEvent({ promotionId: promo.id, placement: "top_banner", event: "impression", path: pathname });
+    trackPromoEvent({
+      promotionId: promo.id,
+      placement: "top_banner",
+      event: "impression",
+      path: pathname,
+      promoType: promo.promo_type ?? null
+    });
   }, [promo, pathname, canShow]);
 
   const onClick = () => {
     if (!promo) return;
-    trackPromoEvent({ promotionId: promo.id, placement: "top_banner", event: "click", path: pathname });
+    trackPromoEvent({
+      promotionId: promo.id,
+      placement: "top_banner",
+      event: "click",
+      path: pathname,
+      promoType: promo.promo_type ?? null
+    });
   };
 
   if (!canShow) return <div className="promo-top-slot" aria-hidden="true" />;
@@ -53,15 +65,16 @@ export function TopBannerPromo() {
   const clickable = Boolean(promo?.cta_url);
   const ctaLabel = promo?.cta_label ?? "Ver";
   const title = promo?.title ?? "";
-  const desc = promo?.description ?? "";
 
   return (
-    <div className="promo-top-slot" role="complementary" aria-label="Promoción">
+    <div className="promo-top-slot" role="complementary" aria-label="Promoción" data-type={promo?.promo_type ?? "sponsor"}>
       {promo ? (
         <div className="promo-top-inner">
-          <div className="promo-top-text">
-            <div className="promo-top-title clamp-2">{title}</div>
-            {desc ? <div className="promo-top-desc clamp-2">{desc}</div> : null}
+          <div className="promo-top-one">
+            <span className="promo-top-label">
+              {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "RECOMENDADO" : "SPONSOR"}
+            </span>
+            <span className="promo-top-title clamp-2">{title}</span>
           </div>
           {clickable ? (
             <a className="button promo-top-cta" href={promo.cta_url ?? "#"} target="_blank" rel="noreferrer" onClick={onClick}>
@@ -75,4 +88,3 @@ export function TopBannerPromo() {
     </div>
   );
 }
-

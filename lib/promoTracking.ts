@@ -1,4 +1,5 @@
 export type PromoEvent = "impression" | "click" | "dismiss";
+export type PromoType = "sponsor" | "internal" | "affiliate";
 
 export function getSessionId(): string {
   const key = "spm_session_id";
@@ -14,6 +15,7 @@ export async function trackPromoEvent(params: {
   placement: string;
   event: PromoEvent;
   path: string;
+  promoType?: PromoType | null;
 }) {
   try {
     const sessionId = getSessionId();
@@ -26,4 +28,3 @@ export async function trackPromoEvent(params: {
     // tracking is best-effort
   }
 }
-

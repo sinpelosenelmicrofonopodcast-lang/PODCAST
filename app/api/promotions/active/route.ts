@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const supabase = supabaseServer();
     const { data, error } = await supabase
       .from("promotions")
-      .select("id, title, description, image_url, cta_label, cta_url, placement, display_order, starts_at, ends_at")
+      .select("id, title, description, image_url, cta_label, cta_url, placement, display_order, starts_at, ends_at, promo_type")
       .eq("is_active", true)
       .eq("placement", placement)
       .or(`starts_at.is.null,starts_at.lte.${nowIso}`)

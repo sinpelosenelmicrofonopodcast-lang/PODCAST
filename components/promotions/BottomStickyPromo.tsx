@@ -9,6 +9,7 @@ type Promo = {
   title: string;
   cta_label: string | null;
   cta_url: string | null;
+  promo_type?: "sponsor" | "internal" | "affiliate" | null;
 };
 
 export function BottomStickyPromo() {
@@ -56,19 +57,37 @@ export function BottomStickyPromo() {
     if (closed) return;
     if (sentImpression.current) return;
     sentImpression.current = true;
-    trackPromoEvent({ promotionId: promo.id, placement: "bottom_sticky", event: "impression", path: pathname });
+    trackPromoEvent({
+      promotionId: promo.id,
+      placement: "bottom_sticky",
+      event: "impression",
+      path: pathname,
+      promoType: promo.promo_type ?? null
+    });
   }, [promo, pathname, canShow, closed]);
 
   const onClick = () => {
     if (!promo) return;
-    trackPromoEvent({ promotionId: promo.id, placement: "bottom_sticky", event: "click", path: pathname });
+    trackPromoEvent({
+      promotionId: promo.id,
+      placement: "bottom_sticky",
+      event: "click",
+      path: pathname,
+      promoType: promo.promo_type ?? null
+    });
   };
 
   const onClose = () => {
     if (!promo) return;
     localStorage.setItem(`spm_bottom_dismiss_${promo.id}`, "1");
     setClosed(true);
-    trackPromoEvent({ promotionId: promo.id, placement: "bottom_sticky", event: "dismiss", path: pathname });
+    trackPromoEvent({
+      promotionId: promo.id,
+      placement: "bottom_sticky",
+      event: "dismiss",
+      path: pathname,
+      promoType: promo.promo_type ?? null
+    });
   };
 
   if (!canShow) return null;
@@ -78,7 +97,7 @@ export function BottomStickyPromo() {
   const clickable = Boolean(promo.cta_url);
 
   return (
-    <div className="promo-bottom-wrap" role="complementary" aria-label="Promoción">
+    <div className="promo-bottom-wrap" role="complementary" aria-label="Promoción" data-type={promo.promo_type ?? "sponsor"}>
       <div className="promo-bottom-inner">
         <div className="promo-bottom-title clamp-2">{promo.title}</div>
         <div className="promo-bottom-actions">
@@ -95,4 +114,3 @@ export function BottomStickyPromo() {
     </div>
   );
 }
-

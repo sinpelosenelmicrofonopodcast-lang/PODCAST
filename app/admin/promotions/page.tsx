@@ -12,6 +12,7 @@ type Promotion = {
   image_path: string | null;
   cta_label: string | null;
   cta_url: string | null;
+  promo_type: "sponsor" | "internal" | "affiliate" | null;
   placement: string;
   display_order: number;
   is_active: boolean;
@@ -30,6 +31,7 @@ export default function AdminPromotionsPage() {
   const [imagePath, setImagePath] = useState("");
   const [ctaLabel, setCtaLabel] = useState("");
   const [ctaUrl, setCtaUrl] = useState("");
+  const [promoType, setPromoType] = useState<"sponsor" | "internal" | "affiliate">("sponsor");
   const [placement, setPlacement] = useState("top_banner");
   const [displayOrder, setDisplayOrder] = useState(0);
   const [isActive, setIsActive] = useState(true);
@@ -40,7 +42,7 @@ export default function AdminPromotionsPage() {
   const load = async () => {
     const { data } = await supabase
       .from("promotions")
-      .select("id, title, description, image_url, image_path, cta_label, cta_url, placement, display_order, is_active, starts_at, ends_at")
+      .select("id, title, description, image_url, image_path, cta_label, cta_url, promo_type, placement, display_order, is_active, starts_at, ends_at")
       .order("display_order", { ascending: true })
       .order("created_at", { ascending: false });
     setItems((data as Promotion[]) ?? []);
@@ -58,6 +60,7 @@ export default function AdminPromotionsPage() {
     setImagePath("");
     setCtaLabel("");
     setCtaUrl("");
+    setPromoType("sponsor");
     setPlacement("top_banner");
     setDisplayOrder(0);
     setIsActive(true);
@@ -73,6 +76,7 @@ export default function AdminPromotionsPage() {
     setImagePath(item.image_path ?? "");
     setCtaLabel(item.cta_label ?? "");
     setCtaUrl(item.cta_url ?? "");
+    setPromoType((item.promo_type as any) ?? "sponsor");
     setPlacement(item.placement ?? "home");
     setDisplayOrder(item.display_order ?? 0);
     setIsActive(item.is_active);
@@ -156,6 +160,7 @@ export default function AdminPromotionsPage() {
       image_path: imagePath || null,
       cta_label: ctaLabel || null,
       cta_url: ctaUrl || null,
+      promo_type: promoType,
       placement,
       display_order: Number(displayOrder) || 0,
       is_active: isActive,
@@ -241,6 +246,14 @@ export default function AdminPromotionsPage() {
           </label>
         </div>
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+          <label>
+            Tipo
+            <select className="select" value={promoType} onChange={(e) => setPromoType(e.target.value as any)}>
+              <option value="sponsor">Sponsor</option>
+              <option value="internal">Internal (SPM)</option>
+              <option value="affiliate">Affiliate</option>
+            </select>
+          </label>
           <label>
             Placement
             <select className="select" value={placement} onChange={(e) => setPlacement(e.target.value)}>

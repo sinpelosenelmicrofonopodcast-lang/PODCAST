@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
     const event = String(body?.event ?? "").trim();
     const path = String(body?.path ?? "").trim();
     const sessionId = String(body?.sessionId ?? "").trim();
+    const promoType = body?.promoType ? String(body.promoType).trim() : null;
 
     if (!promotionId || !placement || !event || !path || !sessionId) {
       return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
     const supabase = supabaseServer();
     const { error } = await supabase.from("promotion_events").insert({
       promotion_id: promotionId,
+      promo_type: promoType,
       placement,
       event,
       path,
@@ -35,4 +37,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 }
-

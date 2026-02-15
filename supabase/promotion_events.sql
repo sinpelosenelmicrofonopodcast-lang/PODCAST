@@ -6,6 +6,7 @@ begin;
 create table if not exists public.promotion_events (
   id uuid primary key default gen_random_uuid(),
   promotion_id uuid not null references public.promotions(id) on delete cascade,
+  promo_type text null,
   placement text not null,
   event text not null check (event in ('impression','click','dismiss')),
   path text not null,
@@ -30,4 +31,3 @@ to authenticated
 using (public.is_admin(auth.uid()));
 
 commit;
-

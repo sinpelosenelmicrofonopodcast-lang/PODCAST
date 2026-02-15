@@ -10,6 +10,7 @@ type Promo = {
   description: string | null;
   cta_label: string | null;
   cta_url: string | null;
+  promo_type?: "sponsor" | "internal" | "affiliate" | null;
 };
 
 export function MidContentAdSlot() {
@@ -53,20 +54,34 @@ export function MidContentAdSlot() {
     if (!promo) return;
     if (sentImpression.current) return;
     sentImpression.current = true;
-    trackPromoEvent({ promotionId: promo.id, placement: "mid_content", event: "impression", path: pathname });
+    trackPromoEvent({
+      promotionId: promo.id,
+      placement: "mid_content",
+      event: "impression",
+      path: pathname,
+      promoType: promo.promo_type ?? null
+    });
   }, [promo, pathname]);
 
   const onClick = () => {
     if (!promo) return;
-    trackPromoEvent({ promotionId: promo.id, placement: "mid_content", event: "click", path: pathname });
+    trackPromoEvent({
+      promotionId: promo.id,
+      placement: "mid_content",
+      event: "click",
+      path: pathname,
+      promoType: promo.promo_type ?? null
+    });
   };
 
   return (
     <div ref={ref} className="mid-ad-slot" aria-label="Promoción">
       {promo ? (
-        <div className="card mid-ad">
+        <div className="card mid-ad" data-type={promo.promo_type ?? "sponsor"}>
           <div className="mid-ad-top">
-            <span className="badge">Patrocinado</span>
+            <span className="badge">
+              {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "Recomendado" : "Patrocinado"}
+            </span>
           </div>
           <div className="mid-ad-title clamp-2">{promo.title}</div>
           {promo.description ? <div className="muted mid-ad-desc clamp-3">{promo.description}</div> : null}
@@ -80,4 +95,3 @@ export function MidContentAdSlot() {
     </div>
   );
 }
-

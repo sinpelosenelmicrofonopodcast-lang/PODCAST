@@ -10,6 +10,7 @@ type Promo = {
   description: string | null;
   cta_label: string | null;
   cta_url: string | null;
+  promo_type?: "sponsor" | "internal" | "affiliate" | null;
 };
 
 function isDesktop() {
@@ -79,18 +80,36 @@ export function PromoPopup() {
     if (!promo) return;
     if (sentImpression.current) return;
     sentImpression.current = true;
-    trackPromoEvent({ promotionId: promo.id, placement: "popup", event: "impression", path: pathname });
+    trackPromoEvent({
+      promotionId: promo.id,
+      placement: "popup",
+      event: "impression",
+      path: pathname,
+      promoType: promo.promo_type ?? null
+    });
   }, [open, promo, pathname]);
 
   const onClose = () => {
     if (!promo) return;
     setOpen(false);
-    trackPromoEvent({ promotionId: promo.id, placement: "popup", event: "dismiss", path: pathname });
+    trackPromoEvent({
+      promotionId: promo.id,
+      placement: "popup",
+      event: "dismiss",
+      path: pathname,
+      promoType: promo.promo_type ?? null
+    });
   };
 
   const onClick = () => {
     if (!promo) return;
-    trackPromoEvent({ promotionId: promo.id, placement: "popup", event: "click", path: pathname });
+    trackPromoEvent({
+      promotionId: promo.id,
+      placement: "popup",
+      event: "click",
+      path: pathname,
+      promoType: promo.promo_type ?? null
+    });
   };
 
   if (!canShow) return null;
@@ -122,4 +141,3 @@ export function PromoPopup() {
     </div>
   );
 }
-
