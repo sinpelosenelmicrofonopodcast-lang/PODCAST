@@ -19,18 +19,31 @@ alter table if exists public.blog_posts
   add column if not exists updated_at timestamptz not null default now();
 
 -- Backfill safe defaults so routes work immediately.
-update public.blog_posts
-set slug = coalesce(slug, id::text)
-where slug is null or btrim(slug) = '';
+do $$
+begin
+  if to_regclass('public.blog_posts') is not null then
+    update public.blog_posts
+    set slug = coalesce(slug, id::text)
+    where slug is null or btrim(slug) = '';
+  end if;
+end$$;
 
 -- Basic meta description fallback: prefer meta_description, else excerpt.
-update public.blog_posts
-set meta_description = coalesce(meta_description, excerpt)
-where meta_description is null;
+do $$
+begin
+  if to_regclass('public.blog_posts') is not null then
+    update public.blog_posts
+    set meta_description = coalesce(meta_description, excerpt)
+    where meta_description is null;
+  end if;
+end$$;
 
 -- Unique slug (allow existing duplicates to fail fast so we can fix content).
 do $$
 begin
+  if to_regclass('public.blog_posts') is null then
+    return;
+  end if;
   if not exists (
     select 1
     from pg_constraint
@@ -41,8 +54,12 @@ begin
   end if;
 end$$;
 
-create index if not exists blog_posts_created_at_idx on public.blog_posts(created_at desc);
+do $$
+begin
+  if to_regclass('public.blog_posts') is not null then
+    create index if not exists blog_posts_created_at_idx on public.blog_posts(created_at desc);
+  end if;
+end$$;
 
 -- PostgREST schema cache refresh (Supabase)
 notify pgrst, 'reload schema';
-
