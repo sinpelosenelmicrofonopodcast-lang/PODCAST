@@ -3,6 +3,8 @@ import { Footer } from "@/components/Footer";
 import { AuthWall } from "@/components/AuthWall";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { ShareButtons } from "@/components/ShareButtons";
+import { YouTubeInlinePlayer } from "@/components/YouTubeInlinePlayer";
+import { getYouTubeVideoId } from "@/lib/youtube";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -55,9 +57,17 @@ export default async function FeedPage() {
                 const renderCard = (post: any) => {
                   const metrics = (post.metrics as any) ?? {};
                   const isShort = metrics.isShort === true;
+                  const ytId = post.platform === "YouTube" ? getYouTubeVideoId(post.source_url) : null;
                   return (
                     <article key={post.id} className="card feed-card" style={{ display: "grid", gap: 12 }}>
-                      {post.media_url ? (
+                      {ytId ? (
+                        <YouTubeInlinePlayer
+                          videoId={ytId}
+                          title={post.title}
+                          thumbnailUrl={post.media_url}
+                          className="yt-inline"
+                        />
+                      ) : post.media_url ? (
                         <a href={post.source_url ?? "#"} target="_blank" rel="noreferrer">
                           <img
                             src={post.media_url}

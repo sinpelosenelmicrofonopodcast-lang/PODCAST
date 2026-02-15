@@ -4,87 +4,132 @@ export type YouTubeVideo = {
   description: string;
   publishedAt: string;
   thumbnailUrl: string;
-  viewCount?: number;
-  likeCount?: number;
-  commentCount?: number;
-  durationSeconds?: number;
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  durationSeconds: number;
 };
 
-const YOUTUBE_API = "https://www.googleapis.com/youtube/v3";
-
-function getEnv(name: string) {
+function requireEnv(name: string): string {
   const value = process.env[name];
-  if (!value) throw new Error(`Missing ${name}`);
+  if (!value) throw new Error(`${name} is required.`);
   return value;
 }
 
-function parseIsoDurationToSeconds(iso: string) {
-  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!match) return undefined;
-  const hours = Number(match[1] ?? 0);
-  const minutes = Number(match[2] ?? 0);
-  const seconds = Number(match[3] ?? 0);
-  return hours * 3600 + minutes * 60 + seconds;
+function parseIsoDurationToSeconds(iso: string): number {
+  // Example: PT1H2M3S, PT15M, PT50S
+  const m = iso.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+  if (!m) return 0;
+  const h = Number(m[1] ?? 0);
+  const min = Number(m[2] ?? 0);
+  const s = Number(m[3] ?? 0);
+  return h * 3600 + min * 60 + s;
 }
 
-export async function fetchYouTubeVideos(maxResults = 25): Promise<YouTubeVideo[]> {
-  const apiKey = getEnv("YOUTUBE_API_KEY");
-  const channelId = getEnv("YOUTUBE_CHANNEL_ID");
+export function isShorts(durationSeconds?: number | null): boolean {
+  const d = Number(durationSeconds ?? 0);
+  return d > 0 && d <= 60;
+}
 
-  const channelsRes = await fetch(
-    `${YOUTUBE_API}/channels?part=contentDetails&id=${channelId}&key=${apiKey}`,
-    { cache: "no-store" }
-  );
-  const channelsJson = await channelsRes.json();
-  const uploadsPlaylist = channelsJson?.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
-  if (!uploadsPlaylist) return [];
+export async function fetchYouTubeVideos(limit = 25): Promise<YouTubeVideo[]> {
+  const apiKey = requireEnv("YOUTUBE_API_KEY");
+  const channelId = requireEnv("YOUTUBE_CHANNEL_ID");
+  const maxResults = Math.min(Math.max(1, limit), 50);
 
-  const playlistRes = await fetch(
-    `${YOUTUBE_API}/playlistItems?part=snippet,contentDetails&playlistId=${uploadsPlaylist}&maxResults=${maxResults}&key=${apiKey}`,
-    { cache: "no-store" }
-  );
-  const playlistJson = await playlistRes.json();
-  const items = playlistJson?.items ?? [];
-  const videoIds = items.map((item: any) => item.contentDetails?.videoId).filter(Boolean);
+  // 1) Search newest uploads from the channel
+  const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+  searchUrl.searchParams.set("key", apiKey);
+  searchUrl.searchParams.set("channelId", channelId);
+  searchUrl.searchParams.set("part", "snippet");
+  searchUrl.searchParams.set("order", "date");
+  searchUrl.searchParams.set("type", "video");
+  searchUrl.searchParams.set("maxResults", String(maxResults));
 
-  if (videoIds.length === 0) return [];
+  const searchRes = await fetch(searchUrl.toString(), { next: { revalidate: 3600 } });
+  if (!searchRes.ok) throw new Error(`YouTube search failed (${searchRes.status}).`);
+  const searchJson = await searchRes.json();
 
-  const videosRes = await fetch(
-    `${YOUTUBE_API}/videos?part=statistics,contentDetails&id=${videoIds.join(",")}&key=${apiKey}`,
-    { cache: "no-store" }
-  );
-  const videosJson = await videosRes.json();
-  const byId = new Map(
-    (videosJson?.items ?? []).map((video: any) => [video.id, video])
-  );
+  const items = Array.isArray(searchJson.items) ? searchJson.items : [];
+  const ids = items
+    .map((it: any) => it?.id?.videoId)
+    .filter((id: any) => typeof id === "string" && id.length > 0);
 
-  return items.map((item: any) => {
-    const id = item.contentDetails?.videoId as string;
-    const snippet = item.snippet ?? {};
-    const video: any = byId.get(id) ?? {};
-    const stats = video.statistics ?? {};
-    const duration = video.contentDetails?.duration ?? "";
-    const durationSeconds = parseIsoDurationToSeconds(duration);
+  if (ids.length === 0) return [];
+
+  // 2) Fetch stats + duration for those IDs
+  const videosUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+  videosUrl.searchParams.set("key", apiKey);
+  videosUrl.searchParams.set("id", ids.join(","));
+  videosUrl.searchParams.set("part", "snippet,contentDetails,statistics");
+  const vidsRes = await fetch(videosUrl.toString(), { next: { revalidate: 3600 } });
+  if (!vidsRes.ok) throw new Error(`YouTube videos failed (${vidsRes.status}).`);
+  const vidsJson = await vidsRes.json();
+  const vids = Array.isArray(vidsJson.items) ? vidsJson.items : [];
+
+  return vids.map((v: any) => {
+    const id = String(v?.id ?? "");
+    const snippet = v?.snippet ?? {};
+    const stats = v?.statistics ?? {};
+    const content = v?.contentDetails ?? {};
+
+    const thumb =
+      snippet?.thumbnails?.maxres?.url ||
+      snippet?.thumbnails?.standard?.url ||
+      snippet?.thumbnails?.high?.url ||
+      snippet?.thumbnails?.medium?.url ||
+      snippet?.thumbnails?.default?.url ||
+      "";
+
+    const durationSeconds = parseIsoDurationToSeconds(String(content?.duration ?? "PT0S"));
 
     return {
       id,
-      title: snippet.title ?? "",
-      description: snippet.description ?? "",
-      publishedAt: snippet.publishedAt ?? new Date().toISOString(),
-      thumbnailUrl:
-        snippet.thumbnails?.maxres?.url ||
-        snippet.thumbnails?.high?.url ||
-        snippet.thumbnails?.medium?.url ||
-        "",
-      viewCount: stats.viewCount ? Number(stats.viewCount) : undefined,
-      likeCount: stats.likeCount ? Number(stats.likeCount) : undefined,
-      commentCount: stats.commentCount ? Number(stats.commentCount) : undefined,
+      title: String(snippet?.title ?? ""),
+      description: String(snippet?.description ?? ""),
+      publishedAt: String(snippet?.publishedAt ?? ""),
+      thumbnailUrl: String(thumb),
+      viewCount: Number(stats?.viewCount ?? 0),
+      likeCount: Number(stats?.likeCount ?? 0),
+      commentCount: Number(stats?.commentCount ?? 0),
       durationSeconds
-    };
+    } satisfies YouTubeVideo;
   });
 }
 
-export function isShorts(durationSeconds?: number) {
-  if (!durationSeconds && durationSeconds !== 0) return false;
-  return durationSeconds <= 60;
+export function getYouTubeVideoId(input?: string | null): string | null {
+  if (!input) return null;
+  const raw = String(input).trim();
+  if (!raw) return null;
+
+  // Handle plain IDs passed in accidentally.
+  if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) return raw;
+
+  let url: URL | null = null;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+
+  const host = url.hostname.replace(/^www\./, "");
+
+  if (host === "youtu.be") {
+    const id = url.pathname.split("/").filter(Boolean)[0];
+    return id && /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
+  }
+
+  if (host.endsWith("youtube.com")) {
+    const v = url.searchParams.get("v");
+    if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
+
+    const parts = url.pathname.split("/").filter(Boolean);
+    // /shorts/:id, /embed/:id, /live/:id
+    const markerIdx = parts.findIndex((p) => p === "shorts" || p === "embed" || p === "live");
+    if (markerIdx >= 0) {
+      const id = parts[markerIdx + 1];
+      return id && /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
+    }
+  }
+
+  return null;
 }

@@ -6,6 +6,8 @@ import { GuestInvitePopup } from "@/components/GuestInvitePopup";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { ui } from "@/lib/i18n";
 import { getServerLang } from "@/lib/i18nServer";
+import { YouTubeInlinePlayer } from "@/components/YouTubeInlinePlayer";
+import { getYouTubeVideoId } from "@/lib/youtube";
 
 export const revalidate = 86400;
 
@@ -165,6 +167,7 @@ export default async function HomePage() {
 
   const posts = (youtubePosts ?? []) as ExternalPost[];
   const latestEpisode = posts.find((post) => !isShort(post));
+  const latestYtId = latestEpisode?.source_url ? getYouTubeVideoId(latestEpisode.source_url) : null;
   const promotions = ((promotionsRaw ?? []) as Promotion[]);
 
   const hasLatestSection = settings.show_latest_news || settings.show_latest_blog || settings.show_latest_community_post;
@@ -197,8 +200,19 @@ export default async function HomePage() {
         <div className="container">
           <article className="card home-lead-card">
             <span className="badge">{t.home.latestFullEpisode}</span>
-            {latestEpisode?.media_url ? <img className="cover-wide" src={latestEpisode.media_url} alt={latestEpisode.title} /> : null}
-            <h2 style={{ marginTop: 10 }}>{latestEpisode?.title ?? t.home.noEpisodes}</h2>
+            {latestYtId ? (
+              <YouTubeInlinePlayer
+                videoId={latestYtId}
+                title={latestEpisode?.title ?? null}
+                thumbnailUrl={latestEpisode?.media_url ?? null}
+                className="yt-inline"
+              />
+            ) : latestEpisode?.media_url ? (
+              <img className="cover-wide" src={latestEpisode.media_url} alt={latestEpisode.title} />
+            ) : null}
+            <h2 className="clamp-2" style={{ marginTop: 10 }}>
+              {latestEpisode?.title ?? t.home.noEpisodes}
+            </h2>
             <div className="muted metrics-row">
               <span>Views: {formatMetric(latestEpisode?.metrics?.views)}</span>
               <span>Likes: {formatMetric(latestEpisode?.metrics?.likes)}</span>
