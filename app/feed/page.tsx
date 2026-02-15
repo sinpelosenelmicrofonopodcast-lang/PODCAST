@@ -5,7 +5,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { ShareButtons } from "@/components/ShareButtons";
 import { YouTubeInlinePlayer } from "@/components/YouTubeInlinePlayer";
 import { getYouTubeVideoId } from "@/lib/youtube";
-import { PODCAST_RSS_URL } from "@/lib/podcastRss";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,15 +27,30 @@ export default async function FeedPage({
 }: {
   searchParams?: { view?: "episodes" | "shorts" | "all" };
 }) {
+  const ua = headers().get("user-agent") ?? "";
+  const isMobileUA = /(Android|iPhone|iPad|iPod|Mobile)/i.test(ua);
+
   const supabase = supabaseServer();
   const view = (searchParams?.view ?? "all") as "episodes" | "shorts" | "all";
   const { data } = await supabase
     .from("external_posts")
     .select("id, platform, title, caption, metrics, source_url, posted_at, media_url")
     .order("posted_at", { ascending: false })
-    .limit(50);
+    .limit(isMobileUA ? 24 : 50);
 
   const buildHref = (next: "episodes" | "shorts" | "all") => `/feed?view=${next}`;
+
+  const isShortPost = (post: any) => {
+    const metrics = (post.metrics as any) ?? {};
+    if (metrics.isShort === true) return true;
+    const duration = Number(metrics.durationSeconds);
+    if (!Number.isNaN(duration) && duration > 0 && duration <= 60) return true;
+    const sourceUrl = String(post.source_url ?? "");
+    if (sourceUrl.includes("youtube.com/shorts/")) return true;
+    const t = `${post.title ?? ""} ${post.caption ?? ""}`.toLowerCase();
+    if (t.includes("#shorts") || t.includes(" #short ")) return true;
+    return false;
+  };
 
   return (
     <main>
@@ -60,28 +75,47 @@ export default async function FeedPage({
                 <a className={view === "episodes" ? "feed-subtab active" : "feed-subtab"} href={buildHref("episodes")}>Capítulos</a>
                 <a className={view === "shorts" ? "feed-subtab active" : "feed-subtab"} href={buildHref("shorts")}>Shorts</a>
               </div>
-              <a className="button secondary" href={PODCAST_RSS_URL} target="_blank" rel="noreferrer">
-                RSS (Audio)
+              <a className="button secondary" href="/rss">
+                Podcast (Audio)
               </a>
             </div>
           </div>
           {data && data.length > 0 ? (
             <div style={{ marginTop: 20, display: "grid", gap: 24 }}>
               {(() => {
-                const isShortPost = (post: any) => {
-                  const metrics = (post.metrics as any) ?? {};
-                  if (metrics.isShort === true) return true;
-                  const duration = Number(metrics.durationSeconds);
-                  if (!Number.isNaN(duration) && duration > 0 && duration <= 60) return true;
-                  const sourceUrl = String(post.source_url ?? "");
-                  if (sourceUrl.includes("youtube.com/shorts/")) return true;
-                  const t = `${post.title ?? ""} ${post.caption ?? ""}`.toLowerCase();
-                  if (t.includes("#shorts") || t.includes(" #short ")) return true;
-                  return false;
-                };
-
                 const full = data.filter((post) => !isShortPost(post));
                 const shorts = data.filter((post) => isShortPost(post));
+
+                const mobileItems =
+                  view === "episodes" ? full.slice(0, 12) : view === "shorts" ? shorts.slice(0, 12) : data.slice(0, 12);
+
+                const renderMobileItem = (post: any) => {
+                  const metrics = (post.metrics as any) ?? {};
+                  const ytId = post.platform === "YouTube" ? getYouTubeVideoId(post.source_url) : null;
+                  const thumb = post.media_url || (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : "");
+                  const href = String(post.source_url ?? "").trim() || "#";
+                  return (
+                    <a key={post.id} className="feed-mini" href={href} target="_blank" rel="noreferrer">
+                      <div className="feed-mini-thumb">
+                        {thumb ? <img src={thumb} alt={post.title ?? "Post"} loading="lazy" /> : <div className="feed-mini-fallback" />}
+                      </div>
+                      <div className="feed-mini-body">
+                        <div className="feed-mini-top">
+                          <div className="feed-mini-title clamp-2">{post.title ?? "Post sin título"}</div>
+                          <span className="badge">{post.platform}</span>
+                        </div>
+                        {post.caption ? <div className="muted clamp-2">{post.caption}</div> : null}
+                        <div className="feed-mini-meta muted">
+                          <span>{post.posted_at ? new Date(post.posted_at).toLocaleDateString("es-PR") : ""}</span>
+                          <span className="dot">·</span>
+                          <span>👁 {formatNumber(metrics.views)}</span>
+                          <span className="dot">·</span>
+                          <span>♥ {formatNumber(metrics.likes)}</span>
+                        </div>
+                      </div>
+                    </a>
+                  );
+                };
 
                 const renderCard = (post: any) => {
                   const metrics = (post.metrics as any) ?? {};
@@ -138,6 +172,22 @@ export default async function FeedPage({
                     </article>
                   );
                 };
+
+                if (isMobileUA) {
+                  return (
+                    <div className="feed-mobile">
+                      <div className="feed-mobile-head">
+                        <h2 className="section-title" style={{ fontSize: 22, margin: 0 }}>Últimos</h2>
+                        <a className="button secondary" href={buildHref("all")}>
+                          Ver todo
+                        </a>
+                      </div>
+                      <div className="feed-mini-list">
+                        {mobileItems.map(renderMobileItem)}
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
                   <>
