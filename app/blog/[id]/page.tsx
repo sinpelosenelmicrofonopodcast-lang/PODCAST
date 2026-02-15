@@ -106,7 +106,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
               <h1 className="section-title" style={{ marginTop: 0 }}>
                 No encontrado
               </h1>
-              <p className="muted">Este articulo no existe o fue eliminado.</p>
+              <p className="muted">Este artículo no existe o fue eliminado.</p>
               <Link className="button secondary" href="/blog">
                 Volver al blog
               </Link>
@@ -130,9 +130,9 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
   const hook = paragraphBlocks.slice(0, 3).map((b) => String(b.text));
   const trio = paragraphBlocks.slice(3, 6).map((b) => String(b.text));
 
-  const what = trio[0] ?? "Que esta pasando: contexto directo, sin adornos.";
-  const why = trio[1] ?? "Por que importa: impacto real, no teorias.";
-  const who = trio[2] ?? "A quien afecta: a quien lo vive, lo paga o lo sufre.";
+  const what = trio[0] ?? "Qué está pasando: contexto directo, sin adornos.";
+  const why = trio[1] ?? "Por qué importa: impacto real, no teorías.";
+  const who = trio[2] ?? "A quién afecta: a quien lo vive, lo paga o lo sufre.";
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -258,13 +258,13 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
 
               <section className="mag-cta">
                 <div className="mag-cta-inner">
-                  <div className="mag-cta-title">Conclusion</div>
+                  <div className="mag-cta-title">Conclusión</div>
                   <p className="mag-cta-text">
-                    Si esto te hizo pensar, perfecto. Si te pico, mejor. Aqui no se escribe para caer bien.
+                    Si esto te hizo pensar, perfecto. Si te picó, mejor. Aquí no se escribe para caer bien.
                   </p>
                   <div className="mag-cta-actions">
                     <Link className="mag-btn mag-btn-primary" href="/blog">
-                      Leer mas
+                      Leer más
                     </Link>
                     <a className="mag-btn mag-btn-ghost" href="#top">
                       Subir
@@ -273,7 +273,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
                 </div>
               </section>
 
-              <NewsletterForm variant="cta" title="Recibe lo nuevo primero" subtitle="Analisis, noticias y cultura. Directo a tu inbox." />
+              <NewsletterForm variant="cta" title="Recibe lo nuevo primero" subtitle="Análisis, noticias y cultura. Directo a tu inbox." />
 
               <div className="post-footer-actions">
                 <Link className="mag-btn mag-btn-ghost" href="/blog">

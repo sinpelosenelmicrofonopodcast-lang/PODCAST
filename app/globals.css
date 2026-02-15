@@ -1211,20 +1211,23 @@ body {
    Modern, premium editorial look. Does NOT affect other pages.
    ========================= */
 .blog-mag {
-  --mag-black: #111111;
-  --mag-dark: #222222;
-  --mag-soft: #f7f7f7;
-  --mag-white: #ffffff;
-  --mag-border: rgba(17, 17, 17, 0.10);
-  --mag-border-2: rgba(17, 17, 17, 0.16);
-  --mag-text: rgba(17, 17, 17, 0.92);
-  --mag-muted: rgba(17, 17, 17, 0.62);
+  /* Keep site palette (dark) while using a magazine/editorial layout. */
+  --mag-bg: var(--bg);
+  --mag-bg-alt: var(--bg-alt);
+  --mag-panel: var(--panel);
+  --mag-panel-2: var(--panel-2);
+  --mag-border: rgba(255, 255, 255, 0.10);
+  --mag-border-2: rgba(255, 255, 255, 0.16);
+  --mag-text: rgba(248, 245, 242, 0.96);
+  --mag-muted: rgba(248, 245, 242, 0.68);
 
-  background: var(--mag-soft);
+  background: radial-gradient(circle at top, rgba(255, 122, 24, 0.08), transparent 55%),
+    radial-gradient(circle at 20% 20%, rgba(255, 204, 51, 0.08), transparent 45%),
+    var(--mag-bg);
   color: var(--mag-text);
   /* Font stacks: no remote font fetches (build-safe). */
   --font-blog-serif: ui-serif, Georgia, "Times New Roman", Times, serif;
-  --font-blog-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  --font-blog-sans: var(--font-body);
   font-family: var(--font-blog-sans);
 }
 
@@ -1241,15 +1244,15 @@ body {
 }
 
 .blog-mag .card {
-  background: var(--mag-white);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 55%), var(--mag-panel);
   border: 1px solid var(--mag-border);
-  box-shadow: none;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.35);
 }
 
 .blog-mag .pill {
-  background: rgba(17, 17, 17, 0.06);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--mag-border);
-  color: rgba(17, 17, 17, 0.86);
+  color: rgba(248, 245, 242, 0.88);
 }
 
 .mag-kicker {
@@ -1257,7 +1260,7 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-size: 12px;
-  color: rgba(17, 17, 17, 0.62);
+  color: rgba(248, 245, 242, 0.62);
 }
 
 .mag-h1 {
@@ -1267,13 +1270,13 @@ body {
   font-size: 46px;
   line-height: 1.02;
   margin: 6px 0 0;
-  color: var(--mag-black);
+  color: rgba(248, 245, 242, 0.98);
 }
 
 .mag-h2 {
   font-weight: 850;
   letter-spacing: -0.01em;
-  color: var(--mag-black);
+  color: rgba(248, 245, 242, 0.96);
   font-size: 22px;
   line-height: 1.15;
 }
@@ -1281,7 +1284,7 @@ body {
 .mag-h3 {
   font-weight: 850;
   letter-spacing: -0.01em;
-  color: var(--mag-black);
+  color: rgba(248, 245, 242, 0.96);
   font-size: 18px;
   line-height: 1.2;
   margin: 18px 0 8px;
@@ -1307,20 +1310,21 @@ body {
   border-radius: 10px;
   border: 1px solid var(--mag-border-2);
   background: transparent;
-  color: var(--mag-black);
+  color: rgba(248, 245, 242, 0.96);
   font-weight: 800;
   text-decoration: none;
   cursor: pointer;
 }
 
 .mag-btn-primary {
-  background: var(--mag-black);
-  color: var(--mag-white);
-  border-color: rgba(0, 0, 0, 0.65);
+  background: linear-gradient(120deg, rgba(255, 42, 42, 0.95), rgba(255, 122, 24, 0.92), rgba(255, 210, 59, 0.88));
+  color: #0b0b0f;
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: none;
 }
 
 .mag-btn-ghost {
-  background: rgba(17, 17, 17, 0.03);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .mag-blog-head {
@@ -1332,7 +1336,7 @@ body {
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   padding-bottom: 20px;
-  border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .mag-blog-tools {
@@ -1347,15 +1351,15 @@ body {
 .mag-input {
   width: 100%;
   border-radius: 12px;
-  border: 1px solid var(--mag-border);
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 8, 10, 0.70);
   padding: 12px 14px;
   outline: none;
-  color: var(--mag-black);
+  color: rgba(248, 245, 242, 0.96);
 }
 
 .mag-input::placeholder {
-  color: rgba(17, 17, 17, 0.40);
+  color: rgba(248, 245, 242, 0.46);
 }
 
 .mag-filters,
@@ -1370,17 +1374,17 @@ body {
   align-items: center;
   padding: 8px 10px;
   border-radius: 999px;
-  border: 1px solid var(--mag-border);
-  background: rgba(255, 255, 255, 0.70);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
   text-decoration: none;
   font-weight: 750;
   font-size: 12px;
-  color: rgba(17, 17, 17, 0.80);
+  color: rgba(248, 245, 242, 0.86);
 }
 
 .mag-chip.active {
-  border-color: rgba(17, 17, 17, 0.42);
-  background: rgba(17, 17, 17, 0.06);
+  border-color: rgba(255, 122, 24, 0.28);
+  background: rgba(255, 122, 24, 0.10);
 }
 
 .mag-blog-body {
@@ -1404,8 +1408,8 @@ body {
 .mag-hero {
   border-radius: 18px;
   overflow: hidden;
-  border: 1px solid rgba(17, 17, 17, 0.10);
-  background: var(--mag-white);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 55%), var(--mag-panel);
 }
 
 .mag-hero-media {
@@ -1428,13 +1432,14 @@ body {
 .mag-hero-fallback {
   width: 100%;
   height: 100%;
-  background: linear-gradient(180deg, rgba(17, 17, 17, 0.10), rgba(17, 17, 17, 0.28));
+  background: radial-gradient(600px 260px at 20% 10%, rgba(255, 122, 24, 0.20), rgba(0, 0, 0, 0.0) 65%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.22));
 }
 
 .mag-hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.72));
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.00), rgba(0, 0, 0, 0.78));
 }
 
 .mag-hero-content {
@@ -1494,7 +1499,7 @@ body {
 
 .blog-mag .mag-card .mag-meta,
 .blog-mag .mag-side .mag-meta {
-  color: rgba(17, 17, 17, 0.62);
+  color: rgba(248, 245, 242, 0.60);
 }
 
 .mag-meta .dot {
@@ -1536,8 +1541,8 @@ body {
 .mag-card {
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid var(--mag-border);
-  background: var(--mag-white);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 55%), var(--mag-panel);
 }
 
 .mag-card-media {
@@ -1557,7 +1562,7 @@ body {
 .mag-card-fallback {
   width: 100%;
   height: 100%;
-  background: linear-gradient(180deg, rgba(17, 17, 17, 0.08), rgba(17, 17, 17, 0.18));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.22));
 }
 
 .mag-card-body {
@@ -1589,10 +1594,10 @@ body {
 }
 
 .mag-side {
-  border: 1px solid var(--mag-border);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.72);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 65%), var(--mag-panel);
 }
 
 .mag-side-title {
@@ -1600,7 +1605,7 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-size: 12px;
-  color: rgba(17, 17, 17, 0.70);
+  color: rgba(248, 245, 242, 0.70);
 }
 
 .mag-side-list {
@@ -1616,8 +1621,8 @@ body {
   text-decoration: none;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(17, 17, 17, 0.08);
-  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.12);
 }
 
 /* Post page */
@@ -1625,8 +1630,8 @@ body {
   position: relative;
   padding: 42px 0 34px;
   color: #ffffff;
-  background: radial-gradient(900px 260px at 0% 0%, rgba(255, 122, 24, 0.12), rgba(0, 0, 0, 0) 55%),
-    linear-gradient(180deg, rgba(17, 17, 17, 0.86), rgba(17, 17, 17, 0.98));
+  background: radial-gradient(900px 260px at 0% 0%, rgba(255, 122, 24, 0.14), rgba(0, 0, 0, 0) 55%),
+    linear-gradient(180deg, rgba(8, 8, 10, 0.82), rgba(7, 7, 8, 0.98));
 }
 
 .mag-post-hero::before {
@@ -1694,7 +1699,7 @@ body {
 
 .mag-post-body {
   padding: 22px 0 60px;
-  background: var(--mag-soft);
+  background: var(--mag-bg-alt);
 }
 
 .mag-post-shell {
@@ -1706,8 +1711,8 @@ body {
 
 .mag-post-article {
   max-width: 720px;
-  background: var(--mag-white);
-  border: 1px solid var(--mag-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 65%), var(--mag-panel);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
   padding: 22px;
 }
@@ -1715,7 +1720,7 @@ body {
 .mag-reading {
   margin-top: 16px;
   line-height: 1.85;
-  color: rgba(17, 17, 17, 0.88);
+  color: rgba(248, 245, 242, 0.86);
   font-size: 16px;
 }
 
@@ -1727,46 +1732,46 @@ body {
 .mag-quote {
   margin: 18px 0;
   padding: 16px 18px;
-  background: #f1f1f1;
-  border-left: 4px solid rgba(17, 17, 17, 0.34);
-  color: rgba(17, 17, 17, 0.80);
+  background: rgba(0, 0, 0, 0.18);
+  border-left: 4px solid rgba(255, 122, 24, 0.45);
+  color: rgba(248, 245, 242, 0.84);
   border-radius: 14px;
 }
 
 .blog-mag .callout {
-  border: 1px solid rgba(17, 17, 17, 0.10);
-  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.16);
   box-shadow: none;
 }
 
 .blog-mag .callout-title {
-  color: rgba(17, 17, 17, 0.70);
+  color: rgba(248, 245, 242, 0.70);
 }
 
 .blog-mag .callout-hook {
   max-width: 62ch;
   margin: 16px auto 0;
   padding: 18px 18px;
-  background: #f7f7f7;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .blog-mag .callout-body {
-  color: rgba(17, 17, 17, 0.86);
+  color: rgba(248, 245, 242, 0.88);
   font-size: 16px;
   line-height: 1.75;
 }
 
 .blog-mag .problem-card {
-  background: #ffffff;
-  border: 1px solid rgba(17, 17, 17, 0.10);
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .blog-mag .problem-kicker {
-  color: rgba(17, 17, 17, 0.70);
+  color: rgba(248, 245, 242, 0.70);
 }
 
 .blog-mag .problem-text {
-  color: rgba(17, 17, 17, 0.84);
+  color: rgba(248, 245, 242, 0.86);
 }
 
 .mag-cta {
@@ -1805,38 +1810,38 @@ body {
 
 .blog-mag .newsletter-cta {
   margin-top: 18px;
-  border: 1px solid rgba(17, 17, 17, 0.10);
-  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.14);
 }
 
 .blog-mag .newsletter-cta .button {
-  background: var(--mag-black);
-  color: var(--mag-white);
-  border: 1px solid rgba(0, 0, 0, 0.55);
+  background: linear-gradient(120deg, rgba(255, 42, 42, 0.95), rgba(255, 122, 24, 0.92), rgba(255, 210, 59, 0.88));
+  color: #0b0b0f;
+  border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .blog-mag .newsletter-cta .input {
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(17, 17, 17, 0.12);
-  color: var(--mag-black);
+  background: rgba(8, 8, 10, 0.70);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(248, 245, 242, 0.96);
 }
 
 .blog-mag .newsletter .button {
-  background: var(--mag-black);
-  color: var(--mag-white);
-  border: 1px solid rgba(0, 0, 0, 0.55);
+  background: linear-gradient(120deg, rgba(255, 42, 42, 0.95), rgba(255, 122, 24, 0.92), rgba(255, 210, 59, 0.88));
+  color: #0b0b0f;
+  border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .blog-mag .newsletter .input {
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(17, 17, 17, 0.12);
-  color: var(--mag-black);
+  background: rgba(8, 8, 10, 0.70);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(248, 245, 242, 0.96);
 }
 
 .blog-mag .button.secondary.toc-toggle {
-  background: rgba(17, 17, 17, 0.05);
-  color: var(--mag-black);
-  border: 1px solid rgba(17, 17, 17, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(248, 245, 242, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .mag-related {
@@ -1848,12 +1853,12 @@ body {
 }
 
 .blog-mag .toc-list a {
-  color: rgba(17, 17, 17, 0.72);
-  border-bottom-color: rgba(17, 17, 17, 0.10);
+  color: rgba(248, 245, 242, 0.78);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
 }
 
 .blog-mag .reading-progress {
-  background: rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 @media (max-width: 1020px) {

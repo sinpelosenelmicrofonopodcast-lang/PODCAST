@@ -154,7 +154,7 @@ export default async function BlogIndexPage({
             <div className="mag-blog-title">
               <div className="mag-kicker">Editorial</div>
               <h1 className="mag-h1">Blog</h1>
-              <p className="mag-sub">Analisis, cultura y medios. Enfoque PR · TX · USA.</p>
+              <p className="mag-sub">Análisis, cultura y medios. Enfoque PR · TX · USA.</p>
             </div>
 
             <div className="mag-blog-tools">
@@ -166,7 +166,7 @@ export default async function BlogIndexPage({
 
               <div className="mag-filters" aria-label="Filtros">
                 <Link className={sort === "latest" ? "mag-chip active" : "mag-chip"} href={buildHref({ sort: "latest" })}>
-                  Mas reciente
+                  Más reciente
                 </Link>
                 <Link className={sort === "popular" ? "mag-chip active" : "mag-chip"} href={buildHref({ sort: "popular" })}>
                   Popular
@@ -284,12 +284,12 @@ export default async function BlogIndexPage({
                     ))}
                   </div>
                 ) : (
-                  <p className="mag-small">Sin datos aun.</p>
+                  <p className="mag-small">Sin datos aún.</p>
                 )}
               </div>
 
               <div className="mag-side">
-                <div className="mag-side-title">Suscribete</div>
+                <div className="mag-side-title">Suscríbete</div>
                 <p className="mag-small" style={{ marginTop: 10 }}>
                   Sin spam. Solo lo que vale.
                 </p>

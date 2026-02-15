@@ -14,7 +14,7 @@ export function TableOfContents({ items }: { items: TocItem[] }) {
   return (
     <aside className="toc">
       <div className="toc-desktop">
-        <div className="toc-title">Indice</div>
+        <div className="toc-title">Índice</div>
         <nav aria-label="Tabla de contenido">
           <ul className="toc-list">
             {list.map((it) => (
@@ -28,11 +28,11 @@ export function TableOfContents({ items }: { items: TocItem[] }) {
 
       <div className="toc-mobile">
         <button type="button" className="button secondary toc-toggle" onClick={() => setOpen((v) => !v)}>
-          {open ? "Ocultar indice" : "Ver indice"}
+          {open ? "Ocultar índice" : "Ver índice"}
         </button>
         {open ? (
           <div className="card toc-mobile-card">
-            <div className="toc-title">Indice</div>
+            <div className="toc-title">Índice</div>
             <nav aria-label="Tabla de contenido">
               <ul className="toc-list">
                 {list.map((it) => (
@@ -55,4 +55,3 @@ export function TableOfContents({ items }: { items: TocItem[] }) {
     </aside>
   );
 }
-
