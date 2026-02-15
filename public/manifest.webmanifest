@@ -1,0 +1,16 @@
+{
+  "name": "Sin Pelos en el Micrófono",
+  "short_name": "Sin Pelos",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0b0c",
+  "theme_color": "#0b0b0c",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+
