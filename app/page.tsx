@@ -291,7 +291,7 @@ export default async function HomePage() {
                 <article className="card">
                   <span className="badge">Sin agenda</span>
                   <h3>No hay eventos próximos</h3>
-                  <p className="muted">Crea eventos desde Admin / Eventos.</p>
+                  <p className="muted">Cuando haya eventos, aparecerán aquí.</p>
                   <Link className="button secondary" href="/eventos">
                     Ir a eventos
                   </Link>
@@ -307,9 +307,6 @@ export default async function HomePage() {
           <div className="container">
             <div className="home-section-head">
               <h2 className="section-title">Promociones y anuncios</h2>
-              <Link className="muted" href="/admin/promotions">
-                Gestionar desde admin
-              </Link>
             </div>
             <div className="home-grid-ads">
               {(promotions as Promotion[] | null)?.map((promo) => (
@@ -350,7 +347,7 @@ export default async function HomePage() {
                 <article className="card ad-slot hero-ad">
                   <span className="badge">Disponible</span>
                   <h3>Espacio para marcas</h3>
-                  <p className="muted">Activa promociones desde Admin / Promociones o solicita media kit.</p>
+                  <p className="muted">Contáctanos para promocionar tu marca en Sin Pelos.</p>
                   <a className="button secondary" href="mailto:sinpelosenelmicrofonopodcast@gmail.com?subject=Media%20Kit%20Sin%20Pelos">
                     Solicitar media kit
                   </a>

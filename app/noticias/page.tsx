@@ -136,7 +136,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
             </div>
           ) : (
             <div className="card" style={{ marginTop: 20 }}>
-              <p className="muted">No hay noticias cargadas aún. Puedes publicarlas desde el panel admin.</p>
+              <p className="muted">No hay noticias cargadas aún.</p>
             </div>
           )}
         </div>
