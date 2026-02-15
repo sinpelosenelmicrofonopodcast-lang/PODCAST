@@ -558,6 +558,27 @@ main {
   z-index: 40;
 }
 
+.nav-menu-panel-left {
+  left: 0;
+  right: auto;
+}
+
+.nav-submenu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-submenu-btn {
+  opacity: 0.9;
+  padding: 0;
+}
+
+.nav-submenu-btn:hover {
+  opacity: 1;
+}
+
 .nav-menu-link {
   display: flex;
   align-items: center;

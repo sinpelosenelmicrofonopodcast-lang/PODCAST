@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { TopBannerPromo } from "@/components/promotions/TopBannerPromo";
@@ -11,12 +12,16 @@ import { APP_LANG_EVENT, readStoredLang, type AppLang } from "@/lib/language";
 import { supabase } from "@/lib/supabaseClient";
 
 export function Navbar() {
+  const pathname = usePathname() ?? "/";
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminCheckError, setAdminCheckError] = useState<string | null>(null);
   const [lang, setLang] = useState<AppLang>("es");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [communityOpen, setCommunityOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const communityRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -65,6 +70,36 @@ export function Navbar() {
     };
   }, []);
 
+  // UX: close dropdowns on outside click + ESC, and when route changes.
+  useEffect(() => {
+    setMenuOpen(false);
+    setCommunityOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setMenuOpen(false);
+      setCommunityOpen(false);
+    };
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const t = e.target as Node | null;
+      const inMenu = menuRef.current && t ? menuRef.current.contains(t) : false;
+      const inCommunity = communityRef.current && t ? communityRef.current.contains(t) : false;
+      if (inMenu || inCommunity) return;
+      setMenuOpen(false);
+      setCommunityOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("mousedown", onPointerDown as any, { passive: true } as any);
+    window.addEventListener("touchstart", onPointerDown as any, { passive: true } as any);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("mousedown", onPointerDown as any);
+      window.removeEventListener("touchstart", onPointerDown as any);
+    };
+  }, []);
+
   const t = navTexts[lang];
 
   const handleSignOut = async () => {
@@ -88,10 +123,42 @@ export function Navbar() {
             <Link className="nav-link" href="/feed">{t.feed}</Link>
             <Link className="nav-link" href="/noticias">{t.news}</Link>
             <Link className="nav-link" href="/podcast">{t.podcast}</Link>
-            <Link className="nav-link" href="/community">{t.community}</Link>
+
+            <div className="nav-submenu" ref={communityRef}>
+              <Link className="nav-link" href="/community">
+                {t.community}
+              </Link>
+              <button
+                className="nav-link nav-submenu-btn"
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={communityOpen}
+                aria-label={`${t.community}: abrir submenú`}
+                onClick={() => {
+                  setCommunityOpen((v) => !v);
+                  setMenuOpen(false);
+                }}
+              >
+                ▾
+              </button>
+              {communityOpen ? (
+                <div className="nav-menu-panel nav-menu-panel-left" role="menu" aria-label={`${t.community}: submenú`}>
+                  <Link className="nav-menu-link" role="menuitem" href="/foro" onClick={() => setCommunityOpen(false)}>
+                    {t.forum}
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/confesionario" onClick={() => setCommunityOpen(false)}>
+                    {t.confessional}
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/teorias" onClick={() => setCommunityOpen(false)}>
+                    {t.theories}
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+
             <Link className="nav-link nav-link-raw" href="/zona-cruda">{t.rawZone}</Link>
 
-            <div className="nav-menu">
+            <div className="nav-menu" ref={menuRef}>
               <button
                 className="nav-link nav-menu-btn"
                 type="button"
@@ -106,17 +173,8 @@ export function Navbar() {
                   <Link className="nav-menu-link" role="menuitem" href="/blog" onClick={() => setMenuOpen(false)}>
                     {t.blog}
                   </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/foro" onClick={() => setMenuOpen(false)}>
-                    {t.forum}
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/confesionario" onClick={() => setMenuOpen(false)}>
-                    {t.confessional}
-                  </Link>
                   <Link className="nav-menu-link" role="menuitem" href="/confesiones" onClick={() => setMenuOpen(false)}>
                     Confesiones
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/teorias" onClick={() => setMenuOpen(false)}>
-                    {t.theories}
                   </Link>
                   <Link className="nav-menu-link" role="menuitem" href="/eventos" onClick={() => setMenuOpen(false)}>
                     {t.events}
