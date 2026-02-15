@@ -15,7 +15,7 @@ export default async function ConfesionesPage() {
   const supabase = supabaseServer();
   const { data } = await supabase
     .from("confessions")
-    .select("id, body, created_at")
+    .select("id, body, created_at, users(nickname, avatar_url)")
     .eq("level", "public")
     .order("created_at", { ascending: false })
     .limit(20);
@@ -41,11 +41,21 @@ export default async function ConfesionesPage() {
       <Navbar />
       <section className="section">
         <div className="container">
-          <h1 className="section-title">Confesiones</h1>
+          <div className="confesionario-hero card">
+            <div className="confesionario-banner" aria-hidden="true" />
+            <div className="confesionario-overlay">
+              <span className="badge">Sección exclusiva</span>
+              <h1 className="section-title" style={{ margin: 0 }}>
+                El Confesionario Sin Pelos
+              </h1>
+              <p className="muted" style={{ margin: 0 }}>
+                “Esto no es terapia. Es realidad compartida.”
+              </p>
+            </div>
+          </div>
+
           <div className="card" style={{ marginTop: 18 }}>
-            <p className="muted" style={{ marginTop: 0 }}>
-              “Esto no es terapia. Es realidad compartida.”
-            </p>
+            <h3 style={{ marginTop: 0 }}>Reglas del confesionario</h3>
             <p>Área pública con moderación. Zona paga con confesiones crudas y respuestas sin filtro.</p>
           </div>
           <ConfesionComposer />
@@ -53,8 +63,24 @@ export default async function ConfesionesPage() {
             <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", marginTop: 20 }}>
               {data.map((item) => {
                 const replies = commentsByContent.get(item.id) ?? [];
+                const author = pickUser((item as any).users);
                 return (
                   <div key={item.id} className="card" style={{ display: "grid", gap: 12 }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <img
+                        src={author?.avatar_url ?? "/logo.png"}
+                        alt={author?.nickname ?? "avatar"}
+                        width={30}
+                        height={30}
+                        style={{ borderRadius: "50%", objectFit: "cover" }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>{author?.nickname ?? "Anónimo"}</div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          {item.created_at ? new Date(item.created_at).toLocaleDateString("es-PR") : ""}
+                        </div>
+                      </div>
+                    </div>
                     <h3>Confesión</h3>
                     <p className="muted">{item.body}</p>
                     <AdminDeleteButton table="confessions" id={item.id} label="Eliminar confesión" />

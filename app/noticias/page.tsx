@@ -85,13 +85,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="card"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: item.cover_url ? "160px 1fr" : "1fr",
-                    gap: 14,
-                    alignItems: "center"
-                  }}
+                  className={item.cover_url ? "card news-item-card" : "card"}
                 >
                   {item.cover_url ? (
                     <Link href={`/noticias/${item.id}`}>

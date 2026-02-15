@@ -90,6 +90,7 @@ export default async function HomePage() {
   const lang = getServerLang();
   const t = ui[lang];
   const nowIso = new Date().toISOString();
+  const brandTitle = "Sin Pelos en el Micrófono";
 
   const [
     { data: settingsData },
@@ -178,7 +179,7 @@ export default async function HomePage() {
         <div className="home-hero-top">
           <Logo size={90} animated />
           <div>
-            <h1 className="hero-title">{settings.hero_title}</h1>
+            <h1 className="hero-title">{brandTitle}</h1>
             <p className="hero-sub">{settings.hero_subtitle}</p>
           </div>
         </div>
@@ -226,9 +227,11 @@ export default async function HomePage() {
               {settings.show_latest_news ? (
                 <article className="card home-news-card">
                   <span className="badge">Última noticia</span>
-                  {latestNews?.cover_url ? <img className="cover-news" src={latestNews.cover_url} alt={latestNews.title} /> : null}
-                  <h3>{latestNews?.title ?? "Aún no hay noticias"}</h3>
-                  <p className="muted">{latestNews?.summary ?? "Publica noticias desde admin."}</p>
+                  {latestNews?.cover_url ? (
+                    <img className="home-latest-thumb" src={latestNews.cover_url} alt={latestNews.title} />
+                  ) : null}
+                  <h3 className="clamp-2">{latestNews?.title ?? "Aún no hay noticias"}</h3>
+                  <p className="muted clamp-3">{latestNews?.summary ?? "Próximamente."}</p>
                   <Link className="button secondary" href={latestNews?.id ? `/noticias/${latestNews.id}` : "/noticias"}>
                     Leer noticia
                   </Link>
@@ -238,9 +241,9 @@ export default async function HomePage() {
               {settings.show_latest_blog ? (
                 <article className="card">
                   <span className="badge">Último blog</span>
-                  {latestBlog?.cover_url ? <img className="cover-news" src={latestBlog.cover_url} alt={latestBlog.title} /> : null}
-                  <h3>{latestBlog?.title ?? "Aún no hay blogs"}</h3>
-                  <p className="muted">{latestBlog?.excerpt ?? "Próximamente."}</p>
+                  {latestBlog?.cover_url ? <img className="home-latest-thumb" src={latestBlog.cover_url} alt={latestBlog.title} /> : null}
+                  <h3 className="clamp-2">{latestBlog?.title ?? "Aún no hay blogs"}</h3>
+                  <p className="muted clamp-3">{latestBlog?.excerpt ?? "Próximamente."}</p>
                   <Link className="button secondary" href="/blog">
                     Ir al blog
                   </Link>
@@ -250,8 +253,8 @@ export default async function HomePage() {
               {settings.show_latest_community_post ? (
                 <article className="card">
                   <span className="badge">Último post</span>
-                  <h3>{latestCommunity?.title ?? "Aún no hay actividad"}</h3>
-                  <p className="muted">{latestCommunity?.body ?? "Crea el primer post en comunidad."}</p>
+                  <h3 className="clamp-2">{latestCommunity?.title ?? "Aún no hay actividad"}</h3>
+                  <p className="muted clamp-3">{latestCommunity?.body ?? "Crea el primer post en comunidad."}</p>
                   <Link className="button secondary" href="/community">
                     Ir a comunidad
                   </Link>

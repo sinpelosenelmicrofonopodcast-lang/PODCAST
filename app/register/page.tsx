@@ -7,6 +7,8 @@ import { Navbar } from "@/components/Navbar";
 import { Logo } from "@/components/Logo";
 
 export default function RegisterPage() {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
@@ -45,6 +47,8 @@ export default function RegisterPage() {
       password,
       options: {
         data: {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
           nickname,
           birth_date: birthDate,
           is_21_confirmed: confirm21,
@@ -74,6 +78,14 @@ export default function RegisterPage() {
             Crear cuenta
           </h1>
           <form className="card form-stack" onSubmit={handleRegister}>
+            <label>
+              Nombre real
+              <input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+            </label>
+            <label>
+              Apellido real
+              <input className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+            </label>
             <label>
               Nickname único
               <input className="input" value={nickname} onChange={(e) => setNickname(e.target.value)} required />

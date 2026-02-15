@@ -4,6 +4,7 @@ import type { Route } from "next";
 const links: Array<{ href: Route; label: string }> = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/home", label: "Home" },
+  { href: "/admin/stats", label: "Estadísticas" },
   { href: "/admin/content", label: "Contenido" },
   { href: "/admin/news", label: "Noticias" },
   { href: "/admin/blog", label: "Blog" },

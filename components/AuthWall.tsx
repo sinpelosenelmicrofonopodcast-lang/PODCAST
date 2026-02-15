@@ -19,6 +19,16 @@ export function AuthWall() {
         router.replace(`/login?next=${encodeURIComponent(pathname || "/")}`);
         return;
       }
+      const { data: profile } = await supabase
+        .from("users")
+        .select("user_status")
+        .eq("id", data.user.id)
+        .single();
+      if (profile?.user_status === "blocked") {
+        await supabase.auth.signOut();
+        router.replace("/login?blocked=1");
+        return;
+      }
       setChecking(false);
     };
     run();
@@ -48,4 +58,3 @@ export function AuthWall() {
     </div>
   );
 }
-

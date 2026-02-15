@@ -67,9 +67,16 @@ export default async function FeedPage() {
                         </a>
                       ) : null}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <h3 style={{ margin: 0, fontSize: 18 }}>{post.title ?? "Post sin título"}</h3>
+                        <h3 className="clamp-2" style={{ margin: 0, fontSize: 18 }}>
+                          {post.title ?? "Post sin título"}
+                        </h3>
                         <span className="badge">{post.platform}{isShort ? " · SHORT" : ""}</span>
                       </div>
+                      {post.caption ? (
+                        <p className="muted clamp-3" style={{ margin: 0 }}>
+                          {post.caption}
+                        </p>
+                      ) : null}
                       <div className="muted" style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 12 }}>
                         <span>Views: {formatNumber(metrics.views)}</span>
                         <span>Likes: {formatNumber(metrics.likes)}</span>
@@ -114,7 +121,7 @@ export default async function FeedPage() {
             </div>
           ) : (
             <div className="card" style={{ marginTop: 20 }}>
-              <p className="muted">Aún no hay contenido sincronizado. Entra a /admin y presiona “Sincronizar ahora”.</p>
+              <p className="muted">Aún no hay contenido para mostrar.</p>
             </div>
           )}
         </div>
