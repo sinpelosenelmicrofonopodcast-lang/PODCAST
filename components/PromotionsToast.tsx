@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { promoSectionFromPath } from "@/lib/promoSection";
 
 type Promo = {
   id: string;
@@ -22,11 +23,13 @@ export function PromotionsToast({
   minSecondsBeforeClose?: number;
 }) {
   const pathname = usePathname();
+  const section = promoSectionFromPath(pathname ?? "/");
   const [items, setItems] = useState<Promo[]>([]);
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
   const [canClose, setCanClose] = useState(false);
   const [closeIn, setCloseIn] = useState<number>(minSecondsBeforeClose);
+  const [animate, setAnimate] = useState(false);
   const timerRef = useRef<number | null>(null);
   const closeTimerRef = useRef<number | null>(null);
   const closeTickRef = useRef<number | null>(null);
@@ -45,7 +48,7 @@ export function PromotionsToast({
     }
 
     const run = async () => {
-      const res = await fetch(`/api/promotions/active?placement=${encodeURIComponent(placement)}`, {
+      const res = await fetch(`/api/promotions/active?placement=${encodeURIComponent(placement)}&section=${encodeURIComponent(section)}`, {
         cache: "no-store"
       }).catch(() => null);
       if (!res?.ok) return;
@@ -60,12 +63,24 @@ export function PromotionsToast({
     };
 
     run();
-  }, [pathname, placement, isAdminPath, minSecondsBeforeClose]);
+  }, [pathname, placement, isAdminPath, minSecondsBeforeClose, section]);
 
   const promo = useMemo(() => {
     if (items.length === 0) return null;
     return items[index % items.length] ?? null;
   }, [items, index]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!promo) return;
+    const key = `spm_promo_seen_toast_${section}_${promo.id}`;
+    const seen = sessionStorage.getItem(key) === "1";
+    if (!seen) {
+      sessionStorage.setItem(key, "1");
+      setAnimate(true);
+      window.setTimeout(() => setAnimate(false), 420);
+    }
+  }, [open, promo, section]);
 
   useEffect(() => {
     if (!open) return;
@@ -123,7 +138,7 @@ export function PromotionsToast({
 
   return (
     <div className="promo-toast-wrap" data-auth={isAuthPages ? "1" : "0"}>
-      <div className="promo-toast card" role="complementary" aria-label="Promoción">
+      <div className={`promo-toast card ${animate ? "promo-animate-in" : ""}`} role="complementary" aria-label="Promoción">
         <div className="promo-toast-top">
           <span className="badge">Promoción</span>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

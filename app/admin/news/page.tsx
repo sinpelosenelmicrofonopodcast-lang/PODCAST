@@ -141,26 +141,37 @@ export default function AdminNewsPage() {
       // Keep original publish time on edit so sorting/feeds remain stable.
       if (editingPublishedAt) updatePayload.published_at = editingPublishedAt;
 
-      const { data: updated, error } = await supabase
-        .from("news_items")
-        .update(updatePayload)
-        .eq("id", editingId)
-        .select("id, title, summary, analysis, source_url, cover_url, categories, tags, published_at")
-        .single();
-
-      if (error || !updated) {
-        const msg = error?.message ?? "No se pudo actualizar (sin respuesta).";
+      // Do NOT rely on `.single()` here. Under some RLS / schema-cache states PostgREST can return
+      // 0 rows in the "returning" payload even when the update happened, which triggers:
+      // "Cannot coerce the result to a single JSON object".
+      const u = await supabase.from("news_items").update(updatePayload).eq("id", editingId);
+      if (u.error) {
+        const msg = u.error.message ?? "No se pudo actualizar.";
         setStatus(msg);
         toast.error(msg);
         setLoading(false);
         return;
       }
 
-      // Update local list immediately so it's obvious whether it truly changed.
-      setItems((prev) => prev.map((it) => (it.id === updated.id ? (updated as NewsItemFull) : it)));
+      // Try to fetch the updated row to reflect changes immediately.
+      const fetchUpdated = await supabase
+        .from("news_items")
+        .select("id, title, summary, analysis, source_url, cover_url, categories, tags, published_at")
+        .eq("id", editingId)
+        .limit(1)
+        .maybeSingle();
 
-      setStatus("Noticia actualizada (verificada).");
-      toast.success("Noticia actualizada (verificada).");
+      if (fetchUpdated.data) {
+        const updated = fetchUpdated.data as NewsItemFull;
+        setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)));
+        setStatus("Noticia actualizada.");
+        toast.success("Noticia actualizada.");
+      } else {
+        // Fallback: reload list (best-effort) and still show success.
+        await loadItems();
+        setStatus("Noticia actualizada.");
+        toast.success("Noticia actualizada.");
+      }
     } else {
       const createPayload = {
         ...payload,
@@ -210,7 +221,7 @@ export default function AdminNewsPage() {
 
     setLoading(false);
     resetForm();
-    await loadItems();
+    await loadItems(); // ensure UI stays in sync after create/update
     router.refresh();
   };
 

@@ -386,6 +386,29 @@ main {
   flex-wrap: wrap;
 }
 
+.promo-animate-in {
+  animation: promoIn 320ms ease-out both;
+}
+
+@keyframes promoIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: saturate(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: saturate(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .promo-animate-in {
+    animation: none;
+  }
+}
+
 .mid-ad-slot {
   margin: 14px 0;
 }

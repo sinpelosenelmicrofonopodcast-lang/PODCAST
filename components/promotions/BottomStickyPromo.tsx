@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { trackPromoEvent } from "@/lib/promoTracking";
+import { promoSectionFromPath } from "@/lib/promoSection";
 
 type Promo = {
   id: string;
@@ -15,8 +16,10 @@ type Promo = {
 
 export function BottomStickyPromo() {
   const pathname = usePathname() ?? "/";
+  const section = promoSectionFromPath(pathname);
   const [promo, setPromo] = useState<Promo | null>(null);
   const [closed, setClosed] = useState(false);
+  const [animate, setAnimate] = useState(false);
   const sentImpression = useRef(false);
 
   const canShow = useMemo(() => {
@@ -27,7 +30,9 @@ export function BottomStickyPromo() {
 
   useEffect(() => {
     const run = async () => {
-      const res = await fetch("/api/promotions/active?placement=bottom_sticky&limit=1", { cache: "no-store" }).catch(() => null);
+      const res = await fetch(`/api/promotions/active?placement=bottom_sticky&limit=1&section=${encodeURIComponent(section)}`, {
+        cache: "no-store"
+      }).catch(() => null);
       if (!res?.ok) return;
       const json = await res.json().catch(() => null);
       const item = (json?.items?.[0] ?? null) as Promo | null;
@@ -36,7 +41,7 @@ export function BottomStickyPromo() {
       setClosed(false);
     };
     run();
-  }, []);
+  }, [section]);
 
   useEffect(() => {
     if (!promo) return;
@@ -44,6 +49,19 @@ export function BottomStickyPromo() {
     const dismissed = localStorage.getItem(key) === "1";
     if (dismissed) setClosed(true);
   }, [promo]);
+
+  useEffect(() => {
+    if (!promo) return;
+    if (!canShow) return;
+    if (closed) return;
+    const key = `spm_promo_seen_bottom_${section}_${promo.id}`;
+    const seen = sessionStorage.getItem(key) === "1";
+    if (!seen) {
+      sessionStorage.setItem(key, "1");
+      setAnimate(true);
+      window.setTimeout(() => setAnimate(false), 420);
+    }
+  }, [promo, section, canShow, closed]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--promo-bottom-h", promo && canShow && !closed ? "70px" : "0px");
@@ -98,7 +116,12 @@ export function BottomStickyPromo() {
   const clickable = Boolean(promo.cta_url);
 
   return (
-    <div className="promo-bottom-wrap" role="complementary" aria-label="Promoción" data-type={promo.promo_type ?? "sponsor"}>
+    <div
+      className={`promo-bottom-wrap ${animate ? "promo-animate-in" : ""}`}
+      role="complementary"
+      aria-label="Promoción"
+      data-type={promo.promo_type ?? "sponsor"}
+    >
       <div className="promo-bottom-inner">
         <div className="promo-bottom-left">
           <div className="promo-bottom-media" aria-hidden="true">

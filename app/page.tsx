@@ -65,6 +65,7 @@ type Promotion = {
   cta_url: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
+  target_sections?: string[] | null;
 };
 
 const formatDate = (value?: string | null) => {
@@ -155,16 +156,29 @@ export default async function HomePage() {
       .gte("starts_at", nowIso)
       .order("starts_at", { ascending: true })
       .limit(3),
-    supabase
-      .from("promotions")
-      .select("id, title, description, image_url, cta_label, cta_url, starts_at, ends_at")
-      .eq("placement", "home")
-      .eq("is_active", true)
-      // Keep filtering in SQL so we don't depend on string comparisons.
-      .or(`starts_at.is.null,starts_at.lte.${nowIso}`)
-      .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
-      .order("display_order", { ascending: true })
-      .limit(3)
+    (async () => {
+      const primary = await supabase
+        .from("promotions")
+        .select("id, title, description, image_url, cta_label, cta_url, starts_at, ends_at, target_sections")
+        .eq("placement", "home")
+        .eq("is_active", true)
+        .or(`starts_at.is.null,starts_at.lte.${nowIso}`)
+        .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
+        .order("display_order", { ascending: true })
+        .limit(6);
+      if (primary.error && /target_sections/i.test(primary.error.message)) {
+        return supabase
+          .from("promotions")
+          .select("id, title, description, image_url, cta_label, cta_url, starts_at, ends_at")
+          .eq("placement", "home")
+          .eq("is_active", true)
+          .or(`starts_at.is.null,starts_at.lte.${nowIso}`)
+          .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
+          .order("display_order", { ascending: true })
+          .limit(6);
+      }
+      return primary;
+    })()
   ]);
 
   const settings = (settingsData as HomeSettings | null) ?? {
@@ -182,7 +196,12 @@ export default async function HomePage() {
   const latestEpisode = posts.find((post) => !isShort(post)); // full episode only
   const clips = posts.filter((p) => isShort(p)).slice(0, 3);
   const latestYtId = latestEpisode?.source_url ? getYouTubeVideoId(latestEpisode.source_url) : null;
-  const promotions = ((promosHome ?? []) as Promotion[]);
+  const promotions = ((promosHome ?? []) as Promotion[]).filter((p) => {
+    const ts = (p as any).target_sections;
+    if (!ts || (Array.isArray(ts) && ts.length === 0)) return true; // global
+    if (!Array.isArray(ts)) return true;
+    return (ts as any[]).map((x) => String(x).toLowerCase()).includes("home");
+  });
 
   // Engagement signals (fast, small queries).
   const [

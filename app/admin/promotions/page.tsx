@@ -13,12 +13,26 @@ type Promotion = {
   cta_label: string | null;
   cta_url: string | null;
   promo_type?: "sponsor" | "internal" | "affiliate" | null;
+  target_sections?: string[] | null;
   placement: string;
   display_order: number;
   is_active: boolean;
   starts_at: string | null;
   ends_at: string | null;
 };
+
+const SECTION_OPTIONS = [
+  { key: "home", label: "Home" },
+  { key: "blog", label: "Blog" },
+  { key: "noticias", label: "Noticias" },
+  { key: "confesionario", label: "Confesionario" },
+  { key: "confesiones", label: "Confesiones" },
+  { key: "foro", label: "Foro" },
+  { key: "comunidad", label: "Comunidad" },
+  { key: "zona_cruda", label: "Zona Cruda" },
+  { key: "teorias", label: "Teorías" },
+  { key: "feed", label: "Feed" }
+];
 
 export default function AdminPromotionsPage() {
   const [items, setItems] = useState<Promotion[]>([]);
@@ -35,6 +49,7 @@ export default function AdminPromotionsPage() {
   const [placement, setPlacement] = useState("top_banner");
   const [displayOrder, setDisplayOrder] = useState(0);
   const [isActive, setIsActive] = useState(true);
+  const [targetSections, setTargetSections] = useState<string[]>([]);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -43,10 +58,10 @@ export default function AdminPromotionsPage() {
     // Avoid breaking if promo_type hasn't been migrated yet (Supabase schema cache).
     const primary = await supabase
       .from("promotions")
-      .select("id, title, description, image_url, image_path, cta_label, cta_url, promo_type, placement, display_order, is_active, starts_at, ends_at")
+      .select("id, title, description, image_url, image_path, cta_label, cta_url, promo_type, target_sections, placement, display_order, is_active, starts_at, ends_at")
       .order("display_order", { ascending: true })
       .order("created_at", { ascending: false });
-    if (primary.error && /promo_type/i.test(primary.error.message)) {
+    if (primary.error && /(promo_type|target_sections)/i.test(primary.error.message)) {
       const fallback = await supabase
         .from("promotions")
         .select("id, title, description, image_url, image_path, cta_label, cta_url, placement, display_order, is_active, starts_at, ends_at")
@@ -74,6 +89,7 @@ export default function AdminPromotionsPage() {
     setPlacement("top_banner");
     setDisplayOrder(0);
     setIsActive(true);
+    setTargetSections([]);
     setStartsAt("");
     setEndsAt("");
   };
@@ -90,6 +106,7 @@ export default function AdminPromotionsPage() {
     setPlacement(item.placement ?? "home");
     setDisplayOrder(item.display_order ?? 0);
     setIsActive(item.is_active);
+    setTargetSections((((item as any).target_sections ?? []) as any[])?.map((x) => String(x)) ?? []);
     setStartsAt(item.starts_at ? new Date(item.starts_at).toISOString().slice(0, 16) : "");
     setEndsAt(item.ends_at ? new Date(item.ends_at).toISOString().slice(0, 16) : "");
   };
@@ -172,6 +189,12 @@ export default function AdminPromotionsPage() {
       setStatus(msg);
       return;
     }
+    if (promoType !== "internal" && targetSections.length === 0) {
+      const msg = "Sponsor/Affiliate: selecciona al menos 1 sección (para no molestar en todas).";
+      toast.error(msg);
+      setStatus(msg);
+      return;
+    }
 
     const payloadBase: any = {
       title,
@@ -185,14 +208,16 @@ export default function AdminPromotionsPage() {
       is_active: isActive,
       starts_at: startsAt ? new Date(startsAt).toISOString() : null,
       ends_at: endsAt ? new Date(endsAt).toISOString() : null,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      target_sections: targetSections.length ? targetSections : null
     };
     // promo_type is optional until migrated.
     payloadBase.promo_type = promoType;
     if (editingId) {
       let { error } = await supabase.from("promotions").update(payloadBase).eq("id", editingId);
-      if (error && /promo_type/i.test(error.message)) {
+      if (error && /(promo_type|target_sections)/i.test(error.message)) {
         const { promo_type: _ignore, ...withoutType } = payloadBase;
+        delete (withoutType as any).target_sections;
         const retry = await supabase.from("promotions").update(withoutType).eq("id", editingId);
         error = retry.error;
       }
@@ -201,8 +226,9 @@ export default function AdminPromotionsPage() {
       setStatus("Promoción actualizada.");
     } else {
       let { error } = await supabase.from("promotions").insert(payloadBase);
-      if (error && /promo_type/i.test(error.message)) {
+      if (error && /(promo_type|target_sections)/i.test(error.message)) {
         const { promo_type: _ignore, ...withoutType } = payloadBase;
+        delete (withoutType as any).target_sections;
         const retry = await supabase.from("promotions").insert(withoutType);
         error = retry.error;
       }
@@ -289,6 +315,27 @@ export default function AdminPromotionsPage() {
             </select>
           </label>
           <label>
+            Secciones
+            <div className="check-grid" style={{ marginTop: 10 }}>
+              {SECTION_OPTIONS.map((s) => (
+                <label key={s.key} className="check-row compact">
+                  <input
+                    type="checkbox"
+                    checked={targetSections.includes(s.key)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setTargetSections((prev) => (checked ? [...prev, s.key] : prev.filter((x) => x !== s.key)));
+                    }}
+                  />
+                  {s.label}
+                </label>
+              ))}
+            </div>
+            <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+              Sponsor/Affiliate requieren al menos 1 sección. Internal puede ser global.
+            </p>
+          </label>
+          <label>
             Placement
             <select className="select" value={placement} onChange={(e) => setPlacement(e.target.value)}>
               <option value="top_banner">Top banner (debajo del header)</option>
@@ -330,39 +377,42 @@ export default function AdminPromotionsPage() {
         {status ? <p className="muted" style={{ margin: 0 }}>{status}</p> : null}
       </form>
 
-      <div className="card" style={{ marginTop: 24 }}>
-        <h3 style={{ marginTop: 0 }}>Promociones cargadas</h3>
-        <div className="list" style={{ marginTop: 12 }}>
-          {items.map((item) => (
-            <div key={item.id} className="card" style={{ display: "grid", gap: 10 }}>
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <img
-                  src={item.image_url ?? "/logo.png"}
-                  alt=""
-                  width={44}
-                  height={44}
-                  style={{ borderRadius: 12, objectFit: "cover", border: "1px solid rgba(255,255,255,0.12)" }}
-                  loading="lazy"
-                  decoding="async"
-                />
-                <div style={{ display: "grid", gap: 2 }}>
-                  <strong>{item.title}</strong>
-                  <span className="muted" style={{ fontSize: 12 }}>
-                    {(item.promo_type ?? "sponsor").toUpperCase()} · {item.placement} · order {item.display_order} ·{" "}
-                    {item.is_active ? "activa" : "inactiva"}
-                  </span>
+        <div className="card" style={{ marginTop: 24 }}>
+          <h3 style={{ marginTop: 0 }}>Promociones cargadas</h3>
+          <div className="list" style={{ marginTop: 12 }}>
+            {items.map((item) => (
+              <div key={item.id} className="card" style={{ display: "grid", gap: 10 }}>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <img
+                    src={item.image_url ?? "/logo.png"}
+                    alt=""
+                    width={44}
+                    height={44}
+                    style={{ borderRadius: 12, objectFit: "cover", border: "1px solid rgba(255,255,255,0.12)" }}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div style={{ display: "grid", gap: 2 }}>
+                    <strong>{item.title}</strong>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {(item.promo_type ?? "sponsor").toUpperCase()} · {item.placement} · order {item.display_order} ·{" "}
+                      {item.is_active ? "activa" : "inactiva"}
+                    </span>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      Secciones: {((item as any).target_sections ?? []).length ? ((item as any).target_sections ?? []).join(", ") : "global"}
+                    </span>
+                  </div>
+                </div>
+                <div className="admin-item-actions">
+                  <button className="button secondary" type="button" onClick={() => edit(item)}>
+                    Editar
+                  </button>
+                  <button className="button secondary" type="button" onClick={() => deletePromotion(item.id)}>
+                    Eliminar
+                  </button>
                 </div>
               </div>
-              <div className="admin-item-actions">
-                <button className="button secondary" type="button" onClick={() => edit(item)}>
-                  Editar
-                </button>
-                <button className="button secondary" type="button" onClick={() => deletePromotion(item.id)}>
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          ))}
+            ))}
           {items.length === 0 ? <p className="muted">No hay promociones.</p> : null}
         </div>
       </div>

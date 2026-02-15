@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { trackPromoEvent } from "@/lib/promoTracking";
+import { promoSectionFromPath } from "@/lib/promoSection";
 
 type Promo = {
   id: string;
@@ -15,13 +16,17 @@ type Promo = {
 
 export function TopBannerPromo() {
   const pathname = usePathname() ?? "/";
+  const section = promoSectionFromPath(pathname);
   const [promo, setPromo] = useState<Promo | null>(null);
+  const [animate, setAnimate] = useState(false);
   const sentImpression = useRef(false);
 
   // Always reserve space (no CLS). Content can be empty if no promo active.
   useEffect(() => {
     const run = async () => {
-      const res = await fetch("/api/promotions/active?placement=top_banner&limit=1", { cache: "no-store" }).catch(() => null);
+      const res = await fetch(`/api/promotions/active?placement=top_banner&limit=1&section=${encodeURIComponent(section)}`, {
+        cache: "no-store"
+      }).catch(() => null);
       if (!res?.ok) return;
       const json = await res.json().catch(() => null);
       const item = (json?.items?.[0] ?? null) as Promo | null;
@@ -29,7 +34,7 @@ export function TopBannerPromo() {
       sentImpression.current = false;
     };
     run();
-  }, []);
+  }, [section]);
 
   const canShow = useMemo(() => {
     // Avoid promos on admin pages.
@@ -39,6 +44,15 @@ export function TopBannerPromo() {
   useEffect(() => {
     if (!canShow) return;
     if (!promo) return;
+
+    const key = `spm_promo_seen_top_banner_${section}_${promo.id}`;
+    const seen = sessionStorage.getItem(key) === "1";
+    if (!seen) {
+      sessionStorage.setItem(key, "1");
+      setAnimate(true);
+      window.setTimeout(() => setAnimate(false), 420);
+    }
+
     if (sentImpression.current) return;
     sentImpression.current = true;
     trackPromoEvent({
@@ -48,7 +62,7 @@ export function TopBannerPromo() {
       path: pathname,
       promoType: promo.promo_type ?? null
     });
-  }, [promo, pathname, canShow]);
+  }, [promo, pathname, canShow, section]);
 
   const onClick = () => {
     if (!promo) return;
@@ -81,7 +95,7 @@ export function TopBannerPromo() {
   return (
     <div className="promo-top-slot" role="complementary" aria-label="Promoción" data-type={promo?.promo_type ?? "sponsor"}>
       {promo ? (
-        <Root className="promo-top-inner promo-top-banner" aria-label={title || "Promoción"} {...rootProps}>
+        <Root className={`promo-top-inner promo-top-banner ${animate ? "promo-animate-in" : ""}`} aria-label={title || "Promoción"} {...rootProps}>
           <div className="promo-top-bg" aria-hidden="true">
             <img src={imageUrl || "/logo.png"} alt="" loading="lazy" decoding="async" />
             <div className="promo-top-bg-overlay" aria-hidden="true" />

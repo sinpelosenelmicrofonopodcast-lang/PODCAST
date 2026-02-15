@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { trackPromoEvent } from "@/lib/promoTracking";
+import { promoSectionFromPath } from "@/lib/promoSection";
 
 type Promo = {
   id: string;
@@ -16,9 +17,11 @@ type Promo = {
 
 export function MidContentAdSlot() {
   const pathname = usePathname() ?? "/";
+  const section = promoSectionFromPath(pathname);
   const ref = useRef<HTMLDivElement | null>(null);
   const [promo, setPromo] = useState<Promo | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [animate, setAnimate] = useState(false);
   const sentImpression = useRef(false);
 
   useEffect(() => {
@@ -41,7 +44,9 @@ export function MidContentAdSlot() {
   useEffect(() => {
     if (!loaded) return;
     const run = async () => {
-      const res = await fetch("/api/promotions/active?placement=mid_content&limit=1", { cache: "no-store" }).catch(() => null);
+      const res = await fetch(`/api/promotions/active?placement=mid_content&limit=1&section=${encodeURIComponent(section)}`, {
+        cache: "no-store"
+      }).catch(() => null);
       if (!res?.ok) return;
       const json = await res.json().catch(() => null);
       const item = (json?.items?.[0] ?? null) as Promo | null;
@@ -49,10 +54,17 @@ export function MidContentAdSlot() {
       sentImpression.current = false;
     };
     run();
-  }, [loaded]);
+  }, [loaded, section]);
 
   useEffect(() => {
     if (!promo) return;
+    const key = `spm_promo_seen_mid_${section}_${promo.id}`;
+    const seen = sessionStorage.getItem(key) === "1";
+    if (!seen) {
+      sessionStorage.setItem(key, "1");
+      setAnimate(true);
+      window.setTimeout(() => setAnimate(false), 420);
+    }
     if (sentImpression.current) return;
     sentImpression.current = true;
     trackPromoEvent({
@@ -62,7 +74,7 @@ export function MidContentAdSlot() {
       path: pathname,
       promoType: promo.promo_type ?? null
     });
-  }, [promo, pathname]);
+  }, [promo, pathname, section]);
 
   const onClick = () => {
     if (!promo) return;
@@ -78,7 +90,7 @@ export function MidContentAdSlot() {
   return (
     <div ref={ref} className="mid-ad-slot" aria-label="Promoción">
       {promo ? (
-        <div className="card mid-ad" data-type={promo.promo_type ?? "sponsor"}>
+        <div className={`card mid-ad ${animate ? "promo-animate-in" : ""}`} data-type={promo.promo_type ?? "sponsor"}>
           <div className="mid-ad-top">
             <span className="badge">
               {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "Recomendado" : "Patrocinado"}

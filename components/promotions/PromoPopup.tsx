@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { trackPromoEvent } from "@/lib/promoTracking";
+import { promoSectionFromPath } from "@/lib/promoSection";
 
 type Promo = {
   id: string;
@@ -21,8 +22,10 @@ function isDesktop() {
 
 export function PromoPopup() {
   const pathname = usePathname() ?? "/";
+  const section = promoSectionFromPath(pathname);
   const [promo, setPromo] = useState<Promo | null>(null);
   const [open, setOpen] = useState(false);
+  const [animate, setAnimate] = useState(false);
   const timerRef = useRef<number | null>(null);
   const sentImpression = useRef(false);
 
@@ -34,7 +37,9 @@ export function PromoPopup() {
 
   useEffect(() => {
     const run = async () => {
-      const res = await fetch("/api/promotions/active?placement=popup&limit=1", { cache: "no-store" }).catch(() => null);
+      const res = await fetch(`/api/promotions/active?placement=popup&limit=1&section=${encodeURIComponent(section)}`, {
+        cache: "no-store"
+      }).catch(() => null);
       if (!res?.ok) return;
       const json = await res.json().catch(() => null);
       const item = (json?.items?.[0] ?? null) as Promo | null;
@@ -43,7 +48,7 @@ export function PromoPopup() {
       sentImpression.current = false;
     };
     run();
-  }, []);
+  }, [section]);
 
   useEffect(() => {
     if (!canShow) return;
@@ -81,6 +86,13 @@ export function PromoPopup() {
     if (!promo) return;
     if (sentImpression.current) return;
     sentImpression.current = true;
+    const key = `spm_promo_seen_popup_${section}_${promo.id}`;
+    const seen = sessionStorage.getItem(key) === "1";
+    if (!seen) {
+      sessionStorage.setItem(key, "1");
+      setAnimate(true);
+      window.setTimeout(() => setAnimate(false), 420);
+    }
     trackPromoEvent({
       promotionId: promo.id,
       placement: "popup",
@@ -88,7 +100,7 @@ export function PromoPopup() {
       path: pathname,
       promoType: promo.promo_type ?? null
     });
-  }, [open, promo, pathname]);
+  }, [open, promo, pathname, section]);
 
   const onClose = () => {
     if (!promo) return;
@@ -119,7 +131,7 @@ export function PromoPopup() {
 
   return (
     <div className="promo-popup-wrap" role="dialog" aria-modal="false" aria-label="Sugerencia">
-      <div className="promo-popup card" data-type={promo.promo_type ?? "sponsor"}>
+      <div className={`promo-popup card ${animate ? "promo-animate-in" : ""}`} data-type={promo.promo_type ?? "sponsor"}>
         <div className="promo-popup-top">
           <span className="badge">Nuevo</span>
           <button className="promo-popup-close" type="button" onClick={onClose} aria-label="Cerrar">
