@@ -31,6 +31,7 @@ export default function AdminNewsPage() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [items, setItems] = useState<NewsItem[]>([]);
+  const [postToFacebook, setPostToFacebook] = useState(true);
   const router = useRouter();
 
   const loadItems = async () => {
@@ -54,6 +55,7 @@ export default function AdminNewsPage() {
     setCategories([newsCategories[0]]);
     setTags("");
     setEditingId(null);
+    setPostToFacebook(true);
   };
 
   const handleUpload = async (file: File) => {
@@ -138,13 +140,40 @@ export default function AdminNewsPage() {
       }
       setStatus("Noticia actualizada.");
     } else {
-      const { error } = await supabase.from("news_items").insert(payload);
-      if (error) {
-        setStatus(error.message);
+      const { data: inserted, error } = await supabase.from("news_items").insert(payload).select("id").single();
+      if (error || !inserted?.id) {
+        setStatus(error?.message ?? "No se pudo publicar la noticia.");
         setLoading(false);
         return;
       }
       setStatus("Noticia publicada.");
+
+      if (postToFacebook) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) {
+          setStatus("Noticia publicada, pero no se pudo postear a Facebook (sesión inválida).");
+        } else {
+          const res = await fetch("/api/social/meta/facebook/post-news", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              newsId: inserted.id,
+              title,
+              summary
+            })
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            setStatus(`Noticia publicada, pero Facebook falló: ${json?.error ?? "error"}`);
+          } else {
+            setStatus("Noticia publicada y posteada en Facebook.");
+          }
+        }
+      }
     }
 
     setLoading(false);
@@ -216,6 +245,12 @@ export default function AdminNewsPage() {
           Tags (separados por coma)
           <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="medios, pr, politica" />
         </label>
+        {!editingId ? (
+          <label className="check-row">
+            <input type="checkbox" checked={postToFacebook} onChange={(e) => setPostToFacebook(e.target.checked)} />
+            Postear también en Facebook (con link a la noticia)
+          </label>
+        ) : null}
         <div className="form-submit-bar">
           <button className="button" type="submit" disabled={loading || uploading}>
             {loading ? "Guardando..." : uploading ? "Subiendo portada..." : editingId ? "Actualizar noticia" : "Publicar noticia"}
