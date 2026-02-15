@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { AdminDeleteButton } from "@/components/AdminDeleteButton";
+import { toast } from "@/lib/toast";
 
 type Promotion = {
   id: string;
   title: string;
   description: string | null;
   image_url: string | null;
+  image_path: string | null;
   cta_label: string | null;
   cta_url: string | null;
   placement: string;
@@ -26,6 +27,7 @@ export default function AdminPromotionsPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [imagePath, setImagePath] = useState("");
   const [ctaLabel, setCtaLabel] = useState("");
   const [ctaUrl, setCtaUrl] = useState("");
   const [placement, setPlacement] = useState("home");
@@ -33,11 +35,12 @@ export default function AdminPromotionsPage() {
   const [isActive, setIsActive] = useState(true);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const load = async () => {
     const { data } = await supabase
       .from("promotions")
-      .select("id, title, description, image_url, cta_label, cta_url, placement, display_order, is_active, starts_at, ends_at")
+      .select("id, title, description, image_url, image_path, cta_label, cta_url, placement, display_order, is_active, starts_at, ends_at")
       .order("display_order", { ascending: true })
       .order("created_at", { ascending: false });
     setItems((data as Promotion[]) ?? []);
@@ -52,6 +55,7 @@ export default function AdminPromotionsPage() {
     setTitle("");
     setDescription("");
     setImageUrl("");
+    setImagePath("");
     setCtaLabel("");
     setCtaUrl("");
     setPlacement("home");
@@ -66,6 +70,7 @@ export default function AdminPromotionsPage() {
     setTitle(item.title);
     setDescription(item.description ?? "");
     setImageUrl(item.image_url ?? "");
+    setImagePath(item.image_path ?? "");
     setCtaLabel(item.cta_label ?? "");
     setCtaUrl(item.cta_url ?? "");
     setPlacement(item.placement ?? "home");
@@ -75,6 +80,72 @@ export default function AdminPromotionsPage() {
     setEndsAt(item.ends_at ? new Date(item.ends_at).toISOString().slice(0, 16) : "");
   };
 
+  const uploadImage = async (file: File) => {
+    setUploading(true);
+    setStatus(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        toast.error("Sesión inválida. Inicia sesión como admin.");
+        setStatus("Sesión inválida.");
+        setUploading(false);
+        return;
+      }
+
+      const form = new FormData();
+      form.append("file", file);
+      if (imagePath) form.append("oldPath", imagePath);
+
+      const res = await fetch("/api/admin/promotions/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        const msg = json?.error ?? `Error subiendo imagen (HTTP ${res.status}).`;
+        toast.error(msg);
+        setStatus(msg);
+        setUploading(false);
+        return;
+      }
+
+      setImageUrl(String(json.publicUrl ?? ""));
+      setImagePath(String(json.path ?? ""));
+      toast.success("Imagen subida.");
+      setStatus("Imagen subida.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const deletePromotion = async (id: string) => {
+    if (!confirm("¿Eliminar esta promoción?")) return;
+    setStatus(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      toast.error("Sesión inválida. Inicia sesión como admin.");
+      setStatus("Sesión inválida.");
+      return;
+    }
+    const res = await fetch(`/api/admin/promotions/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.ok) {
+      const msg = json?.error ?? `No se pudo eliminar (HTTP ${res.status}).`;
+      toast.error(msg);
+      setStatus(msg);
+      return;
+    }
+    toast.success("Promoción eliminada.");
+    await load();
+  };
+
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setStatus(null);
@@ -82,6 +153,7 @@ export default function AdminPromotionsPage() {
       title,
       description: description || null,
       image_url: imageUrl || null,
+      image_path: imagePath || null,
       cta_label: ctaLabel || null,
       cta_url: ctaUrl || null,
       placement,
@@ -93,13 +165,37 @@ export default function AdminPromotionsPage() {
     };
     if (editingId) {
       const { error } = await supabase.from("promotions").update(payload).eq("id", editingId);
-      if (error) return setStatus(error.message);
+      if (error) {
+        toast.error(error.message);
+        return setStatus(error.message);
+      }
+      toast.success("Promoción actualizada.");
       setStatus("Promoción actualizada.");
     } else {
       const { error } = await supabase.from("promotions").insert(payload);
-      if (error) return setStatus(error.message);
+      if (error) {
+        toast.error(error.message);
+        return setStatus(error.message);
+      }
+      toast.success("Promoción creada.");
       setStatus("Promoción creada.");
     }
+
+    // If a promotion is turned off, remove its image from Storage and clear image fields.
+    if (editingId && !isActive && imagePath) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (token) {
+        await fetch("/api/admin/promotions/cleanup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ id: editingId })
+        }).catch(() => null);
+      }
+      setImageUrl("");
+      setImagePath("");
+    }
+
     reset();
     await load();
   };
@@ -118,8 +214,21 @@ export default function AdminPromotionsPage() {
           <textarea className="textarea" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
         <label>
-          Imagen (URL)
+          Imagen (URL) (opcional)
           <input className="input" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
+        </label>
+        <label>
+          Subir imagen
+          <input
+            className="input"
+            type="file"
+            accept="image/*"
+            disabled={uploading}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) uploadImage(file);
+            }}
+          />
         </label>
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
           <label>
@@ -161,8 +270,8 @@ export default function AdminPromotionsPage() {
           Activa
         </label>
         <div className="form-submit-bar">
-          <button className="button" type="submit">
-            {editingId ? "Actualizar promoción" : "Crear promoción"}
+          <button className="button" type="submit" disabled={uploading}>
+            {uploading ? "Subiendo imagen..." : editingId ? "Actualizar promoción" : "Crear promoción"}
           </button>
           {editingId ? (
             <button className="button secondary" type="button" onClick={reset}>
@@ -186,7 +295,9 @@ export default function AdminPromotionsPage() {
                 <button className="button secondary" type="button" onClick={() => edit(item)}>
                   Editar
                 </button>
-                <AdminDeleteButton table="promotions" id={item.id} label="Eliminar" />
+                <button className="button secondary" type="button" onClick={() => deletePromotion(item.id)}>
+                  Eliminar
+                </button>
               </div>
             </div>
           ))}
