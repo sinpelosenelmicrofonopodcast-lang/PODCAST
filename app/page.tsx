@@ -140,8 +140,11 @@ export default async function HomePage() {
       .select("id, title, description, image_url, cta_label, cta_url, starts_at, ends_at")
       .eq("placement", "home")
       .eq("is_active", true)
+      // Keep filtering in SQL so we don't depend on string comparisons.
+      .or(`starts_at.is.null,starts_at.lte.${nowIso}`)
+      .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
       .order("display_order", { ascending: true })
-      .limit(10)
+      .limit(3)
   ]);
 
   const settings = (settingsData as HomeSettings | null) ?? {
@@ -157,9 +160,7 @@ export default async function HomePage() {
 
   const posts = (youtubePosts ?? []) as ExternalPost[];
   const latestEpisode = posts.find((post) => !isShort(post));
-  const promotions = ((promotionsRaw ?? []) as Promotion[])
-    .filter((promo) => (!promo.starts_at || promo.starts_at <= nowIso) && (!promo.ends_at || promo.ends_at >= nowIso))
-    .slice(0, 3);
+  const promotions = ((promotionsRaw ?? []) as Promotion[]);
 
   const hasLatestSection = settings.show_latest_news || settings.show_latest_blog || settings.show_latest_community_post;
 
