@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { AuthWall } from "@/components/AuthWall";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { CommentComposer } from "@/components/CommentComposer";
 import { ShareButtons } from "@/components/ShareButtons";
@@ -60,6 +61,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
 
   return (
     <main>
+      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">

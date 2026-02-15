@@ -1,5 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { AuthWall } from "@/components/AuthWall";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { ZonaCrudaComposer } from "@/components/ZonaCrudaComposer";
 import { ReplyComposer } from "@/components/ReplyComposer";
@@ -23,6 +24,7 @@ export default async function ZonaCrudaPage() {
 
   return (
     <main>
+      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">

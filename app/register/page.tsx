@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Navbar } from "@/components/Navbar";
 import { Logo } from "@/components/Logo";
@@ -14,23 +15,41 @@ export default function RegisterPage() {
   const [legalAck, setLegalAck] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
+  const computeAge = (dateValue: string) => {
+    const birth = new Date(dateValue);
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const monthDiff = now.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+      age -= 1;
+    }
+    return age;
+  };
+
   const handleRegister = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setStatus(null);
 
     if (!confirm21 || !legalAck) {
-      setStatus("Debes certificar que tienes 21+ y aceptar términos de contenido adulto.");
+      setStatus("Debes certificar 21+ y aceptar Términos y Condiciones para registrarte.");
       return;
     }
 
-    const { data, error } = await supabase.auth.signUp({
+    if (!birthDate || computeAge(birthDate) < 21) {
+      setStatus("El registro está limitado a usuarios de 21 años o más.");
+      return;
+    }
+
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           nickname,
           birth_date: birthDate,
-          is_21_confirmed: confirm21
+          is_21_confirmed: confirm21,
+          legal_ack_at: new Date().toISOString(),
+          terms_accepted: true
         }
       }
     });
@@ -83,7 +102,10 @@ export default function RegisterPage() {
             </label>
             <label className="check-row">
               <input type="checkbox" checked={legalAck} onChange={(e) => setLegalAck(e.target.checked)} />
-              Acepto términos de contenido adulto y lenguaje fuerte
+              Acepto los{" "}
+              <Link href="/terminos" target="_blank">
+                Términos y Condiciones
+              </Link>
             </label>
             {status ? <p className="muted" style={{ margin: 0 }}>{status}</p> : null}
             <div className="form-submit-bar">

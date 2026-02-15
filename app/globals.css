@@ -811,6 +811,22 @@ body {
   flex-wrap: wrap;
 }
 
+.auth-wall {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.78);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.auth-wall-card {
+  width: min(520px, 94vw);
+  display: grid;
+  gap: 12px;
+}
+
 @media (max-width: 720px) {
   .input,
   .select,

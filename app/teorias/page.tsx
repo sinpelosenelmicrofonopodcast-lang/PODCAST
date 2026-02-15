@@ -1,5 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { AuthWall } from "@/components/AuthWall";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { TeoriaComposer } from "@/components/TeoriaComposer";
 import { CommentComposer } from "@/components/CommentComposer";
@@ -35,6 +36,7 @@ export default async function TeoriasPage() {
 
   return (
     <main>
+      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">

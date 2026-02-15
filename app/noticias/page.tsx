@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { AuthWall } from "@/components/AuthWall";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
 import { ShareButtons } from "@/components/ShareButtons";
 import { supabaseServer } from "@/lib/supabaseServer";
@@ -51,6 +52,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
 
   return (
     <main>
+      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">

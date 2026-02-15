@@ -1,5 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { AuthWall } from "@/components/AuthWall";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { ConfesionComposer } from "@/components/ConfesionComposer";
 import { CommentComposer } from "@/components/CommentComposer";
@@ -36,6 +37,7 @@ export default async function ConfesionesPage() {
 
   return (
     <main>
+      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">

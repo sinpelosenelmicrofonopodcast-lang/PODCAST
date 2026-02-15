@@ -1,5 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { AuthWall } from "@/components/AuthWall";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 export default async function PublicProfilePage({ params }: { params: { nickname: string } }) {
@@ -19,6 +20,7 @@ export default async function PublicProfilePage({ params }: { params: { nickname
 
   return (
     <main>
+      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">

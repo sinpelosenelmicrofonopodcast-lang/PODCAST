@@ -1,37 +1,62 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { AuthWall } from "@/components/AuthWall";
+import { supabaseServer } from "@/lib/supabaseServer";
 
-const events = [
-  {
-    id: "e1",
-    title: "Town Hall: ¿quién decide lo que es verdad?",
-    date: "Viernes · 9:00 PM"
-  },
-  {
-    id: "e2",
-    title: "Debate en vivo: medios vs ciudadanía",
-    date: "Domingo · 8:00 PM"
-  }
-];
+export const revalidate = 3600;
 
-export default function EventosPage() {
+type LiveEvent = {
+  id: string;
+  title: string;
+  description: string | null;
+  starts_at: string | null;
+  join_url: string | null;
+};
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "Sin fecha definida";
+  return new Date(value).toLocaleString("es-PR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+};
+
+export default async function EventosPage() {
+  const supabase = supabaseServer();
+  const { data: events } = await supabase
+    .from("live_events")
+    .select("id, title, description, starts_at, join_url")
+    .order("starts_at", { ascending: true });
+
   return (
     <main>
+      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">
           <h1 className="section-title">Eventos en Vivo</h1>
           <p className="muted">Audio rooms, debates y Q&A con enfoque adulto.</p>
           <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", marginTop: 20 }}>
-            {events.map((event) => (
+            {(events as LiveEvent[] | null)?.map((event) => (
               <div key={event.id} className="card">
                 <h3 style={{ marginTop: 0 }}>{event.title}</h3>
-                <p className="muted">{event.date}</p>
-                <button className="button secondary" type="button">
-                  Reservar lugar
-                </button>
+                <p className="muted">{event.description ?? "Debate en tiempo real."}</p>
+                <p className="muted" style={{ marginTop: -6 }}>{formatDateTime(event.starts_at)}</p>
+                {event.join_url ? (
+                  <a className="button secondary" href={event.join_url} target="_blank" rel="noreferrer">
+                    Reservar lugar
+                  </a>
+                ) : (
+                  <button className="button secondary" type="button">
+                    Pronto
+                  </button>
+                )}
               </div>
             ))}
+            {(!events || events.length === 0) ? <p className="muted">No hay eventos cargados aún.</p> : null}
           </div>
         </div>
       </section>

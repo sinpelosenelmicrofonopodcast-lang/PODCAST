@@ -1,5 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { AuthWall } from "@/components/AuthWall";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { ForoComposer } from "@/components/ForoComposer";
 import { ReplyComposer } from "@/components/ReplyComposer";
@@ -31,6 +32,7 @@ export default async function ForoPage() {
 
   return (
     <main>
+      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">
