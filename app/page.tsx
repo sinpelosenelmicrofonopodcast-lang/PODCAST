@@ -148,9 +148,9 @@ export default async function HomePage() {
   ]);
 
   const settings = (settingsData as HomeSettings | null) ?? {
-    hero_kicker: "Plataforma 21+ · Sin censura ideologica",
-    hero_title: "Sin Pelos en el Microfono",
-    hero_subtitle: "Centro de contenido, noticias y comunidad real. Hablar claro no es opcion: es la norma.",
+    hero_kicker: "Plataforma 21+ · Sin censura ideológica",
+    hero_title: "Sin Pelos en el Micrófono",
+    hero_subtitle: "Centro de contenido, noticias y comunidad real. Hablar claro no es opción: es la norma.",
     show_latest_news: true,
     show_latest_blog: true,
     show_latest_community_post: true,
