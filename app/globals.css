@@ -1055,6 +1055,11 @@ body {
   line-height: 1;
 }
 
+.promo-toast-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .promo-toast-close:hover {
   border-color: rgba(255, 59, 59, 0.6);
 }

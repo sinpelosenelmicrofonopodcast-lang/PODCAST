@@ -12,28 +12,24 @@ type Promo = {
   cta_url: string | null;
 };
 
-const CLOSED_UNTIL_KEY = "sinpelos_promo_toast_closed_until";
-
-function msUntilTomorrowLocal() {
-  const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(now.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
-  return tomorrow.getTime() - now.getTime();
-}
-
 export function PromotionsToast({
   placement = "toast",
-  secondsPerPromo = 10
+  secondsPerPromo = 10,
+  minSecondsBeforeClose = 10
 }: {
   placement?: string;
   secondsPerPromo?: number;
+  minSecondsBeforeClose?: number;
 }) {
   const pathname = usePathname();
   const [items, setItems] = useState<Promo[]>([]);
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
+  const [canClose, setCanClose] = useState(false);
+  const [closeIn, setCloseIn] = useState<number>(minSecondsBeforeClose);
   const timerRef = useRef<number | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const closeTickRef = useRef<number | null>(null);
 
   const isAdminPath = (pathname ?? "").startsWith("/admin");
   const isAuthPages =
@@ -42,9 +38,11 @@ export function PromotionsToast({
   useEffect(() => {
     if (!pathname) return;
     if (isAdminPath) return;
-
-    const closedUntil = Number(window.localStorage.getItem(CLOSED_UNTIL_KEY) ?? "0");
-    if (closedUntil && Date.now() < closedUntil) return;
+    // Requirement: promotions toast must show on entering Home.
+    if (pathname !== "/") {
+      setOpen(false);
+      return;
+    }
 
     const run = async () => {
       const res = await fetch(`/api/promotions/active?placement=${encodeURIComponent(placement)}`, {
@@ -57,10 +55,12 @@ export function PromotionsToast({
       setItems(promos);
       setIndex(0);
       setOpen(true);
+      setCanClose(false);
+      setCloseIn(Math.max(0, Math.floor(minSecondsBeforeClose)));
     };
 
     run();
-  }, [pathname, placement, isAdminPath]);
+  }, [pathname, placement, isAdminPath, minSecondsBeforeClose]);
 
   const promo = useMemo(() => {
     if (items.length === 0) return null;
@@ -83,12 +83,39 @@ export function PromotionsToast({
     };
   }, [open, promo, items.length, secondsPerPromo]);
 
+  useEffect(() => {
+    if (!open) return;
+    setCanClose(false);
+    setCloseIn(Math.max(0, Math.floor(minSecondsBeforeClose)));
+
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+    if (closeTickRef.current) window.clearInterval(closeTickRef.current);
+
+    closeTickRef.current = window.setInterval(() => {
+      setCloseIn((s) => Math.max(0, s - 1));
+    }, 1000);
+
+    closeTimerRef.current = window.setTimeout(() => {
+      setCanClose(true);
+      if (closeTickRef.current) window.clearInterval(closeTickRef.current);
+      closeTickRef.current = null;
+      setCloseIn(0);
+    }, Math.max(0, minSecondsBeforeClose) * 1000);
+
+    return () => {
+      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+      if (closeTickRef.current) window.clearInterval(closeTickRef.current);
+      closeTimerRef.current = null;
+      closeTickRef.current = null;
+    };
+  }, [open, minSecondsBeforeClose]);
+
   if (!open || !promo) return null;
   if (isAdminPath) return null;
+  if (pathname !== "/") return null;
 
   const dismiss = () => {
-    const until = Date.now() + msUntilTomorrowLocal();
-    window.localStorage.setItem(CLOSED_UNTIL_KEY, String(until));
+    if (!canClose) return;
     setOpen(false);
   };
 
@@ -99,9 +126,23 @@ export function PromotionsToast({
       <div className="promo-toast card" role="complementary" aria-label="Promoción">
         <div className="promo-toast-top">
           <span className="badge">Promoción</span>
-          <button className="promo-toast-close" type="button" onClick={dismiss} aria-label="Cerrar promoción">
-            ×
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {!canClose ? (
+              <span className="muted" style={{ fontSize: 12 }}>
+                Puedes cerrar en {closeIn}s
+              </span>
+            ) : null}
+            <button
+              className="promo-toast-close"
+              type="button"
+              onClick={dismiss}
+              aria-label="Cerrar promoción"
+              disabled={!canClose}
+              title={!canClose ? `Puedes cerrar en ${closeIn}s` : "Cerrar"}
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         {promo.image_url ? (
@@ -138,4 +179,3 @@ export function PromotionsToast({
     </div>
   );
 }
-
