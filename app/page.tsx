@@ -358,10 +358,10 @@ export default async function HomePage() {
                 <article className="card ad-slot hero-ad">
                   <span className="badge">Disponible</span>
                   <h3>Espacio para marcas</h3>
-                  <p className="muted">Contáctanos para promocionar tu marca en Sin Pelos.</p>
-                  <a className="button secondary" href="mailto:sinpelosenelmicrofonopodcast@gmail.com?subject=Media%20Kit%20Sin%20Pelos">
+                  <p className="muted">Contáctanos para promociones, banners y media kit.</p>
+                  <Link className="button secondary" href="/publicidad">
                     Solicitar media kit
-                  </a>
+                  </Link>
                 </article>
               ) : null}
             </div>
