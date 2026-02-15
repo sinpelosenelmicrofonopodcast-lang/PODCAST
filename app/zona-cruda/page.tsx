@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { ZonaCrudaComposer } from "@/components/ZonaCrudaComposer";
 import { ReplyComposer } from "@/components/ReplyComposer";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
+import { ThreadMedia } from "@/components/ThreadMedia";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,7 +17,7 @@ export default async function ZonaCrudaPage() {
   const { data } = await supabase
     .from("threads")
     .select(
-      "id, title, body, created_at, users(nickname, bio, avatar_url), replies(id, body, created_at, users(nickname, avatar_url))"
+      "id, title, body, created_at, users(nickname, bio, avatar_url), thread_media(id, storage_path, kind, mime_type, created_at), replies(id, body, created_at, users(nickname, avatar_url))"
     )
     .eq("space", "zona-cruda")
     .order("created_at", { ascending: false })
@@ -63,6 +64,7 @@ export default async function ZonaCrudaPage() {
                       <h3 style={{ marginTop: 0 }}>{thread.title}</h3>
                       <p className="muted">{thread.body ?? ""}</p>
                     </div>
+                    <ThreadMedia media={(thread as any).thread_media ?? []} />
                     <AdminDeleteButton table="threads" id={thread.id} label="Eliminar thread" />
                     <div>
                       <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>

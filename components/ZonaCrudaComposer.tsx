@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 export function ZonaCrudaComposer() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [allowed, setAllowed] = useState(false);
@@ -56,23 +57,99 @@ export function ZonaCrudaComposer() {
       return;
     }
 
-    const { error } = await supabase.from("threads").insert({
+    const { data: insertedThread, error } = await supabase.from("threads").insert({
       title,
       body,
       author_id: userId,
       space: "zona-cruda",
       visibility: "paid",
       status: "published"
-    });
+    }).select("id").single();
 
     if (error) {
-      setStatus(error.message);
+      setStatus((error as any)?.message ?? "No se pudo publicar.");
       setLoading(false);
       return;
     }
 
+    const threadId = insertedThread?.id;
+    if (!threadId) {
+      setStatus("Publicado, pero no se pudo obtener el id del post.");
+      setLoading(false);
+      return;
+    }
+
+    // Upload attachments (optional). Limits: 1 short video OR up to 6 images.
+    const selected = files ?? [];
+    const videoFiles = selected.filter((f) => f.type.startsWith("video/"));
+    const imageFiles = selected.filter((f) => f.type.startsWith("image/"));
+
+    if (videoFiles.length > 1) {
+      setStatus("Solo 1 video por post.");
+      setLoading(false);
+      return;
+    }
+    if (videoFiles.length === 1 && imageFiles.length > 0) {
+      setStatus("No mezcles video e imágenes en el mismo post (por ahora).");
+      setLoading(false);
+      return;
+    }
+    if (imageFiles.length > 6) {
+      setStatus("Máximo 6 imágenes por post.");
+      setLoading(false);
+      return;
+    }
+    const maxVideoBytes = 50 * 1024 * 1024;
+    const maxImageBytes = 8 * 1024 * 1024;
+    if (videoFiles[0] && videoFiles[0].size > maxVideoBytes) {
+      setStatus("Video demasiado grande (máx 50MB).");
+      setLoading(false);
+      return;
+    }
+    if (imageFiles.some((f) => f.size > maxImageBytes)) {
+      setStatus("Alguna imagen es demasiado grande (máx 8MB).");
+      setLoading(false);
+      return;
+    }
+
+    if (selected.length > 0) {
+      const mediaInserts: Array<any> = [];
+      for (const file of selected) {
+        const ext = file.name.split(".").pop() || "bin";
+        const safeExt = ext.toLowerCase().replace(/[^a-z0-9]+/g, "");
+        const ts = Date.now();
+        const path = `zona-cruda/${userId}/${ts}-${crypto.randomUUID()}.${safeExt}`;
+
+        const upload = await supabase.storage.from("ugc").upload(path, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type
+        });
+        if (upload.error) {
+          setStatus(`Error subiendo archivo: ${upload.error.message}`);
+          setLoading(false);
+          return;
+        }
+
+        mediaInserts.push({
+          thread_id: threadId,
+          storage_path: path,
+          kind: file.type.startsWith("video/") ? "video" : "image",
+          mime_type: file.type
+        });
+      }
+
+      if (mediaInserts.length > 0) {
+        const { error: mediaErr } = await supabase.from("thread_media").insert(mediaInserts);
+        if (mediaErr) {
+          setStatus(`Publicado, pero no se pudo guardar media: ${mediaErr.message}`);
+        }
+      }
+    }
+
     setTitle("");
     setBody("");
+    setFiles([]);
     setStatus("Publicado en Zona Cruda.");
     setLoading(false);
     router.refresh();
@@ -107,6 +184,19 @@ export function ZonaCrudaComposer() {
           onChange={(e) => setBody(e.target.value)}
           required
         />
+        <label style={{ display: "grid", gap: 6 }}>
+          Adjuntar (imágenes o 1 video corto)
+          <input
+            className="input"
+            type="file"
+            multiple
+            accept="image/*,video/*"
+            onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+          />
+          <span className="muted" style={{ fontSize: 12 }}>
+            Máx: 6 imágenes (8MB c/u) o 1 video (50MB). No se permite mezclar por ahora.
+          </span>
+        </label>
         <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} />
           Confirmo que entiendo el contenido explícito y entro bajo mi responsabilidad
