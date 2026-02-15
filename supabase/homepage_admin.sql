@@ -3,9 +3,9 @@
 -- 1) Home settings (single-row style table; latest row wins)
 create table if not exists public.home_settings (
   id uuid primary key default gen_random_uuid(),
-  hero_kicker text not null default 'Plataforma 21+ · Sin censura ideologica',
-  hero_title text not null default 'Sin Pelos en el Microfono',
-  hero_subtitle text not null default 'Centro de contenido, noticias y comunidad real. Hablar claro no es opcion: es la norma.',
+  hero_kicker text not null default 'Plataforma 21+ · Sin censura ideológica',
+  hero_title text not null default 'Sin Pelos en el Micrófono',
+  hero_subtitle text not null default 'Centro de contenido, noticias y comunidad real. Hablar claro no es opción: es la norma.',
   show_latest_news boolean not null default true,
   show_latest_blog boolean not null default true,
   show_latest_community_post boolean not null default true,
@@ -183,8 +183,7 @@ end$$;
 -- Seed one editable row if empty
 insert into public.home_settings (hero_kicker, hero_title, hero_subtitle)
 select
-  'Plataforma 21+ · Sin censura ideologica',
-  'Sin Pelos en el Microfono',
-  'Centro de contenido, noticias y comunidad real. Hablar claro no es opcion: es la norma.'
+  'Plataforma 21+ · Sin censura ideológica',
+  'Sin Pelos en el Micrófono',
+  'Centro de contenido, noticias y comunidad real. Hablar claro no es opción: es la norma.'
 where not exists (select 1 from public.home_settings);
-

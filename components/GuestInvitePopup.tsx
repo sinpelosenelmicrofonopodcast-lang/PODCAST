@@ -41,7 +41,7 @@ export function GuestInvitePopup() {
   const t = ui[lang];
 
   return (
-    <div className="guest-popup-backdrop" role="dialog" aria-modal="true" aria-label="Invitacion para salir en Sin Pelos">
+    <div className="guest-popup-backdrop" role="dialog" aria-modal="true" aria-label="Invitación para salir en Sin Pelos">
       <div className="guest-popup-card">
         <span className="badge">{t.guest.title}</span>
         <h3>{t.guest.cta}</h3>

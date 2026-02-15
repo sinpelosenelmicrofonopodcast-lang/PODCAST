@@ -66,7 +66,7 @@ export function GuestRequestForm() {
 
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
         <label>
-          Telefono / WhatsApp
+          Teléfono / WhatsApp
           <input className="input" name="phone" />
         </label>
         <label>
@@ -77,11 +77,11 @@ export function GuestRequestForm() {
 
       <label>
         Tema que quieres traer
-        <input className="input" name="topic" placeholder="Ej: Politica PR, medios, tecnologia..." required />
+        <input className="input" name="topic" placeholder="Ej: Política PR, medios, tecnología..." required />
       </label>
 
       <label>
-        Cuéntanos mas (angulo, contexto, por que importa)
+        Cuéntanos más (ángulo, contexto, por qué importa)
         <textarea className="textarea" name="details" rows={5} />
       </label>
 
@@ -99,4 +99,3 @@ export function GuestRequestForm() {
     </form>
   );
 }
-
