@@ -12,7 +12,7 @@ type Promotion = {
   image_path: string | null;
   cta_label: string | null;
   cta_url: string | null;
-  promo_type: "sponsor" | "internal" | "affiliate" | null;
+  promo_type?: "sponsor" | "internal" | "affiliate" | null;
   placement: string;
   display_order: number;
   is_active: boolean;
@@ -40,12 +40,22 @@ export default function AdminPromotionsPage() {
   const [uploading, setUploading] = useState(false);
 
   const load = async () => {
-    const { data } = await supabase
+    // Avoid breaking if promo_type hasn't been migrated yet (Supabase schema cache).
+    const primary = await supabase
       .from("promotions")
       .select("id, title, description, image_url, image_path, cta_label, cta_url, promo_type, placement, display_order, is_active, starts_at, ends_at")
       .order("display_order", { ascending: true })
       .order("created_at", { ascending: false });
-    setItems((data as Promotion[]) ?? []);
+    if (primary.error && /promo_type/i.test(primary.error.message)) {
+      const fallback = await supabase
+        .from("promotions")
+        .select("id, title, description, image_url, image_path, cta_label, cta_url, placement, display_order, is_active, starts_at, ends_at")
+        .order("display_order", { ascending: true })
+        .order("created_at", { ascending: false });
+      setItems((fallback.data as Promotion[]) ?? []);
+      return;
+    }
+    setItems((primary.data as Promotion[]) ?? []);
   };
 
   useEffect(() => {
@@ -163,14 +173,13 @@ export default function AdminPromotionsPage() {
       return;
     }
 
-    const payload = {
+    const payloadBase: any = {
       title,
       description: description || null,
       image_url: imageUrl || null,
       image_path: imagePath || null,
       cta_label: ctaLabel || null,
       cta_url: ctaUrl || null,
-      promo_type: promoType,
       placement,
       display_order: Number(displayOrder) || 0,
       is_active: isActive,
@@ -178,20 +187,26 @@ export default function AdminPromotionsPage() {
       ends_at: endsAt ? new Date(endsAt).toISOString() : null,
       updated_at: new Date().toISOString()
     };
+    // promo_type is optional until migrated.
+    payloadBase.promo_type = promoType;
     if (editingId) {
-      const { error } = await supabase.from("promotions").update(payload).eq("id", editingId);
-      if (error) {
-        toast.error(error.message);
-        return setStatus(error.message);
+      let { error } = await supabase.from("promotions").update(payloadBase).eq("id", editingId);
+      if (error && /promo_type/i.test(error.message)) {
+        const { promo_type: _ignore, ...withoutType } = payloadBase;
+        const retry = await supabase.from("promotions").update(withoutType).eq("id", editingId);
+        error = retry.error;
       }
+      if (error) return setStatus(error.message), void toast.error(error.message);
       toast.success("Promoción actualizada.");
       setStatus("Promoción actualizada.");
     } else {
-      const { error } = await supabase.from("promotions").insert(payload);
-      if (error) {
-        toast.error(error.message);
-        return setStatus(error.message);
+      let { error } = await supabase.from("promotions").insert(payloadBase);
+      if (error && /promo_type/i.test(error.message)) {
+        const { promo_type: _ignore, ...withoutType } = payloadBase;
+        const retry = await supabase.from("promotions").insert(withoutType);
+        error = retry.error;
       }
+      if (error) return setStatus(error.message), void toast.error(error.message);
       toast.success("Promoción creada.");
       setStatus("Promoción creada.");
     }

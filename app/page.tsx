@@ -8,8 +8,11 @@ import { ui } from "@/lib/i18n";
 import { getServerLang } from "@/lib/i18nServer";
 import { YouTubeInlinePlayer } from "@/components/YouTubeInlinePlayer";
 import { getYouTubeVideoId } from "@/lib/youtube";
+import { ConfessionSpotlight } from "@/components/home/ConfessionSpotlight";
+import { RegionalTabs } from "@/components/home/RegionalTabs";
+import { createClient } from "@supabase/supabase-js";
 
-export const revalidate = 86400;
+export const revalidate = 600;
 
 type ExternalPost = {
   id: string;
@@ -34,6 +37,15 @@ type HomeSettings = {
   show_latest_community_post: boolean;
   show_upcoming_events: boolean;
   show_promotions: boolean;
+};
+
+type NewsItem = {
+  id: string;
+  title: string;
+  summary: string | null;
+  cover_url: string | null;
+  categories: string[] | null;
+  published_at: string | null;
 };
 
 type LiveEvent = {
@@ -87,21 +99,30 @@ const isShort = (post: ExternalPost) => {
   return !Number.isNaN(duration) && duration > 0 && duration <= 60;
 };
 
+const dayWindowIso = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+function supabaseService() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (!url || !serviceKey) return null;
+  return createClient(url, serviceKey, { auth: { persistSession: false } });
+}
+
 export default async function HomePage() {
   const supabase = supabaseServer();
   const lang = getServerLang();
   const t = ui[lang];
   const nowIso = new Date().toISOString();
   const brandTitle = "Sin Pelos en el Micrófono";
+  const since24h = dayWindowIso(24);
 
   const [
     { data: settingsData },
     { data: youtubePosts },
     { data: latestNews },
-    { data: latestBlog },
-    { data: latestCommunity },
+    { data: hotNewsList },
     { data: upcomingEvents },
-    { data: promotionsRaw }
+    { data: promosHome }
   ] = await Promise.all([
     supabase
       .from("home_settings")
@@ -124,18 +145,10 @@ export default async function HomePage() {
       .limit(1)
       .single(),
     supabase
-      .from("blog_posts")
-      .select("id, title, excerpt, created_at, cover_url")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single(),
-    supabase
-      .from("threads")
-      .select("id, title, body, created_at")
-      .eq("space", "community")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single(),
+      .from("news_items")
+      .select("id, title, summary, published_at, cover_url, categories")
+      .order("published_at", { ascending: false })
+      .limit(24),
     supabase
       .from("live_events")
       .select("id, title, description, starts_at, join_url")
@@ -166,14 +179,69 @@ export default async function HomePage() {
   };
 
   const posts = (youtubePosts ?? []) as ExternalPost[];
-  const latestEpisode = posts.find((post) => !isShort(post));
+  const latestEpisode = posts.find((post) => !isShort(post)); // full episode only
+  const clips = posts.filter((p) => isShort(p)).slice(0, 3);
   const latestYtId = latestEpisode?.source_url ? getYouTubeVideoId(latestEpisode.source_url) : null;
-  const promotions = ((promotionsRaw ?? []) as Promotion[]);
+  const promotions = ((promosHome ?? []) as Promotion[]);
 
-  const hasLatestSection = settings.show_latest_news || settings.show_latest_blog || settings.show_latest_community_post;
+  // Engagement signals (fast, small queries).
+  const [
+    { count: newsToday },
+    { count: threadsToday },
+    { count: confessionsToday }
+  ] = await Promise.all([
+    supabase.from("news_items").select("id", { count: "exact", head: true }).gte("published_at", since24h),
+    supabase.from("threads").select("id", { count: "exact", head: true }).gte("created_at", since24h),
+    supabase.from("confessions").select("id", { count: "exact", head: true }).eq("level", "public").gte("created_at", since24h)
+  ]);
+  const newToday = Number(newsToday ?? 0) + Number(threadsToday ?? 0) + Number(confessionsToday ?? 0);
+
+  // Confession spotlight (public only).
+  const { data: confessionsSpot } = await supabase
+    .from("confessions")
+    .select("id, body, created_at, users(nickname)")
+    .eq("level", "public")
+    .order("created_at", { ascending: false })
+    .limit(8);
+
+  // "Most read" from page_visits (service role, aggregated only).
+  let mostReadNewsIds: string[] = [];
+  try {
+    const svc = supabaseService();
+    if (svc) {
+      const { data: visits } = await svc
+        .from("page_visits")
+        .select("path, visited_at")
+        .gte("visited_at", since24h)
+        .like("path", "/noticias/%")
+        .limit(2000);
+      const counts = new Map<string, number>();
+      (visits ?? []).forEach((v: any) => {
+        const m = String(v.path ?? "").match(/^\/noticias\/([0-9a-f-]{36})/i);
+        if (!m) return;
+        counts.set(m[1], (counts.get(m[1]) ?? 0) + 1);
+      });
+      mostReadNewsIds = Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([id]) => id);
+    }
+  } catch {
+    mostReadNewsIds = [];
+  }
+
+  // News cards
+  const hotNews = (hotNewsList ?? []) as NewsItem[];
+  const mostReadNews = mostReadNewsIds.length
+    ? hotNews.filter((n) => mostReadNewsIds.includes(n.id)).sort((a, b) => mostReadNewsIds.indexOf(a.id) - mostReadNewsIds.indexOf(b.id))
+    : hotNews.slice(0, 4);
+
+  // Regional slices
+  const byRegion = (key: "PR" | "TX" | "USA" | "Mundo") =>
+    hotNews.filter((n) => (n.categories ?? []).map((c) => c.toUpperCase()).includes(key.toUpperCase())).slice(0, 9);
 
   return (
-    <main className="app-enter home-v2">
+    <main className="app-enter home-v3">
       <GuestInvitePopup />
       <Navbar />
 
@@ -181,24 +249,105 @@ export default async function HomePage() {
         <span className="kicker">{settings.hero_kicker}</span>
         <div className="home-hero-top">
           <Logo size={90} animated />
-          <div>
+          <div className="home-hero-copy">
             <h1 className="hero-title">{brandTitle}</h1>
             <h2 className="hero-headline">{t.home.heroHeadline}</h2>
             <p className="hero-sub">{t.home.heroSubheadline}</p>
+            <div className="activity-pill" aria-label="Actividad de hoy">
+              <span className="pill-dot" aria-hidden="true" />
+              <span>{newToday} temas nuevos hoy</span>
+            </div>
           </div>
         </div>
         <div className="home-cta-row">
-          <Link className="button" href="/register">
-            {t.home.enterNow}
+          <Link className="button" href={latestYtId ? "#podcast" : "/feed"}>
+            Último episodio
           </Link>
-          <Link className="button secondary" href="/feed">
-            {t.home.viewUnifiedFeed}
+          <Link className="button secondary" href={latestNews?.id ? `/noticias/${latestNews.id}` : "/noticias"}>
+            Noticia caliente
           </Link>
         </div>
       </section>
 
-      <section className="section home-grid-wrap">
+      <section className="section">
         <div className="container">
+          <div className="home-section-head">
+            <h2 className="section-title">Lo que está prendiendo</h2>
+            <Link className="muted" href="/noticias">
+              Ver más
+            </Link>
+          </div>
+          <div className="home-grid-3" style={{ marginTop: 12 }}>
+            <article className="card">
+              <span className="badge">Más leído 24h</span>
+              <h3 className="clamp-2" style={{ marginTop: 10 }}>
+                {mostReadNews[0]?.title ?? "Sin datos aún"}
+              </h3>
+              <p className="muted clamp-3">{mostReadNews[0]?.summary ?? ""}</p>
+              <Link className="button secondary" href={mostReadNews[0]?.id ? `/noticias/${mostReadNews[0].id}` : "/noticias"}>
+                Leer
+              </Link>
+            </article>
+
+            <article className="card">
+              <span className="badge">Último episodio</span>
+              <h3 className="clamp-2" style={{ marginTop: 10 }}>
+                {latestEpisode?.title ?? t.home.noEpisodes}
+              </h3>
+              <div className="muted metrics-row">
+                <span>Views: {formatMetric(latestEpisode?.metrics?.views)}</span>
+                <span>Likes: {formatMetric(latestEpisode?.metrics?.likes)}</span>
+                <span>{formatDate(latestEpisode?.posted_at)}</span>
+              </div>
+              <Link className="button secondary" href="#podcast">
+                Ver aquí
+              </Link>
+            </article>
+
+            <article className="card">
+              <span className="badge">Noticia caliente</span>
+              <h3 className="clamp-2" style={{ marginTop: 10 }}>
+                {latestNews?.title ?? "Aún no hay noticias"}
+              </h3>
+              <p className="muted clamp-3">{latestNews?.summary ?? ""}</p>
+              <Link className="button secondary" href={latestNews?.id ? `/noticias/${latestNews.id}` : "/noticias"}>
+                Leer
+              </Link>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container">
+          <div className="home-section-head">
+            <h2 className="section-title">Opinión del día</h2>
+            <span className="muted">Exclusiva</span>
+          </div>
+          <article className="card home-opinion">
+            <p className="opinion-text">
+              Aquí no estamos para agradarte. Estamos para pensar sin miedo.
+            </p>
+            <div className="home-cta-row" style={{ marginTop: 12 }}>
+              <Link className="button secondary" href="/foro">
+                Abrir debate
+              </Link>
+              <Link className="button" href="/register">
+                Entrar a la comunidad
+              </Link>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="section" id="podcast">
+        <div className="container">
+          <div className="home-section-head">
+            <h2 className="section-title">Podcast Protagónico</h2>
+            <Link className="muted" href="/feed">
+              Ver feed
+            </Link>
+          </div>
           <article className="card home-lead-card">
             <span className="badge">{t.home.latestFullEpisode}</span>
             {latestYtId ? (
@@ -211,9 +360,9 @@ export default async function HomePage() {
             ) : latestEpisode?.media_url ? (
               <img className="cover-wide" src={latestEpisode.media_url} alt={latestEpisode.title} />
             ) : null}
-            <h2 className="clamp-2" style={{ marginTop: 10 }}>
+            <h3 className="clamp-2" style={{ marginTop: 10 }}>
               {latestEpisode?.title ?? t.home.noEpisodes}
-            </h2>
+            </h3>
             <div className="muted metrics-row">
               <span>Views: {formatMetric(latestEpisode?.metrics?.views)}</span>
               <span>Likes: {formatMetric(latestEpisode?.metrics?.likes)}</span>
@@ -221,64 +370,46 @@ export default async function HomePage() {
             </div>
             {latestEpisode?.source_url ? (
               <a className="button secondary" href={latestEpisode.source_url} target="_blank" rel="noreferrer">
-                {t.home.viewEpisode}
+                Ver completo en YouTube
               </a>
-            ) : (
-              <Link className="button secondary" href="/feed">
-                {t.home.viewFeed}
-              </Link>
-            )}
+            ) : null}
           </article>
+          <div className="home-grid-3" style={{ marginTop: 12 }}>
+            {clips.map((c) => (
+              <article key={c.id} className="card clip-card">
+                <span className="badge">Clip</span>
+                <h3 className="clamp-2" style={{ marginTop: 10 }}>
+                  {c.title}
+                </h3>
+                <div className="muted metrics-row">
+                  <span>Views: {formatMetric(c.metrics?.views)}</span>
+                  <span>Likes: {formatMetric(c.metrics?.likes)}</span>
+                </div>
+                {c.source_url ? (
+                  <a className="button secondary" href={c.source_url} target="_blank" rel="noreferrer">
+                    Ver clip
+                  </a>
+                ) : null}
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-      {hasLatestSection ? (
-        <section className="section">
-          <div className="container">
-            <div className="home-section-head">
-              <h2 className="section-title">Lo último</h2>
-            </div>
-            <div className="home-grid-3">
-              {settings.show_latest_news ? (
-                <article className="card home-news-card">
-                  <span className="badge">Última noticia</span>
-                  {latestNews?.cover_url ? (
-                    <img className="home-latest-thumb" src={latestNews.cover_url} alt={latestNews.title} />
-                  ) : null}
-                  <h3 className="clamp-2">{latestNews?.title ?? "Aún no hay noticias"}</h3>
-                  <p className="muted clamp-3">{latestNews?.summary ?? "Próximamente."}</p>
-                  <Link className="button secondary" href={latestNews?.id ? `/noticias/${latestNews.id}` : "/noticias"}>
-                    Leer noticia
-                  </Link>
-                </article>
-              ) : null}
+      <section className="section">
+        <div className="container">
+          <ConfessionSpotlight items={((confessionsSpot ?? []) as any[])} rotateSeconds={10} />
+        </div>
+      </section>
 
-              {settings.show_latest_blog ? (
-                <article className="card">
-                  <span className="badge">Último blog</span>
-                  {latestBlog?.cover_url ? <img className="home-latest-thumb" src={latestBlog.cover_url} alt={latestBlog.title} /> : null}
-                  <h3 className="clamp-2">{latestBlog?.title ?? "Aún no hay blogs"}</h3>
-                  <p className="muted clamp-3">{latestBlog?.excerpt ?? "Próximamente."}</p>
-                  <Link className="button secondary" href="/blog">
-                    Ir al blog
-                  </Link>
-                </article>
-              ) : null}
-
-              {settings.show_latest_community_post ? (
-                <article className="card">
-                  <span className="badge">Último post</span>
-                  <h3 className="clamp-2">{latestCommunity?.title ?? "Aún no hay actividad"}</h3>
-                  <p className="muted clamp-3">{latestCommunity?.body ?? "Crea el primer post en comunidad."}</p>
-                  <Link className="button secondary" href="/community">
-                    Ir a comunidad
-                  </Link>
-                </article>
-              ) : null}
-            </div>
-          </div>
-        </section>
-      ) : null}
+      <RegionalTabs
+        items={{
+          PR: byRegion("PR"),
+          TX: byRegion("TX"),
+          USA: byRegion("USA"),
+          Mundo: byRegion("Mundo")
+        }}
+      />
 
       {settings.show_upcoming_events ? (
         <section className="section">
@@ -313,7 +444,7 @@ export default async function HomePage() {
                 <article className="card">
                   <span className="badge">Sin agenda</span>
                   <h3>{t.home.noUpcomingEventsTitle}</h3>
-                  <p className="muted">{t.home.noUpcomingEventsBody}</p>
+                  <p className="muted">Cuando haya un evento, aparece aqui primero.</p>
                   <Link className="button secondary" href="/eventos">
                     {t.home.goToEvents}
                   </Link>
