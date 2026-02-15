@@ -73,6 +73,8 @@ export const ui: Record<
       noData: string;
     };
     home: {
+      heroHeadline: string;
+      heroSubheadline: string;
       enterNow: string;
       viewUnifiedFeed: string;
       latestSection: string;
@@ -133,6 +135,8 @@ export const ui: Record<
       noData: "Aún no hay datos."
     },
     home: {
+      heroHeadline: "La plaza pública privada donde se dice lo que otros callan.",
+      heroSubheadline: "Contenido diario y conversación directa. Entra por PR, TX o USA y quédate por la verdad incómoda.",
       enterNow: "Entrar ahora",
       viewUnifiedFeed: "Ver feed unificado",
       latestSection: "Lo último",
@@ -192,6 +196,8 @@ export const ui: Record<
       noData: "No data yet."
     },
     home: {
+      heroHeadline: "The private public square where people say what others won’t.",
+      heroSubheadline: "Daily content and direct conversation. Enter through PR, TX, or the USA and stay for the uncomfortable truth.",
       enterNow: "Enter now",
       viewUnifiedFeed: "View unified feed",
       latestSection: "Latest",

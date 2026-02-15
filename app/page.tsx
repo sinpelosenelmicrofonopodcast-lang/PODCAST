@@ -183,7 +183,8 @@ export default async function HomePage() {
           <Logo size={90} animated />
           <div>
             <h1 className="hero-title">{brandTitle}</h1>
-            <p className="hero-sub">{settings.hero_subtitle}</p>
+            <h2 className="hero-headline">{t.home.heroHeadline}</h2>
+            <p className="hero-sub">{t.home.heroSubheadline}</p>
           </div>
         </div>
         <div className="home-cta-row">
