@@ -1,8 +1,9 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { PageViewTracker } from "@/components/PageViewTracker";
-import { PromotionsToast } from "@/components/PromotionsToast";
 import { Toaster } from "@/components/Toaster";
+import { BottomStickyPromo } from "@/components/promotions/BottomStickyPromo";
+import { PromoPopup } from "@/components/promotions/PromoPopup";
 
 export const metadata: Metadata = {
   title: "Sin Pelos en el Micrófono",
@@ -22,7 +23,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="splash-logo" />
         </div>
         <PageViewTracker />
-        <PromotionsToast />
+        <BottomStickyPromo />
+        <PromoPopup />
         <Toaster />
         {children}
       </body>

@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { CommentComposer } from "@/components/CommentComposer";
 import { ShareButtons } from "@/components/ShareButtons";
+import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -85,7 +86,23 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
               </div>
               <h1 style={{ margin: 0 }}>{item.title}</h1>
               {item.summary ? <p className="muted">{item.summary}</p> : null}
-              {item.analysis ? <p>{item.analysis}</p> : null}
+
+              {(() => {
+                const text = String(item.analysis ?? "").trim();
+                if (!text) return null;
+                const parts = text.split(/\n{2,}/g).map((p) => p.trim()).filter(Boolean);
+                const insertAfter = parts.length >= 3 ? 2 : 1;
+                return (
+                  <div className="article-body">
+                    {parts.map((p, idx) => (
+                      <div key={idx}>
+                        <p>{p}</p>
+                        {idx === insertAfter ? <MidContentAdSlot /> : null}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               <ShareButtons path={`/noticias/${item.id}`} text={item.title} />
               {item.source_url ? (
                 <a className="button secondary" href={item.source_url} target="_blank" rel="noreferrer">

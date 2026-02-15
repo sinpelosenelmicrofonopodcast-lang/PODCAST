@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const placement = (url.searchParams.get("placement") ?? "toast").trim();
+    const limit = Math.min(10, Math.max(1, Number(url.searchParams.get("limit") ?? 10)));
     const nowIso = new Date().toISOString();
 
     const supabase = supabaseServer();
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
       .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
       .order("display_order", { ascending: true })
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(limit);
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
@@ -28,4 +29,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
-

@@ -30,7 +30,7 @@ export default function AdminPromotionsPage() {
   const [imagePath, setImagePath] = useState("");
   const [ctaLabel, setCtaLabel] = useState("");
   const [ctaUrl, setCtaUrl] = useState("");
-  const [placement, setPlacement] = useState("home");
+  const [placement, setPlacement] = useState("top_banner");
   const [displayOrder, setDisplayOrder] = useState(0);
   const [isActive, setIsActive] = useState(true);
   const [startsAt, setStartsAt] = useState("");
@@ -58,7 +58,7 @@ export default function AdminPromotionsPage() {
     setImagePath("");
     setCtaLabel("");
     setCtaUrl("");
-    setPlacement("home");
+    setPlacement("top_banner");
     setDisplayOrder(0);
     setIsActive(true);
     setStartsAt("");
@@ -244,10 +244,11 @@ export default function AdminPromotionsPage() {
           <label>
             Placement
             <select className="select" value={placement} onChange={(e) => setPlacement(e.target.value)}>
-              <option value="home">Home</option>
-              <option value="home_hero">Home Hero</option>
-              <option value="home_mid">Home Mid</option>
-              <option value="toast">Popup (abajo)</option>
+              <option value="top_banner">Top banner (debajo del header)</option>
+              <option value="mid_content">Mid-content (artículos)</option>
+              <option value="bottom_sticky">Barra inferior sticky</option>
+              <option value="popup">Popup controlado</option>
+              <option value="home">Home (sección promociones)</option>
             </select>
           </label>
           <label>

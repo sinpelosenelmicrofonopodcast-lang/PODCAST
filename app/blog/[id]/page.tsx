@@ -3,6 +3,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ShareButtons } from "@/components/ShareButtons";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -73,9 +74,22 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
               </p>
             ) : null}
 
-            <div className="post-body" style={{ whiteSpace: "pre-wrap", lineHeight: 1.65 }}>
-              {data.body ?? ""}
-            </div>
+            {(() => {
+              const text = String(data.body ?? "").trim();
+              if (!text) return <div className="post-body" style={{ whiteSpace: "pre-wrap", lineHeight: 1.65 }} />;
+              const parts = text.split(/\n{2,}/g).map((p) => p.trim()).filter(Boolean);
+              const insertAfter = parts.length >= 3 ? 2 : 1;
+              return (
+                <div className="post-body article-body">
+                  {parts.map((p, idx) => (
+                    <div key={idx}>
+                      <p>{p}</p>
+                      {idx === insertAfter ? <MidContentAdSlot /> : null}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </section>
@@ -83,4 +97,3 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
     </main>
   );
 }
-

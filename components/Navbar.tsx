@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { TopBannerPromo } from "@/components/promotions/TopBannerPromo";
 import { navTexts } from "@/lib/i18n";
 import { APP_LANG_EVENT, readStoredLang, type AppLang } from "@/lib/language";
 import { supabase } from "@/lib/supabaseClient";
@@ -123,6 +124,7 @@ export function Navbar() {
           )}
         </div>
       </div>
+      <TopBannerPromo />
     </nav>
   );
 }
