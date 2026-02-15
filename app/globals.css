@@ -1712,6 +1712,50 @@ body {
   margin-top: 6px;
 }
 
+.mag-episode {
+  margin-top: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  max-width: 720px;
+}
+
+.mag-episode-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mag-episode-kicker {
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.70);
+}
+
+.mag-episode-title {
+  margin-top: 6px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.mag-episode-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.yt-inline-tight {
+  border-radius: 14px;
+}
+
 .mag-post-body {
   padding: 22px 0 60px;
   background: var(--mag-bg-alt);

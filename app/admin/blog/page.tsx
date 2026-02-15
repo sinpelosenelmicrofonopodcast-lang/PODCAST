@@ -18,6 +18,8 @@ type BlogPost = {
   categories?: string[] | null;
   tags?: string[] | null;
   cover_url: string | null;
+  episode_url?: string | null;
+  episode_title?: string | null;
   created_at: string | null;
 };
 
@@ -28,6 +30,8 @@ export default function AdminBlogPage() {
   const [slug, setSlug] = useState("");
   const [body, setBody] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
+  const [episodeUrl, setEpisodeUrl] = useState("");
+  const [episodeTitle, setEpisodeTitle] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
   const [tags, setTags] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -41,9 +45,11 @@ export default function AdminBlogPage() {
     // Column-safe: don't break admin if migrations haven't been applied yet.
     const primary = await supabase
       .from("blog_posts")
-      .select("id, slug, title, excerpt, meta_description, body, cover_url, created_at, reading_time_minutes, categories, tags")
+      .select(
+        "id, slug, title, excerpt, meta_description, body, cover_url, episode_url, episode_title, created_at, reading_time_minutes, categories, tags"
+      )
       .order("created_at", { ascending: false });
-    if (primary.error && /(slug|meta_description|reading_time_minutes|categories|tags)/i.test(primary.error.message)) {
+    if (primary.error && /(slug|meta_description|reading_time_minutes|categories|tags|episode_url|episode_title)/i.test(primary.error.message)) {
       const fallback = await supabase
         .from("blog_posts")
         .select("id, title, excerpt, body, cover_url, created_at")
@@ -65,6 +71,8 @@ export default function AdminBlogPage() {
     setSlug("");
     setBody("");
     setCoverUrl("");
+    setEpisodeUrl("");
+    setEpisodeTitle("");
     setCategories([]);
     setTags("");
     setEditingId(null);
@@ -134,13 +142,15 @@ export default function AdminBlogPage() {
       tags: tagList.length ? tagList : null,
       body: body || null,
       cover_url: coverUrl || null,
+      episode_url: episodeUrl.trim() ? episodeUrl.trim() : null,
+      episode_title: episodeTitle.trim() ? episodeTitle.trim() : null,
       author_id: userId,
       updated_at: new Date().toISOString()
     };
 
     if (editingId) {
       let { error } = await supabase.from("blog_posts").update(payloadBase).eq("id", editingId);
-      if (error && /(slug|meta_description|reading_time_minutes|categories|tags|updated_at)/i.test(error.message)) {
+      if (error && /(slug|meta_description|reading_time_minutes|categories|tags|updated_at|episode_url|episode_title)/i.test(error.message)) {
         const minimal = { title, excerpt: excerpt || null, body: body || null, cover_url: coverUrl || null, author_id: userId };
         const retry = await supabase.from("blog_posts").update(minimal).eq("id", editingId);
         error = retry.error;
@@ -149,7 +159,7 @@ export default function AdminBlogPage() {
       setStatus("Artículo actualizado.");
     } else {
       let { error } = await supabase.from("blog_posts").insert(payloadBase);
-      if (error && /(slug|meta_description|reading_time_minutes|categories|tags|updated_at)/i.test(error.message)) {
+      if (error && /(slug|meta_description|reading_time_minutes|categories|tags|updated_at|episode_url|episode_title)/i.test(error.message)) {
         const minimal = { title, excerpt: excerpt || null, body: body || null, cover_url: coverUrl || null, author_id: userId };
         const retry = await supabase.from("blog_posts").insert(minimal);
         error = retry.error;
@@ -172,6 +182,8 @@ export default function AdminBlogPage() {
     setSlug((item as any).slug ?? "");
     setBody(item.body ?? "");
     setCoverUrl(item.cover_url ?? "");
+    setEpisodeUrl(String((item as any).episode_url ?? ""));
+    setEpisodeTitle(String((item as any).episode_title ?? ""));
     setCategories((item as any).categories ?? []);
     setTags(((item as any).tags ?? []).join(", "));
   };
@@ -231,6 +243,22 @@ export default function AdminBlogPage() {
         <label>
           Contenido
           <textarea className="textarea" rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
+        </label>
+        <label>
+          Episodio relacionado (URL)
+          <input
+            className="input"
+            value={episodeUrl}
+            onChange={(e) => setEpisodeUrl(e.target.value)}
+            placeholder="https://www.youtube.com/watch?v=... (o link del episodio)"
+          />
+          <div className="muted" style={{ fontSize: 12 }}>
+            Si el artículo es sobre un episodio, este link se muestra arriba (con embed si es YouTube).
+          </div>
+        </label>
+        <label>
+          Título del episodio (opcional)
+          <input className="input" value={episodeTitle} onChange={(e) => setEpisodeTitle(e.target.value)} placeholder="Ej: Episodio 142 — ..." />
         </label>
         <label>
           Cover URL

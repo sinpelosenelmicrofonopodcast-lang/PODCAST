@@ -6,12 +6,12 @@ import { ShareButtons } from "@/components/ShareButtons";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { ReadingProgressBar } from "@/components/blog/ReadingProgressBar";
 import { TableOfContents } from "@/components/blog/TableOfContents";
-import { Callout } from "@/components/blog/Callout";
-import { ProblemTrio } from "@/components/blog/ProblemTrio";
 import { NewsletterForm } from "@/components/newsletter/NewsletterForm";
+import { YouTubeInlinePlayer } from "@/components/YouTubeInlinePlayer";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { clampMetaDescription, estimateReadingTimeMinutes } from "@/lib/blogSeo";
 import { parseBlogBlocks } from "@/lib/blogContent";
+import { getYouTubeVideoId } from "@/lib/youtube";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,6 +25,8 @@ type BlogPost = {
   meta_description?: string | null;
   body: string | null;
   cover_url: string | null;
+  episode_url?: string | null;
+  episode_title?: string | null;
   created_at: string | null;
   updated_at?: string | null;
   reading_time_minutes?: number | null;
@@ -48,7 +50,9 @@ async function loadPost(idOrSlug: string) {
 
   const primary = await supabase
     .from("blog_posts")
-    .select("id, slug, title, excerpt, meta_description, body, cover_url, created_at, updated_at, reading_time_minutes, categories, tags")
+    .select(
+      "id, slug, title, excerpt, meta_description, body, cover_url, episode_url, episode_title, created_at, updated_at, reading_time_minutes, categories, tags"
+    )
     .or(`slug.eq.${key},id.eq.${key}`)
     .limit(1)
     .maybeSingle();
@@ -126,25 +130,11 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
       : estimateReadingTimeMinutes(`${data.title}\n\n${data.body ?? ""}`);
 
   const { blocks, toc } = parseBlogBlocks(String(data.body ?? ""));
-  // Avoid repeating the same intro paragraphs:
-  // - First 3 paragraphs are rendered inside the Hook callout
-  // - Next 3 paragraphs are used for the "Problema claro" trio
-  // Those paragraphs should NOT render again in the main reading flow.
-  const paragraphIdxs: number[] = [];
-  blocks.forEach((b, idx) => {
-    if (b.type === "p") paragraphIdxs.push(idx);
-  });
-  const hookIdxs = paragraphIdxs.slice(0, 3);
-  const trioIdxs = paragraphIdxs.slice(3, 6);
-  const skipIdxs = new Set<number>([...hookIdxs, ...trioIdxs]);
+  const readingBlocks = blocks;
 
-  const hook = hookIdxs.map((idx) => String((blocks[idx] as any)?.text ?? "")).filter(Boolean);
-  const trio = trioIdxs.map((idx) => String((blocks[idx] as any)?.text ?? "")).filter(Boolean);
-  const readingBlocks = blocks.filter((_, idx) => !skipIdxs.has(idx));
-
-  const what = trio[0] ?? "Qué está pasando: contexto directo, sin adornos.";
-  const why = trio[1] ?? "Por qué importa: impacto real, no teorías.";
-  const who = trio[2] ?? "A quién afecta: a quien lo vive, lo paga o lo sufre.";
+  const episodeUrl = String((data as any).episode_url ?? "").trim() || null;
+  const episodeTitle = String((data as any).episode_title ?? "").trim() || null;
+  const episodeYtId = episodeUrl ? getYouTubeVideoId(episodeUrl) : null;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -219,6 +209,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <section
+        id="top"
         className="mag-post-hero"
         style={
           data.cover_url
@@ -248,6 +239,29 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
             <div className="mag-post-share">
               <ShareButtons path={canonicalPath} text={data.title} />
             </div>
+
+            {episodeUrl ? (
+              <div className="mag-episode">
+                <div className="mag-episode-head">
+                  <div>
+                    <div className="mag-episode-kicker">Episodio relacionado</div>
+                    <div className="mag-episode-title clamp-2">{episodeTitle ?? "Ver episodio"}</div>
+                  </div>
+                  <div className="mag-episode-actions">
+                    <a className="mag-btn mag-btn-primary" href={episodeUrl} target="_blank" rel="noreferrer">
+                      Abrir
+                    </a>
+                  </div>
+                </div>
+                {episodeYtId ? (
+                  <YouTubeInlinePlayer
+                    videoId={episodeYtId}
+                    title={episodeTitle ?? data.title}
+                    className="yt-inline yt-inline-tight"
+                  />
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -258,18 +272,6 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
             <TableOfContents items={toc} />
 
             <article className="mag-post-article" id="reading-root">
-              {hook.length ? (
-                <Callout variant="hook">
-                  {hook.map((p, i) => (
-                    <p key={i} style={{ margin: i === 0 ? 0 : "10px 0 0" }}>
-                      {p}
-                    </p>
-                  ))}
-                </Callout>
-              ) : null}
-
-              <ProblemTrio what={what} why={why} who={who} />
-
               <div className="mag-reading">
                 {readingBlocks.map((b, idx) => (
                   <div key={`${b.type}-${idx}`}>
