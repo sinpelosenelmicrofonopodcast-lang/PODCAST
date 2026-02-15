@@ -13,6 +13,7 @@ export function Navbar() {
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminCheckError, setAdminCheckError] = useState<string | null>(null);
   const [lang, setLang] = useState<AppLang>("es");
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export function Navbar() {
     window.addEventListener(APP_LANG_EVENT, onLangChange);
 
     const loadProfile = async () => {
+      if (mounted) setAdminCheckError(null);
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) return;
@@ -36,14 +38,16 @@ export function Navbar() {
       if (mounted && profile?.nickname) setNickname(profile.nickname);
       if (mounted) setAvatarUrl(profile?.avatar_url ?? null);
 
-      const { data: roles } = await supabase
+      const { data: roles, error: rolesError } = await supabase
         .from("user_roles")
         .select("roles(name)")
         .eq("user_id", userId);
-      const hasAdmin = roles?.some((row: any) => {
-        const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
-        return role?.name === "admin";
-      }) ?? false;
+      if (mounted && rolesError) setAdminCheckError(rolesError.message);
+      const hasAdmin =
+        roles?.some((row: any) => {
+          const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
+          return role?.name === "admin";
+        }) ?? false;
       if (mounted) setIsAdmin(hasAdmin);
     };
 
@@ -87,6 +91,11 @@ export function Navbar() {
           <Link className="nav-link" href="/zona-cruda">{t.rawZone}</Link>
           <LanguageToggle />
           {isAdmin ? <Link className="nav-link" href="/admin">{t.dashboard}</Link> : null}
+          {!isAdmin && adminCheckError ? (
+            <Link className="nav-link" href="/admin" title={adminCheckError}>
+              {t.dashboard}
+            </Link>
+          ) : null}
           {nickname ? (
             <div className="nav-user">
               <Link href="/perfil" className="muted">
