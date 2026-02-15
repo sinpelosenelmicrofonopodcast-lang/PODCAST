@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { ShareButtons } from "@/components/ShareButtons";
 import { YouTubeInlinePlayer } from "@/components/YouTubeInlinePlayer";
 import { getYouTubeVideoId } from "@/lib/youtube";
+import { PODCAST_RSS_URL } from "@/lib/podcastRss";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -21,13 +22,20 @@ function formatDuration(seconds?: number) {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-export default async function FeedPage() {
+export default async function FeedPage({
+  searchParams
+}: {
+  searchParams?: { view?: "episodes" | "shorts" | "all" };
+}) {
   const supabase = supabaseServer();
+  const view = (searchParams?.view ?? "all") as "episodes" | "shorts" | "all";
   const { data } = await supabase
     .from("external_posts")
     .select("id, platform, title, caption, metrics, source_url, posted_at, media_url")
     .order("posted_at", { ascending: false })
     .limit(50);
+
+  const buildHref = (next: "episodes" | "shorts" | "all") => `/feed?view=${next}`;
 
   return (
     <main>
@@ -35,8 +43,28 @@ export default async function FeedPage() {
       <Navbar />
       <section className="section feed-page">
         <div className="container">
-          <h1 className="section-title">Feed Unificado</h1>
-          <p className="muted">Todo el contenido centralizado. Filtro por plataforma en versión completa.</p>
+          <div className="home-section-head">
+            <div style={{ display: "grid", gap: 6 }}>
+              <h1 className="section-title" style={{ margin: 0 }}>Feed</h1>
+              <p className="muted" style={{ margin: 0 }}>
+                {view === "episodes"
+                  ? "Capítulos completos (sin Shorts)."
+                  : view === "shorts"
+                    ? "Shorts / clips (rápido)."
+                    : "Lo último: capítulos + shorts."}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              <div className="feed-subtabs" aria-label="Vistas del feed">
+                <a className={view === "all" ? "feed-subtab active" : "feed-subtab"} href={buildHref("all")}>Todo</a>
+                <a className={view === "episodes" ? "feed-subtab active" : "feed-subtab"} href={buildHref("episodes")}>Capítulos</a>
+                <a className={view === "shorts" ? "feed-subtab active" : "feed-subtab"} href={buildHref("shorts")}>Shorts</a>
+              </div>
+              <a className="button secondary" href={PODCAST_RSS_URL} target="_blank" rel="noreferrer">
+                RSS (Audio)
+              </a>
+            </div>
+          </div>
           {data && data.length > 0 ? (
             <div style={{ marginTop: 20, display: "grid", gap: 24 }}>
               {(() => {
@@ -53,6 +81,7 @@ export default async function FeedPage() {
                 };
 
                 const full = data.filter((post) => !isShortPost(post));
+                const shorts = data.filter((post) => isShortPost(post));
 
                 const renderCard = (post: any) => {
                   const metrics = (post.metrics as any) ?? {};
@@ -112,19 +141,42 @@ export default async function FeedPage() {
 
                 return (
                   <>
-                    <div>
-                      <h2 className="section-title" style={{ fontSize: 30 }}>Capítulos completos</h2>
-                      <div
-                        className="grid feed-full-grid"
-                        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginTop: 14 }}
-                      >
-                        {full.length > 0 ? full.map(renderCard) : (
+                    {view !== "episodes" && shorts.length > 0 ? (
+                      <div>
+                        <h2 className="section-title" style={{ fontSize: 26, marginBottom: 8 }}>Shorts</h2>
+                        <div className="feed-shorts-row" aria-label="Shorts en carrusel">
+                          {shorts.slice(0, 12).map((p) => (
+                            <div key={p.id} className="feed-short-card">
+                              {renderCard(p)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {view !== "shorts" ? (
+                      <div>
+                        <h2 className="section-title" style={{ fontSize: 26, marginBottom: 8 }}>Capítulos completos</h2>
+                        <div
+                          className="grid feed-full-grid"
+                          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginTop: 14 }}
+                        >
+                          {full.length > 0 ? full.map(renderCard) : (
+                            <div className="card">
+                              <p className="muted">No hay capítulos completos todavía.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid feed-full-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+                        {shorts.length > 0 ? shorts.map(renderCard) : (
                           <div className="card">
-                            <p className="muted">No hay capítulos completos todavía.</p>
+                            <p className="muted">No hay shorts todavía.</p>
                           </div>
                         )}
                       </div>
-                    </div>
+                    )}
                   </>
                 );
               })()}

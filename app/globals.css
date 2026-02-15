@@ -3039,6 +3039,48 @@ body {
   align-items: start;
 }
 
+.feed-subtabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.feed-subtab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.80);
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+
+.feed-subtab.active {
+  color: #0b0b0f;
+  background: linear-gradient(120deg, #ff2a2a, #ff7a18, #ffd23b);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.feed-shorts-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(280px, 320px);
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
+}
+
+.feed-short-card {
+  scroll-snap-align: start;
+}
+
 @media (max-width: 720px) {
   .promo-top-slot {
     height: 60px;

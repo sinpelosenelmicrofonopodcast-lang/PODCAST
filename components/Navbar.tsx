@@ -122,7 +122,6 @@ export function Navbar() {
           <div className="nav-tabs" role="navigation" aria-label="Navegación principal">
             <Link className="nav-link" href="/feed">{t.feed}</Link>
             <Link className="nav-link" href="/noticias">{t.news}</Link>
-            <Link className="nav-link" href="/podcast">{t.podcast}</Link>
 
             <div className="nav-submenu" ref={communityRef}>
               <Link className="nav-link" href="/community">
@@ -172,6 +171,9 @@ export function Navbar() {
                 <div className="nav-menu-panel" role="menu">
                   <Link className="nav-menu-link" role="menuitem" href="/blog" onClick={() => setMenuOpen(false)}>
                     {t.blog}
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/feed?view=episodes" onClick={() => setMenuOpen(false)}>
+                    {t.podcast}
                   </Link>
                   <Link className="nav-menu-link" role="menuitem" href="/confesiones" onClick={() => setMenuOpen(false)}>
                     Confesiones
