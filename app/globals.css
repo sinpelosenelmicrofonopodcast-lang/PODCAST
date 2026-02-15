@@ -158,6 +158,23 @@ main {
   min-width: 0;
 }
 
+.promo-top-media {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  flex: 0 0 auto;
+}
+
+.promo-top-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .promo-top-label {
   font-size: 11px;
   font-weight: 900;
@@ -219,6 +236,30 @@ main {
   align-items: center;
 }
 
+.promo-bottom-left {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.promo-bottom-media {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.promo-bottom-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .promo-bottom-actions {
   display: inline-flex;
   align-items: center;
@@ -263,6 +304,22 @@ main {
   border: 1px solid rgba(255, 122, 24, 0.35);
 }
 
+.promo-popup-media {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #0b0b0c;
+  background-size: cover;
+  background-position: center;
+}
+
+.promo-popup-media-fallback {
+  background: radial-gradient(circle at 30% 20%, rgba(255, 210, 59, 0.14), transparent 55%),
+    radial-gradient(circle at 80% 50%, rgba(255, 42, 42, 0.12), transparent 58%),
+    linear-gradient(120deg, rgba(255, 122, 24, 0.14), rgba(8, 8, 10, 0.9));
+}
+
 .promo-popup-top {
   display: flex;
   justify-content: space-between;
@@ -294,6 +351,23 @@ main {
   background: linear-gradient(180deg, rgba(255, 210, 59, 0.04), transparent 65%), var(--panel);
 }
 
+.mid-ad-media {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #0b0b0c;
+  background-size: cover;
+  background-position: center;
+  margin-top: 10px;
+}
+
+.mid-ad-media-fallback {
+  background: radial-gradient(circle at 30% 20%, rgba(255, 210, 59, 0.12), transparent 55%),
+    radial-gradient(circle at 80% 50%, rgba(255, 42, 42, 0.1), transparent 58%),
+    linear-gradient(120deg, rgba(255, 122, 24, 0.12), rgba(8, 8, 10, 0.9));
+}
+
 .mid-ad-top {
   display: flex;
   justify-content: flex-start;
@@ -320,6 +394,11 @@ main {
   }
   .promo-top-label {
     display: none;
+  }
+  .promo-top-media {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
   }
   .promo-popup-wrap {
     right: 12px;

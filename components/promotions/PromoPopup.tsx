@@ -8,6 +8,7 @@ type Promo = {
   id: string;
   title: string;
   description: string | null;
+  image_url?: string | null;
   cta_label: string | null;
   cta_url: string | null;
   promo_type?: "sponsor" | "internal" | "affiliate" | null;
@@ -118,13 +119,18 @@ export function PromoPopup() {
 
   return (
     <div className="promo-popup-wrap" role="dialog" aria-modal="false" aria-label="Sugerencia">
-      <div className="promo-popup card">
+      <div className="promo-popup card" data-type={promo.promo_type ?? "sponsor"}>
         <div className="promo-popup-top">
           <span className="badge">Nuevo</span>
           <button className="promo-popup-close" type="button" onClick={onClose} aria-label="Cerrar">
             ×
           </button>
         </div>
+        {promo.image_url ? (
+          <div className="promo-popup-media" style={{ backgroundImage: `url(${promo.image_url})` }} aria-hidden="true" />
+        ) : (
+          <div className="promo-popup-media promo-popup-media-fallback" aria-hidden="true" />
+        )}
         <div className="promo-popup-title">{promo.title}</div>
         {promo.description ? <div className="muted promo-popup-desc">{promo.description}</div> : null}
         <div className="promo-popup-actions">

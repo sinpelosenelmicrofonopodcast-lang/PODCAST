@@ -7,6 +7,7 @@ import { trackPromoEvent } from "@/lib/promoTracking";
 type Promo = {
   id: string;
   title: string;
+  image_url?: string | null;
   cta_label: string | null;
   cta_url: string | null;
   promo_type?: "sponsor" | "internal" | "affiliate" | null;
@@ -99,7 +100,19 @@ export function BottomStickyPromo() {
   return (
     <div className="promo-bottom-wrap" role="complementary" aria-label="Promoción" data-type={promo.promo_type ?? "sponsor"}>
       <div className="promo-bottom-inner">
-        <div className="promo-bottom-title clamp-2">{promo.title}</div>
+        <div className="promo-bottom-left">
+          <div className="promo-bottom-media" aria-hidden="true">
+            <img
+              src={promo.image_url || "/logo.png"}
+              alt=""
+              width={44}
+              height={44}
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <div className="promo-bottom-title clamp-2">{promo.title}</div>
+        </div>
         <div className="promo-bottom-actions">
           {clickable ? (
             <a className="button promo-bottom-cta" href={promo.cta_url ?? "#"} target="_blank" rel="noreferrer" onClick={onClick}>

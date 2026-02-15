@@ -7,6 +7,7 @@ import { trackPromoEvent } from "@/lib/promoTracking";
 type Promo = {
   id: string;
   title: string;
+  image_url?: string | null;
   cta_label: string | null;
   cta_url: string | null;
   promo_type?: "sponsor" | "internal" | "affiliate" | null;
@@ -65,12 +66,23 @@ export function TopBannerPromo() {
   const clickable = Boolean(promo?.cta_url);
   const ctaLabel = promo?.cta_label ?? "Ver";
   const title = promo?.title ?? "";
+  const imageUrl = promo?.image_url ?? null;
 
   return (
     <div className="promo-top-slot" role="complementary" aria-label="Promoción" data-type={promo?.promo_type ?? "sponsor"}>
       {promo ? (
         <div className="promo-top-inner">
           <div className="promo-top-one">
+            <div className="promo-top-media" aria-hidden="true">
+              <img
+                src={imageUrl || "/logo.png"}
+                alt=""
+                width={38}
+                height={38}
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
             <span className="promo-top-label">
               {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "RECOMENDADO" : "SPONSOR"}
             </span>

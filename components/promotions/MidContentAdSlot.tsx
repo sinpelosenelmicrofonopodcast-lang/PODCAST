@@ -8,6 +8,7 @@ type Promo = {
   id: string;
   title: string;
   description: string | null;
+  image_url?: string | null;
   cta_label: string | null;
   cta_url: string | null;
   promo_type?: "sponsor" | "internal" | "affiliate" | null;
@@ -83,6 +84,11 @@ export function MidContentAdSlot() {
               {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "Recomendado" : "Patrocinado"}
             </span>
           </div>
+          {promo.image_url ? (
+            <div className="mid-ad-media" style={{ backgroundImage: `url(${promo.image_url})` }} aria-hidden="true" />
+          ) : (
+            <div className="mid-ad-media mid-ad-media-fallback" aria-hidden="true" />
+          )}
           <div className="mid-ad-title clamp-2">{promo.title}</div>
           {promo.description ? <div className="muted mid-ad-desc clamp-3">{promo.description}</div> : null}
           {promo.cta_url ? (
