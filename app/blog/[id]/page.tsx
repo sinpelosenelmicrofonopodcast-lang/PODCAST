@@ -163,9 +163,24 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
   }));
 
   const renderBlock = (b: any, idx: number) => {
-    if (b.type === "h2") return <h2 key={b.id} id={b.id} className="post-h2">{b.text}</h2>;
-    if (b.type === "h3") return <h3 key={b.id} id={b.id} className="post-h3">{b.text}</h3>;
-    if (b.type === "quote") return <blockquote key={`q-${idx}`} className="post-quote">{b.text}</blockquote>;
+    if (b.type === "h2")
+      return (
+        <h2 key={b.id} id={b.id} className="mag-h2 mag-h2-block">
+          {b.text}
+        </h2>
+      );
+    if (b.type === "h3")
+      return (
+        <h3 key={b.id} id={b.id} className="mag-h3">
+          {b.text}
+        </h3>
+      );
+    if (b.type === "quote")
+      return (
+        <blockquote key={`q-${idx}`} className="mag-quote">
+          {b.text}
+        </blockquote>
+      );
     if (b.type === "ul") return <ul key={`ul-${idx}`}>{(b.items ?? []).map((it: string, i: number) => <li key={i}>{it}</li>)}</ul>;
     if (b.type === "ol") return <ol key={`ol-${idx}`}>{(b.items ?? []).map((it: string, i: number) => <li key={i}>{it}</li>)}</ol>;
     return <p key={`p-${idx}`}>{b.text}</p>;
@@ -175,46 +190,51 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
   const insertAfter = Math.min(6, Math.max(2, blocks.filter((b) => b.type === "p").length >= 3 ? 4 : 2));
 
   return (
-    <main className="blog-post-page">
+    <main className="blog-mag blog-mag-post">
       <Navbar />
       <ReadingProgressBar />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      <section className="section">
+      <section
+        className="mag-post-hero"
+        style={
+          data.cover_url
+            ? ({
+                ["--hero-bg" as any]: `url(${data.cover_url})`
+              } as any)
+            : undefined
+        }
+      >
         <div className="container blog-container">
-          <div className="blog-post-shell">
+          <div className="mag-post-hero-inner">
+            <div className="mag-post-kickers">
+              {(data.categories ?? []).slice(0, 1).map((c: string) => (
+                <span key={c} className={`mag-cat ${c === "Zona Cruda" ? "mag-cat-cruda" : ""}`}>
+                  {c}
+                </span>
+              ))}
+              <span className="mag-cat">Editorial</span>
+            </div>
+            <h1 className="mag-post-h1">{data.title}</h1>
+            {meta ? <p className="mag-post-sub">{meta}</p> : null}
+            <div className="mag-post-meta">
+              <span>{formatDate(data.created_at)}</span>
+              <span className="dot">·</span>
+              <span>{readMin} min</span>
+            </div>
+            <div className="mag-post-share">
+              <ShareButtons path={canonicalPath} text={data.title} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mag-post-body">
+        <div className="container blog-container">
+          <div className="mag-post-shell">
             <TableOfContents items={toc} />
 
-            <article className="blog-post" id="reading-root">
-              {data.cover_url ? (
-                <div className="post-cover">
-                  <img src={data.cover_url} alt={data.title} />
-                </div>
-              ) : null}
-
-              <div className="post-badges">
-                {(data.categories ?? []).slice(0, 3).map((c: string) => (
-                  <span key={c} className="pill">
-                    {c}
-                  </span>
-                ))}
-                <span className="pill">Analisis</span>
-              </div>
-
-              <h1 className="post-h1">{data.title}</h1>
-              {meta ? <p className="post-meta-desc">{meta}</p> : null}
-
-              <div className="post-meta-row">
-                <div className="post-meta">
-                  <span>Sin Pelos</span>
-                  <span>·</span>
-                  <span>{formatDate(data.created_at)}</span>
-                  <span>·</span>
-                  <span>{readMin} min</span>
-                </div>
-                <ShareButtons path={canonicalPath} text={data.title} />
-              </div>
-
+            <article className="mag-post-article" id="reading-root">
               {hook.length ? (
                 <Callout variant="hook">
                   {hook.map((p, i) => (
@@ -227,7 +247,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
 
               <ProblemTrio what={what} why={why} who={who} />
 
-              <div className="post-reading">
+              <div className="mag-reading">
                 {blocks.map((b, idx) => (
                   <div key={`${b.type}-${idx}`}>
                     {renderBlock(b, idx)}
@@ -236,29 +256,27 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
                 ))}
               </div>
 
-              <div className="post-cta card">
-                <div className="sidebar-title">Conclusion</div>
-                <p className="muted" style={{ marginTop: 8 }}>
-                  Si esto te hizo pensar, comparte. Si te pico, vuelve manana. Aqui no se escribe para caer bien.
-                </p>
-                <div className="featured-actions">
-                  <Link className="button" href="/blog">
-                    Leer relacionado
-                  </Link>
-                  <a className="button secondary" href="#top">
-                    Subir
-                  </a>
+              <section className="mag-cta">
+                <div className="mag-cta-inner">
+                  <div className="mag-cta-title">Conclusion</div>
+                  <p className="mag-cta-text">
+                    Si esto te hizo pensar, perfecto. Si te pico, mejor. Aqui no se escribe para caer bien.
+                  </p>
+                  <div className="mag-cta-actions">
+                    <Link className="mag-btn mag-btn-primary" href="/blog">
+                      Leer mas
+                    </Link>
+                    <a className="mag-btn mag-btn-ghost" href="#top">
+                      Subir
+                    </a>
+                  </div>
                 </div>
-              </div>
+              </section>
 
-              <NewsletterForm
-                variant="cta"
-                title="Recibe lo nuevo primero"
-                subtitle="Analisis, noticias y cultura. Directo a tu inbox."
-              />
+              <NewsletterForm variant="cta" title="Recibe lo nuevo primero" subtitle="Analisis, noticias y cultura. Directo a tu inbox." />
 
               <div className="post-footer-actions">
-                <Link className="button secondary" href="/blog">
+                <Link className="mag-btn mag-btn-ghost" href="/blog">
                   Volver al blog
                 </Link>
               </div>
@@ -266,28 +284,37 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
           </div>
 
           {related.length ? (
-            <section className="section" style={{ paddingTop: 0 }}>
-              <div className="home-section-head">
-                <h2 className="section-title">Articulos relacionados</h2>
+            <section className="mag-related">
+              <div className="mag-related-head">
+                <h2 className="mag-h2" style={{ margin: 0 }}>
+                  Relacionados
+                </h2>
               </div>
-              <div className="blog-grid">
+              <div className="mag-grid" style={{ marginTop: 18 }}>
                 {related.map((p: any) => (
-                  <article key={p.id} className="card post-card">
-                    <Link className="post-card-media" href={`/blog/${p.slug ?? p.id}`}>
-                      {p.cover_url ? <img src={p.cover_url} alt={p.title} loading="lazy" /> : <div className="post-card-fallback" />}
+                  <article key={p.id} className="mag-card">
+                    <Link className="mag-card-media" href={`/blog/${p.slug ?? p.id}`} aria-label={p.title}>
+                      {p.cover_url ? <img src={p.cover_url} alt={p.title} loading="lazy" /> : <div className="mag-card-fallback" />}
                     </Link>
-                    <div className="post-card-body">
-                      <h3 className="clamp-2" style={{ margin: 0 }}>
+                    <div className="mag-card-body">
+                      <div className="mag-card-top">
+                        {(p.categories ?? []).slice(0, 1).map((c: string) => (
+                          <span key={c} className={`mag-cat ${c === "Zona Cruda" ? "mag-cat-cruda" : ""}`}>
+                            {c}
+                          </span>
+                        ))}
+                        <div className="mag-meta">
+                          <span>{formatDate(p.created_at)}</span>
+                          <span className="dot">·</span>
+                          <span>{p.reading_time_minutes} min</span>
+                        </div>
+                      </div>
+                      <h3 className="mag-h2 clamp-2" style={{ margin: 0 }}>
                         <Link href={`/blog/${p.slug ?? p.id}`}>{p.title}</Link>
                       </h3>
-                      <p className="muted clamp-2" style={{ margin: "8px 0 0" }}>
+                      <p className="mag-excerpt clamp-2" style={{ margin: "10px 0 0" }}>
                         {p.meta_description ?? ""}
                       </p>
-                      <div className="post-meta">
-                        <span>{formatDate(p.created_at)}</span>
-                        <span>·</span>
-                        <span>{p.reading_time_minutes} min</span>
-                      </div>
                     </div>
                   </article>
                 ))}
@@ -296,6 +323,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
           ) : null}
         </div>
       </section>
+
       <Footer />
     </main>
   );
