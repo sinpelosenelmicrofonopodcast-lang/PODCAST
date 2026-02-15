@@ -59,6 +59,17 @@ async function loadPost(idOrSlug: string) {
 
   if (!primary.error) return primary.data as BlogPost | null;
 
+  // Column-safe: if episode fields aren't migrated yet, retry without them (but keep slug lookup).
+  if (/(episode_url|episode_title)/i.test(primary.error.message)) {
+    const retry = await supabase
+      .from("blog_posts")
+      .select("id, slug, title, excerpt, meta_description, body, cover_url, created_at, updated_at, reading_time_minutes, categories, tags")
+      .or(`slug.eq.${key},id.eq.${key}`)
+      .limit(1)
+      .maybeSingle();
+    if (!retry.error) return retry.data as BlogPost | null;
+  }
+
   // Fallback for older schemas.
   const fallback = await supabase
     .from("blog_posts")
