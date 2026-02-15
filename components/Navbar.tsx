@@ -16,6 +16,7 @@ export function Navbar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminCheckError, setAdminCheckError] = useState<string | null>(null);
   const [lang, setLang] = useState<AppLang>("es");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -82,23 +83,74 @@ export function Navbar() {
             <span>Sin Pelos</span>
           </div>
         </Link>
-        <div className="nav-actions">
-          <Link className="nav-link" href="/feed">{t.feed}</Link>
-          <Link className="nav-link" href="/community">{t.community}</Link>
-          <Link className="nav-link" href="/foro">{t.forum}</Link>
-          <Link className="nav-link" href="/noticias">{t.news}</Link>
-          <Link className="nav-link" href="/blog">{t.blog}</Link>
-          <Link className="nav-link" href="/confesionario">{t.confessional}</Link>
-          <Link className="nav-link" href="/publicidad">{t.ads}</Link>
-          <Link className="nav-link" href="/quiero-salir">{t.guest}</Link>
-          <Link className="nav-link" href="/zona-cruda">{t.rawZone}</Link>
+        <div className="nav-mid">
+          <div className="nav-tabs" role="navigation" aria-label="Navegación principal">
+            <Link className="nav-link" href="/feed">{t.feed}</Link>
+            <Link className="nav-link" href="/noticias">{t.news}</Link>
+            <Link className="nav-link" href="/podcast">{t.podcast}</Link>
+            <Link className="nav-link" href="/community">{t.community}</Link>
+            <Link className="nav-link nav-link-raw" href="/zona-cruda">{t.rawZone}</Link>
+
+            <div className="nav-menu">
+              <button
+                className="nav-link nav-menu-btn"
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((v) => !v)}
+              >
+                {t.menu}
+              </button>
+              {menuOpen ? (
+                <div className="nav-menu-panel" role="menu">
+                  <Link className="nav-menu-link" role="menuitem" href="/blog" onClick={() => setMenuOpen(false)}>
+                    {t.blog}
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/foro" onClick={() => setMenuOpen(false)}>
+                    {t.forum}
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/confesionario" onClick={() => setMenuOpen(false)}>
+                    {t.confessional}
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/confesiones" onClick={() => setMenuOpen(false)}>
+                    Confesiones
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/teorias" onClick={() => setMenuOpen(false)}>
+                    {t.theories}
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/eventos" onClick={() => setMenuOpen(false)}>
+                    {t.events}
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/publicidad" onClick={() => setMenuOpen(false)}>
+                    {t.ads}
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/quiero-salir" onClick={() => setMenuOpen(false)}>
+                    {t.guest}
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/terminos" onClick={() => setMenuOpen(false)}>
+                    Términos
+                  </Link>
+                  {isAdmin ? (
+                    <>
+                      <div className="nav-menu-divider" role="separator" aria-hidden="true" />
+                      <Link className="nav-menu-link" role="menuitem" href="/admin" onClick={() => setMenuOpen(false)}>
+                        {t.dashboard}
+                      </Link>
+                    </>
+                  ) : null}
+                  {!isAdmin && adminCheckError ? (
+                    <p className="muted" style={{ margin: "6px 10px 0", fontSize: 11 }} title={adminCheckError}>
+                      Admin: no se pudo verificar permisos.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="nav-right">
           <LanguageToggle />
-          {isAdmin ? <Link className="nav-link" href="/admin">{t.dashboard}</Link> : null}
-          {!isAdmin && adminCheckError ? (
-            <Link className="nav-link" href="/admin" title={adminCheckError}>
-              {t.dashboard}
-            </Link>
-          ) : null}
           {nickname ? (
             <div className="nav-user">
               <Link href="/perfil" className="muted">

@@ -4,14 +4,18 @@ export const navTexts: Record<
   AppLang,
   {
     feed: string;
+    podcast: string;
     community: string;
-    forum: string;
     news: string;
+    rawZone: string;
+    menu: string;
     blog: string;
-    confessional: string;
     ads: string;
     guest: string;
-    rawZone: string;
+    confessional: string;
+    forum: string;
+    events: string;
+    theories: string;
     dashboard: string;
     profile: string;
     hello: string;
@@ -22,14 +26,18 @@ export const navTexts: Record<
 > = {
   es: {
     feed: "Feed",
+    podcast: "Podcast",
     community: "Comunidad",
-    forum: "Foro",
     news: "Noticias",
+    rawZone: "Zona Cruda",
+    menu: "Menú",
     blog: "Blog",
-    confessional: "Confesionario",
     ads: "Publicidad",
     guest: "Quiero salir",
-    rawZone: "Zona Cruda",
+    confessional: "Confesionario",
+    forum: "Foro",
+    events: "Eventos",
+    theories: "Teorías",
     dashboard: "Dashboard",
     profile: "Mi perfil",
     hello: "Hola",
@@ -39,14 +47,18 @@ export const navTexts: Record<
   },
   en: {
     feed: "Feed",
+    podcast: "Podcast",
     community: "Community",
-    forum: "Forum",
     news: "News",
+    rawZone: "Raw Zone",
+    menu: "Menu",
     blog: "Blog",
-    confessional: "Confessional",
     ads: "Advertise",
     guest: "Be a guest",
-    rawZone: "Raw Zone",
+    confessional: "Confessional",
+    forum: "Forum",
+    events: "Events",
+    theories: "Theories",
     dashboard: "Dashboard",
     profile: "My profile",
     hello: "Hi",
