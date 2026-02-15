@@ -5,7 +5,7 @@ function getClients(authToken?: string) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
-  // Use RLS with the caller's JWT. This avoids hard dependency on service role key for simple "am I admin?" checks.
+  // Use RLS with the caller's JWT. We rely on an RPC (`is_admin`) that should be SECURITY DEFINER on the DB side.
   const anon = createClient(url, anonKey, {
     global: authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : undefined
   });
@@ -22,20 +22,8 @@ async function requireAdmin(request: NextRequest) {
   const requesterId = userData.user?.id ?? null;
   if (!requesterId) return { ok: false as const, status: 401 };
 
-  const { data: roles, error } = await anon
-    .from("user_roles")
-    .select("roles(name)")
-    .eq("user_id", requesterId);
-
-  if (error) {
-    // If RLS/policies are missing or misconfigured, surface as 500 so the UI can show a clear message.
-    return { ok: false as const, status: 500 };
-  }
-
-  const isAdmin = (roles ?? []).some((row: any) => {
-    const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
-    return role?.name === "admin";
-  });
+  const { data: isAdmin, error } = await anon.rpc("is_admin", { uid: requesterId });
+  if (error) return { ok: false as const, status: 500 };
 
   if (!isAdmin) return { ok: false as const, status: 403 };
   return { ok: true as const, status: 200 };
