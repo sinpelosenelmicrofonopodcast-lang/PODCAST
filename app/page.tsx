@@ -235,7 +235,7 @@ export default async function HomePage() {
                   <span className="badge">Último blog</span>
                   {latestBlog?.cover_url ? <img className="cover-news" src={latestBlog.cover_url} alt={latestBlog.title} /> : null}
                   <h3>{latestBlog?.title ?? "Aún no hay blogs"}</h3>
-                  <p className="muted">{latestBlog?.excerpt ?? "Publica blogs desde admin."}</p>
+                  <p className="muted">{latestBlog?.excerpt ?? "Próximamente."}</p>
                   <Link className="button secondary" href="/blog">
                     Ir al blog
                   </Link>
@@ -312,17 +312,38 @@ export default async function HomePage() {
             </div>
             <div className="home-grid-ads">
               {(promotions as Promotion[] | null)?.map((promo) => (
-                <article key={promo.id} className="card ad-slot">
+                <a
+                  key={promo.id}
+                  className="card ad-slot ad-banner"
+                  href={promo.cta_url ?? "#"}
+                  target={promo.cta_url ? "_blank" : undefined}
+                  rel={promo.cta_url ? "noreferrer" : undefined}
+                  aria-disabled={!promo.cta_url}
+                  onClick={(e) => {
+                    if (!promo.cta_url) e.preventDefault();
+                  }}
+                >
                   <span className="badge">Promoción</span>
-                  {promo.image_url ? <img className="cover-news" src={promo.image_url} alt={promo.title} /> : null}
-                  <h3>{promo.title}</h3>
-                  <p className="muted">{promo.description ?? "Promoción destacada"}</p>
-                  {promo.cta_url ? (
-                    <a className="button secondary" href={promo.cta_url} target="_blank" rel="noreferrer">
-                      {promo.cta_label ?? "Ver promoción"}
-                    </a>
-                  ) : null}
-                </article>
+                  {promo.image_url ? (
+                    <div className="ad-banner-media" style={{ backgroundImage: `url(${promo.image_url})` }} aria-hidden="true" />
+                  ) : (
+                    <div className="ad-banner-media ad-banner-fallback" aria-hidden="true" />
+                  )}
+                  <div className="ad-banner-overlay" aria-hidden="true" />
+                  <div className="ad-banner-body">
+                    <h3 style={{ marginTop: 0 }}>{promo.title}</h3>
+                    <p className="muted" style={{ marginBottom: 0 }}>
+                      {promo.description ?? "Promoción destacada"}
+                    </p>
+                    {promo.cta_url ? (
+                      <span className="ad-banner-cta">{promo.cta_label ?? "Ver promoción"}</span>
+                    ) : (
+                      <span className="muted" style={{ fontSize: 12 }}>
+                        Sin link configurado
+                      </span>
+                    )}
+                  </div>
+                </a>
               ))}
               {(!promotions || promotions.length === 0) ? (
                 <article className="card ad-slot hero-ad">
