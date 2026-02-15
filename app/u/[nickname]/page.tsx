@@ -9,7 +9,8 @@ export default async function PublicProfilePage({ params }: { params: { nickname
     .from("users")
     .select("id, nickname, bio, avatar_url")
     .eq("nickname", params.nickname)
-    .single();
+    .limit(1)
+    .maybeSingle();
 
   const { data: threads } = await supabase
     .from("threads")
