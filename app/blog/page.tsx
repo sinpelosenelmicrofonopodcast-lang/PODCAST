@@ -1,8 +1,8 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { AuthWall } from "@/components/AuthWall";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { ShareButtons } from "@/components/ShareButtons";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -17,7 +17,6 @@ export default async function BlogPage() {
 
   return (
     <main>
-      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">
@@ -31,15 +30,24 @@ export default async function BlogPage() {
                     <img
                       src={post.cover_url}
                       alt={post.title}
-                      style={{ width: "100%", borderRadius: 12, objectFit: "cover" }}
+                      className="cover-news"
                     />
                   ) : null}
-                  <h3 style={{ marginTop: 0 }}>{post.title}</h3>
-                  <p className="muted">{post.excerpt ?? ""}</p>
+                  <h3 className="blog-title-clamp" style={{ marginTop: 0 }}>
+                    {post.title}
+                  </h3>
+                  <p className="muted blog-excerpt-clamp" style={{ margin: 0 }}>
+                    {post.excerpt ?? ""}
+                  </p>
                   <span className="muted" style={{ fontSize: 12 }}>
                     {post.created_at ? new Date(post.created_at).toLocaleDateString("es-PR") : ""}
                   </span>
-                  <ShareButtons path={`/blog`} text={post.title} />
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <Link className="button secondary" href={`/blog/${post.id}`}>
+                      Leer
+                    </Link>
+                    <ShareButtons path={`/blog/${post.id}`} text={post.title} />
+                  </div>
                 </div>
               ))}
             </div>
