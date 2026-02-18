@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { requireAdminApi } from "@/lib/adminAuth";
 
 const ALLOWED_TABLES = new Set([
   "confessions",
@@ -12,49 +12,13 @@ const ALLOWED_TABLES = new Set([
   "promotions"
 ]);
 
-function getClients(authToken?: string) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-
-  const anon = createClient(url, anonKey, {
-    global: authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : undefined
-  });
-  const service = createClient(url, serviceKey);
-  return { anon, service };
-}
-
-async function requireAdmin(request: NextRequest) {
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token) return { ok: false as const, status: 401, error: "Falta token." };
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { ok: false as const, status: 500, error: "Falta SUPABASE_SERVICE_ROLE_KEY." };
-
-  const { anon, service } = getClients(token);
-  const { data: userData } = await anon.auth.getUser(token);
-  const requesterId = userData.user?.id ?? null;
-  if (!requesterId) return { ok: false as const, status: 401, error: "Sesión inválida." };
-
-  const { data: roles, error } = await service.from("user_roles").select("roles(name)").eq("user_id", requesterId);
-  if (error) return { ok: false as const, status: 500, error: error.message };
-
-  const isAdmin =
-    (roles ?? []).some((row: any) => {
-      const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
-      return role?.name === "admin";
-    }) ?? false;
-
-  if (!isAdmin) return { ok: false as const, status: 403, error: "No autorizado." };
-  return { ok: true as const, status: 200, token, requesterId, service };
-}
-
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireAdminApi(request);
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const body = await request.json().catch(() => null);

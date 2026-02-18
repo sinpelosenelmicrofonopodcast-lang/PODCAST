@@ -1,9 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { fetchYouTubeVideos, isShorts } from "@/lib/youtube";
+import { requireAdminApi } from "@/lib/adminAuth";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdminApi(request);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+
     const supabase = supabaseServer();
     const videos = await fetchYouTubeVideos(25);
     const ids = videos.map((video) => video.id);

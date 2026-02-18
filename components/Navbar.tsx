@@ -7,9 +7,26 @@ import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { TopBannerPromo } from "@/components/promotions/TopBannerPromo";
+import type { Session } from "@supabase/supabase-js";
 import { navTexts } from "@/lib/i18n";
 import { APP_LANG_EVENT, readStoredLang, type AppLang } from "@/lib/language";
 import { supabase } from "@/lib/supabaseClient";
+
+async function syncServerSession(session: Session | null) {
+  if (session?.access_token && session.refresh_token) {
+    await fetch("/api/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token,
+        expiresIn: session.expires_in
+      })
+    }).catch(() => null);
+    return;
+  }
+  await fetch("/api/auth/session", { method: "DELETE" }).catch(() => null);
+}
 
 export function Navbar() {
   const pathname = usePathname() ?? "/";
@@ -55,6 +72,7 @@ export function Navbar() {
       // Admin check must NOT rely on client-side RLS (can fail and hide admin UI).
       // We validate via server route that uses service role for role lookup.
       const { data: sessionData } = await supabase.auth.getSession();
+      await syncServerSession(sessionData.session ?? null);
       const token = sessionData.session?.access_token;
       if (!token) {
         if (mounted) setIsAdmin(false);
@@ -83,7 +101,8 @@ export function Navbar() {
     };
 
     loadProfile();
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      await syncServerSession(session);
       loadProfile();
     });
 
@@ -128,6 +147,7 @@ export function Navbar() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    await fetch("/api/auth/session", { method: "DELETE" }).catch(() => null);
     setNickname(null);
     setAvatarUrl(null);
     setIsAdmin(false);

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
-import { AdminWall } from "@/components/AdminWall";
+import { requireAdminPageOrRedirect } from "@/lib/adminAuth";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  await requireAdminPageOrRedirect("/admin");
+
   return (
     <AdminShell>
-      <AdminWall />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <Link className="button secondary" href="/">
           Volver al Home

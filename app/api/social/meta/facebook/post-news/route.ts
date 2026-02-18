@@ -1,34 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-function getAnonClient(authToken?: string) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-  return createClient(url, anonKey, {
-    global: authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : undefined
-  });
-}
-
-async function requireAdmin(request: NextRequest) {
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token) return { ok: false as const, status: 401 };
-
-  const supabase = getAnonClient(token);
-  const { data: userData } = await supabase.auth.getUser(token);
-  const requesterId = userData.user?.id ?? null;
-  if (!requesterId) return { ok: false as const, status: 401 };
-
-  const { data: roles, error } = await supabase.from("user_roles").select("roles(name)").eq("user_id", requesterId);
-  if (error) return { ok: false as const, status: 500 };
-
-  const isAdmin = (roles ?? []).some((row: any) => {
-    const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
-    return role?.name === "admin";
-  });
-  if (!isAdmin) return { ok: false as const, status: 403 };
-  return { ok: true as const, status: 200 };
-}
+import { requireAdminApi } from "@/lib/adminAuth";
 
 function getConfig() {
   const pageId = process.env.META_PAGE_ID ?? "";
@@ -40,8 +11,8 @@ function getConfig() {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
-    if (!auth.ok) return NextResponse.json({ ok: false }, { status: auth.status });
+    const auth = await requireAdminApi(request);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const { pageId, pageAccessToken, graphVersion, baseUrl } = getConfig();
     if (!pageId || !pageAccessToken) {

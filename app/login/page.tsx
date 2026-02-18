@@ -21,6 +21,19 @@ export default function LoginPage() {
       setStatus(error.message);
       return;
     }
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData.session;
+    if (session?.access_token && session.refresh_token) {
+      await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresIn: session.expires_in
+        })
+      }).catch(() => null);
+    }
     setStatus("Ingreso exitoso. Redirigiendo al feed...");
     router.push("/feed");
   };
