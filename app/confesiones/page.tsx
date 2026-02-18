@@ -1,44 +1,77 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { AuthWall } from "@/components/AuthWall";
-import { supabaseServer } from "@/lib/supabaseServer";
 import { ConfesionComposer } from "@/components/ConfesionComposer";
 import { CommentComposer } from "@/components/CommentComposer";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
+import { LazyContentComments } from "@/components/LazyContentComments";
+import { supabase } from "@/lib/supabaseClient";
+import { useProtectedUser } from "@/lib/useProtectedUser";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+type ConfessionRow = {
+  id: string;
+  body: string;
+  created_at: string | null;
+  users: { nickname?: string | null; avatar_url?: string | null } | { nickname?: string | null; avatar_url?: string | null }[] | null;
+};
 
 const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
 
-export default async function ConfesionesPage() {
-  const supabase = supabaseServer();
+export default function ConfesionesPage() {
+  const { checking, userId } = useProtectedUser();
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<ConfessionRow[]>([]);
+  const [commentsCountByContent, setCommentsCountByContent] = useState<Map<string, number>>(new Map());
   const bannerUrl = (process.env.NEXT_PUBLIC_CONFESIONARIO_BANNER_URL ?? "").trim();
-  const { data } = await supabase
-    .from("confessions")
-    .select("id, body, created_at, users(nickname, avatar_url)")
-    .eq("level", "public")
-    .order("created_at", { ascending: false })
-    .limit(20);
 
-  const ids = (data ?? []).map((item) => item.id);
-  const { data: comments } = await supabase
-    .from("comments")
-    .select("id, body, content_id, created_at, users(nickname, avatar_url)")
-    .eq("content_type", "confession")
-    .in("content_id", ids.length > 0 ? ids : ["00000000-0000-0000-0000-000000000000"])
-    .order("created_at", { ascending: true });
+  useEffect(() => {
+    if (!userId) return;
+    let mounted = true;
 
-  const commentsByContent = new Map<string, any[]>();
-  (comments ?? []).forEach((comment) => {
-    const list = commentsByContent.get(comment.content_id) ?? [];
-    list.push(comment);
-    commentsByContent.set(comment.content_id, list);
-  });
+    const load = async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("confessions")
+        .select("id, body, created_at, users(nickname, avatar_url)")
+        .eq("level", "public")
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (!mounted) return;
+      const rows = (data as ConfessionRow[]) ?? [];
+      setItems(rows);
+
+      const ids = rows.map((x) => x.id);
+      if (ids.length === 0) {
+        setCommentsCountByContent(new Map());
+        setLoading(false);
+        return;
+      }
+
+      const { data: comments } = await supabase
+        .from("comments")
+        .select("id, content_id")
+        .eq("content_type", "confession")
+        .in("content_id", ids)
+        .limit(2000);
+
+      if (!mounted) return;
+      const counts = new Map<string, number>();
+      (comments ?? []).forEach((r: any) => counts.set(r.content_id, (counts.get(r.content_id) ?? 0) + 1));
+      setCommentsCountByContent(counts);
+      setLoading(false);
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [userId]);
 
   return (
     <main>
-      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">
@@ -69,12 +102,20 @@ export default async function ConfesionesPage() {
             <h3 style={{ marginTop: 0 }}>Reglas del confesionario</h3>
             <p>Área pública con moderación. Zona paga con confesiones crudas y respuestas sin filtro.</p>
           </div>
-          <ConfesionComposer />
-          {data && data.length > 0 ? (
+
+          {!checking && userId ? <ConfesionComposer /> : null}
+
+          {checking || loading ? (
+            <div className="card" style={{ marginTop: 20 }}>
+              <p className="muted">Cargando confesiones...</p>
+            </div>
+          ) : null}
+
+          {!checking && !loading && items.length > 0 ? (
             <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", marginTop: 20 }}>
-              {data.map((item) => {
-                const replies = commentsByContent.get(item.id) ?? [];
-                const author = pickUser((item as any).users);
+              {items.map((item) => {
+                const author = pickUser(item.users);
+                const repliesCount = commentsCountByContent.get(item.id) ?? 0;
                 return (
                   <div key={item.id} className="card" style={{ display: "grid", gap: 12 }}>
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -97,44 +138,26 @@ export default async function ConfesionesPage() {
                     <AdminDeleteButton table="confessions" id={item.id} label="Eliminar confesión" />
                     <div>
                       <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-                        Respuestas: {replies.length}
+                        Respuestas: {repliesCount}
                       </div>
-                      {replies.length > 0 ? (
-                        <div style={{ display: "grid", gap: 8 }}>
-                          {replies.map((reply) => {
-                            const user = pickUser(reply.users);
-                            return (
-                              <div key={reply.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                <img
-                                  src={user?.avatar_url ?? "/logo.png"}
-                                  alt={user?.nickname ?? "avatar"}
-                                  width={24}
-                                  height={24}
-                                  style={{ borderRadius: "50%", objectFit: "cover" }}
-                                />
-                                <div>
-                                  <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.nickname ?? "Anónimo"}</div>
-                                  <div className="muted" style={{ fontSize: 13 }}>{reply.body}</div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
+                      <LazyContentComments contentId={item.id} contentType="confession" initialCount={repliesCount} />
                       <CommentComposer contentId={item.id} contentType="confession" />
                     </div>
                   </div>
                 );
               })}
             </div>
-          ) : (
+          ) : null}
+
+          {!checking && !loading && items.length === 0 ? (
             <div className="card" style={{ marginTop: 20 }}>
               <p className="muted">Aún no hay confesiones públicas publicadas.</p>
             </div>
-          )}
+          ) : null}
         </div>
       </section>
       <Footer />
     </main>
   );
 }
+

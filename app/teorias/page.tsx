@@ -1,42 +1,75 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { AuthWall } from "@/components/AuthWall";
-import { supabaseServer } from "@/lib/supabaseServer";
 import { TeoriaComposer } from "@/components/TeoriaComposer";
 import { CommentComposer } from "@/components/CommentComposer";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
+import { LazyContentComments } from "@/components/LazyContentComments";
+import { supabase } from "@/lib/supabaseClient";
+import { useProtectedUser } from "@/lib/useProtectedUser";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+type TheoryRow = {
+  id: string;
+  theory: string;
+  opinion: string | null;
+  question: string | null;
+  subcategory: string | null;
+  created_at: string | null;
+};
 
-const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
+export default function TeoriasPage() {
+  const { checking, userId } = useProtectedUser();
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<TheoryRow[]>([]);
+  const [commentsCountByContent, setCommentsCountByContent] = useState<Map<string, number>>(new Map());
 
-export default async function TeoriasPage() {
-  const supabase = supabaseServer();
-  const { data } = await supabase
-    .from("theories")
-    .select("id, theory, opinion, question, subcategory, created_at")
-    .order("created_at", { ascending: false })
-    .limit(20);
+  useEffect(() => {
+    if (!userId) return;
+    let mounted = true;
 
-  const ids = (data ?? []).map((item) => item.id);
-  const { data: comments } = await supabase
-    .from("comments")
-    .select("id, body, content_id, created_at, users(nickname, avatar_url)")
-    .eq("content_type", "theory")
-    .in("content_id", ids.length > 0 ? ids : ["00000000-0000-0000-0000-000000000000"])
-    .order("created_at", { ascending: true });
+    const load = async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("theories")
+        .select("id, theory, opinion, question, subcategory, created_at")
+        .order("created_at", { ascending: false })
+        .limit(20);
 
-  const commentsByContent = new Map<string, any[]>();
-  (comments ?? []).forEach((comment) => {
-    const list = commentsByContent.get(comment.content_id) ?? [];
-    list.push(comment);
-    commentsByContent.set(comment.content_id, list);
-  });
+      if (!mounted) return;
+      const rows = (data as TheoryRow[]) ?? [];
+      setItems(rows);
+
+      const ids = rows.map((x) => x.id);
+      if (ids.length === 0) {
+        setCommentsCountByContent(new Map());
+        setLoading(false);
+        return;
+      }
+
+      const { data: comments } = await supabase
+        .from("comments")
+        .select("id, content_id")
+        .eq("content_type", "theory")
+        .in("content_id", ids)
+        .limit(2000);
+
+      if (!mounted) return;
+      const counts = new Map<string, number>();
+      (comments ?? []).forEach((r: any) => counts.set(r.content_id, (counts.get(r.content_id) ?? 0) + 1));
+      setCommentsCountByContent(counts);
+      setLoading(false);
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [userId]);
 
   return (
     <main>
-      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">
@@ -44,11 +77,19 @@ export default async function TeoriasPage() {
           <p className="muted">
             Formato obligatorio: Teoría · Fuente · Opinión personal · Pregunta abierta. Objetivo: pensar, no repetir memes.
           </p>
-          <TeoriaComposer />
-          {data && data.length > 0 ? (
+
+          {!checking && userId ? <TeoriaComposer /> : null}
+
+          {checking || loading ? (
+            <div className="card" style={{ marginTop: 20 }}>
+              <p className="muted">Cargando teorías...</p>
+            </div>
+          ) : null}
+
+          {!checking && !loading && items.length > 0 ? (
             <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", marginTop: 20 }}>
-              {data.map((item) => {
-                const replies = commentsByContent.get(item.id) ?? [];
+              {items.map((item) => {
+                const repliesCount = commentsCountByContent.get(item.id) ?? 0;
                 return (
                   <div key={item.id} className="card" style={{ display: "grid", gap: 12 }}>
                     <h3 style={{ marginTop: 0 }}>{item.theory}</h3>
@@ -58,44 +99,26 @@ export default async function TeoriasPage() {
                     <AdminDeleteButton table="theories" id={item.id} label="Eliminar teoría" />
                     <div>
                       <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-                        Respuestas: {replies.length}
+                        Respuestas: {repliesCount}
                       </div>
-                      {replies.length > 0 ? (
-                        <div style={{ display: "grid", gap: 8 }}>
-                          {replies.map((reply) => {
-                            const user = pickUser(reply.users);
-                            return (
-                              <div key={reply.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                <img
-                                  src={user?.avatar_url ?? "/logo.png"}
-                                  alt={user?.nickname ?? "avatar"}
-                                  width={24}
-                                  height={24}
-                                  style={{ borderRadius: "50%", objectFit: "cover" }}
-                                />
-                                <div>
-                                  <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.nickname ?? "Anónimo"}</div>
-                                  <div className="muted" style={{ fontSize: 13 }}>{reply.body}</div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
+                      <LazyContentComments contentId={item.id} contentType="theory" initialCount={repliesCount} />
                       <CommentComposer contentId={item.id} contentType="theory" />
                     </div>
                   </div>
                 );
               })}
             </div>
-          ) : (
+          ) : null}
+
+          {!checking && !loading && items.length === 0 ? (
             <div className="card" style={{ marginTop: 20 }}>
               <p className="muted">Aún no hay teorías publicadas.</p>
             </div>
-          )}
+          ) : null}
         </div>
       </section>
       <Footer />
     </main>
   );
 }
+

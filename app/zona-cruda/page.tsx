@@ -1,31 +1,78 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { AuthWall } from "@/components/AuthWall";
-import { supabaseServer } from "@/lib/supabaseServer";
 import { ZonaCrudaComposer } from "@/components/ZonaCrudaComposer";
 import { ReplyComposer } from "@/components/ReplyComposer";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
 import { ThreadMedia } from "@/components/ThreadMedia";
+import { LazyThreadReplies } from "@/components/LazyThreadReplies";
+import { supabase } from "@/lib/supabaseClient";
+import { useProtectedUser } from "@/lib/useProtectedUser";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+type ThreadRow = {
+  id: string;
+  title: string;
+  body: string | null;
+  created_at: string | null;
+  users: { nickname?: string | null; bio?: string | null; avatar_url?: string | null } | { nickname?: string | null; bio?: string | null; avatar_url?: string | null }[] | null;
+  thread_media: Array<{ id: string; storage_path: string; kind: "image" | "video"; mime_type: string | null; created_at: string | null }> | null;
+};
 
 const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
 
-export default async function ZonaCrudaPage() {
-  const supabase = supabaseServer();
-  const { data } = await supabase
-    .from("threads")
-    .select(
-      "id, title, body, created_at, users(nickname, bio, avatar_url), thread_media(id, storage_path, kind, mime_type, created_at), replies(id, body, created_at, users(nickname, avatar_url))"
-    )
-    .eq("space", "zona-cruda")
-    .order("created_at", { ascending: false })
-    .limit(20);
+export default function ZonaCrudaPage() {
+  const { checking, userId } = useProtectedUser({ require21: true });
+  const [loading, setLoading] = useState(true);
+  const [threads, setThreads] = useState<ThreadRow[]>([]);
+  const [replyCountByThread, setReplyCountByThread] = useState<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    if (!userId) return;
+    let mounted = true;
+
+    const load = async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("threads")
+        .select("id, title, body, created_at, users(nickname, bio, avatar_url), thread_media(id, storage_path, kind, mime_type, created_at)")
+        .eq("space", "zona-cruda")
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (!mounted) return;
+      const items = (data as ThreadRow[]) ?? [];
+      setThreads(items);
+
+      const ids = items.map((x) => x.id);
+      if (ids.length === 0) {
+        setReplyCountByThread(new Map());
+        setLoading(false);
+        return;
+      }
+
+      const { data: replies } = await supabase
+        .from("replies")
+        .select("id, thread_id")
+        .in("thread_id", ids)
+        .limit(2000);
+
+      if (!mounted) return;
+      const counts = new Map<string, number>();
+      (replies ?? []).forEach((r: any) => counts.set(r.thread_id, (counts.get(r.thread_id) ?? 0) + 1));
+      setReplyCountByThread(counts);
+      setLoading(false);
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [userId]);
 
   return (
     <main>
-      <AuthWall />
       <Navbar />
       <section className="section">
         <div className="container">
@@ -37,12 +84,19 @@ export default async function ZonaCrudaPage() {
             <p className="muted">Mensaje anclado: “Si entras aquí, es bajo tu responsabilidad.”</p>
           </div>
 
-          <ZonaCrudaComposer />
+          {!checking && userId ? <ZonaCrudaComposer /> : null}
 
-          {data && data.length > 0 ? (
+          {checking || loading ? (
+            <div className="card" style={{ marginTop: 20 }}>
+              <p className="muted">Cargando Zona Cruda...</p>
+            </div>
+          ) : null}
+
+          {!checking && !loading && threads.length > 0 ? (
             <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginTop: 20 }}>
-              {data.map((thread) => {
+              {threads.map((thread) => {
                 const user = pickUser(thread.users);
+                const repliesCount = replyCountByThread.get(thread.id) ?? 0;
                 return (
                   <div key={thread.id} className="card" style={{ display: "grid", gap: 12 }}>
                     <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -64,48 +118,30 @@ export default async function ZonaCrudaPage() {
                       <h3 style={{ marginTop: 0 }}>{thread.title}</h3>
                       <p className="muted">{thread.body ?? ""}</p>
                     </div>
-                    <ThreadMedia media={(thread as any).thread_media ?? []} />
+                    <ThreadMedia media={thread.thread_media ?? []} />
                     <AdminDeleteButton table="threads" id={thread.id} label="Eliminar thread" />
                     <div>
                       <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-                        Respuestas: {thread.replies?.length ?? 0}
+                        Respuestas: {repliesCount}
                       </div>
-                      {thread.replies && thread.replies.length > 0 ? (
-                        <div style={{ display: "grid", gap: 8 }}>
-                          {thread.replies.map((reply) => {
-                            const replyUser = pickUser(reply.users);
-                            return (
-                              <div key={reply.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                <img
-                                  src={replyUser?.avatar_url ?? "/logo.png"}
-                                  alt={replyUser?.nickname ?? "avatar"}
-                                  width={24}
-                                  height={24}
-                                  style={{ borderRadius: "50%", objectFit: "cover" }}
-                                />
-                                <div>
-                                  <div style={{ fontSize: 13, fontWeight: 600 }}>{replyUser?.nickname ?? "Anónimo"}</div>
-                                  <div className="muted" style={{ fontSize: 13 }}>{reply.body}</div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
+                      <LazyThreadReplies threadId={thread.id} initialCount={repliesCount} />
                       <ReplyComposer threadId={thread.id} />
                     </div>
                   </div>
                 );
               })}
             </div>
-          ) : (
+          ) : null}
+
+          {!checking && !loading && threads.length === 0 ? (
             <div className="card" style={{ marginTop: 20 }}>
               <p className="muted">Aún no hay publicaciones en Zona Cruda.</p>
             </div>
-          )}
+          ) : null}
         </div>
       </section>
       <Footer />
     </main>
   );
 }
+
