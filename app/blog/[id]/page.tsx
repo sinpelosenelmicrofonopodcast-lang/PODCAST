@@ -140,6 +140,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
 
   const { blocks, toc } = parseBlogBlocks(String(data.body ?? ""));
   const readingBlocks = blocks;
+  const hasToc = toc.length > 0;
 
   const episodeUrl = String((data as any).episode_url ?? "").trim() || null;
   const episodeTitle = String((data as any).episode_title ?? "").trim() || null;
@@ -277,9 +278,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
 
       <section className="mag-post-body">
         <div className="container blog-container">
-          <div className="mag-post-shell">
-            <TableOfContents items={toc} />
-
+          <div className={`mag-post-shell ${hasToc ? "" : "no-toc"}`}>
             <article className="mag-post-article" id="reading-root">
               <div className="mag-reading">
                 {readingBlocks.map((b, idx) => (
@@ -315,6 +314,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
                 </Link>
               </div>
             </article>
+            <TableOfContents items={toc} />
           </div>
 
           {related.length ? (

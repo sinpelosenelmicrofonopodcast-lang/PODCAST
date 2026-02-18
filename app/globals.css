@@ -1763,17 +1763,23 @@ body {
 
 .mag-post-shell {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 260px;
   gap: 26px;
   align-items: start;
 }
 
+.mag-post-shell.no-toc {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .mag-post-article {
-  max-width: 720px;
+  width: 100%;
+  max-width: 760px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 65%), var(--mag-panel);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
   padding: 22px;
+  justify-self: start;
 }
 
 .mag-reading {
@@ -2271,7 +2277,11 @@ body {
 
 .toc {
   position: sticky;
-  top: 110px;
+  top: 96px;
+  align-self: start;
+  max-height: calc(100vh - 132px);
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .toc-title {
@@ -2288,9 +2298,12 @@ body {
 }
 
 .toc-list a {
+  display: block;
   color: rgba(255, 255, 255, 0.78);
   text-decoration: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  line-height: 1.35;
+  padding: 4px 0;
 }
 
 .toc-list .lvl3 {
@@ -2352,6 +2365,9 @@ body {
   }
   .toc {
     position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
   }
   .toc-desktop {
     display: none;
