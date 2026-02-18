@@ -3,6 +3,12 @@
 import { FormEvent, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+const DUPLICATE_WINDOW_HOURS = 12;
+
+function norm(value: string) {
+  return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
 export function GuestRequestForm() {
   const [loading, setLoading] = useState(false);
   const [ok, setOk] = useState<string | null>(null);
@@ -29,6 +35,35 @@ export function GuestRequestForm() {
     if (requiredMissing) {
       setLoading(false);
       setError("Completa nombre, email, disponibilidad y tema.");
+      return;
+    }
+
+    // Idempotencia simple para evitar triplicados por reintentos o doble click.
+    const dedupeSince = new Date(Date.now() - DUPLICATE_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
+    const { data: recent, error: checkError } = await supabase
+      .from("guest_requests")
+      .select("id, email, topic, details, full_name, availability, created_at")
+      .eq("email", payload.email)
+      .gte("created_at", dedupeSince)
+      .order("created_at", { ascending: false })
+      .limit(15);
+    if (checkError) {
+      setLoading(false);
+      setError("No se pudo validar solicitud previa. Intenta nuevamente.");
+      return;
+    }
+    const isDuplicate = (recent ?? []).some((row: any) => {
+      return (
+        norm(String(row.email ?? "")) === norm(payload.email) &&
+        norm(String(row.topic ?? "")) === norm(payload.topic) &&
+        norm(String(row.details ?? "")) === norm(payload.details ?? "") &&
+        norm(String(row.full_name ?? "")) === norm(payload.full_name) &&
+        norm(String(row.availability ?? "")) === norm(payload.availability)
+      );
+    });
+    if (isDuplicate) {
+      setLoading(false);
+      setOk("Ya recibimos esta solicitud. No hace falta enviarla de nuevo.");
       return;
     }
 

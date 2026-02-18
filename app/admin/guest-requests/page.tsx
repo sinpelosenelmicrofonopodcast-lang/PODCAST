@@ -18,7 +18,30 @@ type GuestRequest = {
   created_at: string;
 };
 
+type GuestRequestView = GuestRequest & {
+  duplicate_count: number;
+};
+
 const statuses: GuestRequestStatus[] = ["new", "contacted", "closed"];
+
+function norm(value: string | null | undefined) {
+  return String(value ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function fingerprint(item: GuestRequest) {
+  return [
+    norm(item.email),
+    norm(item.full_name),
+    norm(item.topic),
+    norm(item.availability),
+    norm(item.details),
+    norm(item.phone)
+  ].join("|");
+}
 
 export default function AdminGuestRequestsPage() {
   const [items, setItems] = useState<GuestRequest[]>([]);
@@ -49,10 +72,27 @@ export default function AdminGuestRequestsPage() {
     loadItems();
   }, []);
 
+  const deduped = useMemo<GuestRequestView[]>(() => {
+    const byKey = new Map<string, GuestRequestView>();
+    for (const item of items) {
+      const key = fingerprint(item);
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, { ...item, duplicate_count: 1 });
+        continue;
+      }
+      existing.duplicate_count += 1;
+      if (new Date(item.created_at).getTime() > new Date(existing.created_at).getTime()) {
+        byKey.set(key, { ...item, duplicate_count: existing.duplicate_count });
+      }
+    }
+    return Array.from(byKey.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [items]);
+
   const filtered = useMemo(() => {
-    if (activeFilter === "all") return items;
-    return items.filter((item) => item.status === activeFilter);
-  }, [items, activeFilter]);
+    if (activeFilter === "all") return deduped;
+    return deduped.filter((item) => item.status === activeFilter);
+  }, [deduped, activeFilter]);
 
   const changeStatus = async (id: string, nextStatus: GuestRequestStatus) => {
     setUpdatingId(id);
@@ -73,7 +113,7 @@ export default function AdminGuestRequestsPage() {
 
       <div className="card" style={{ marginTop: 18, display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button className={`news-tab ${activeFilter === "all" ? "active" : ""}`} onClick={() => setActiveFilter("all")} type="button">
-          Todos ({items.length})
+          Todos ({deduped.length})
         </button>
         {statuses.map((status) => (
           <button
@@ -82,7 +122,7 @@ export default function AdminGuestRequestsPage() {
             onClick={() => setActiveFilter(status)}
             type="button"
           >
-            {status} ({items.filter((item) => item.status === status).length})
+            {status} ({deduped.filter((item) => item.status === status).length})
           </button>
         ))}
       </div>
@@ -100,7 +140,10 @@ export default function AdminGuestRequestsPage() {
           <article key={item.id} className="card" style={{ display: "grid", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <strong>{item.full_name}</strong>
-              <span className="news-badge">{item.status}</span>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {item.duplicate_count > 1 ? <span className="news-badge">x{item.duplicate_count} repetidas</span> : null}
+                <span className="news-badge">{item.status}</span>
+              </div>
             </div>
 
             <div className="muted" style={{ display: "grid", gap: 6, fontSize: 14 }}>
@@ -141,4 +184,3 @@ export default function AdminGuestRequestsPage() {
     </main>
   );
 }
-
