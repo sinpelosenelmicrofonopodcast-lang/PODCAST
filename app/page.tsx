@@ -138,7 +138,7 @@ export default async function HomePage() {
       .select("id, title, source_url, media_url, posted_at, metrics")
       .eq("platform", "YouTube")
       .order("posted_at", { ascending: false })
-      .limit(30),
+      .limit(18),
     supabase
       .from("news_items")
       .select("id, title, summary, published_at, cover_url")
@@ -221,7 +221,7 @@ export default async function HomePage() {
     .select("id, body, created_at, users(nickname)")
     .eq("level", "public")
     .order("created_at", { ascending: false })
-    .limit(8);
+    .limit(6);
 
   // "Most read" from page_visits (service role, aggregated only).
   let mostReadNewsIds: string[] = [];
@@ -233,7 +233,7 @@ export default async function HomePage() {
         .select("path, visited_at")
         .gte("visited_at", since24h)
         .like("path", "/noticias/%")
-        .limit(2000);
+        .limit(900);
       const counts = new Map<string, number>();
       (visits ?? []).forEach((v: any) => {
         const m = String(v.path ?? "").match(/^\/noticias\/([0-9a-f-]{36})/i);

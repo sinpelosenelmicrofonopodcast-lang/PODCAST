@@ -7,9 +7,7 @@ import { CommentComposer } from "@/components/CommentComposer";
 import { ShareButtons } from "@/components/ShareButtons";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const fetchCache = "force-no-store";
+export const revalidate = 180;
 
 const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
 

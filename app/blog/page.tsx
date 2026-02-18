@@ -8,9 +8,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { clampMetaDescription, estimateReadingTimeMinutes } from "@/lib/blogSeo";
 import { createClient } from "@supabase/supabase-js";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const fetchCache = "force-no-store";
+export const revalidate = 300;
 
 type BlogPost = {
   id: string;
@@ -48,77 +46,112 @@ function normalize(s: string) {
 export default async function BlogIndexPage({
   searchParams
 }: {
-  searchParams: { q?: string; cat?: string; sort?: "latest" | "popular" | "trend" };
+  searchParams: { q?: string; cat?: string; sort?: "latest" | "popular" | "trend"; page?: string };
 }) {
   const supabase = supabaseServer();
   const q = String(searchParams?.q ?? "").trim();
   const cat = String(searchParams?.cat ?? "").trim();
   const sort = (searchParams?.sort ?? "latest") as "latest" | "popular" | "trend";
+  const pageNumRaw = Number(searchParams?.page ?? "1");
+  const pageNum = Number.isFinite(pageNumRaw) ? Math.max(1, Math.floor(pageNumRaw)) : 1;
+  const perPage = 12;
 
-  const run = async (selectCols: string) =>
-    supabase.from("blog_posts").select(selectCols).order("created_at", { ascending: false }).limit(60);
-
-  let { data, error } = await run("id, slug, title, excerpt, meta_description, cover_url, created_at, reading_time_minutes, categories, tags");
-  if (error && /(slug|meta_description|reading_time_minutes|categories|tags)/i.test(error.message)) {
-    const fallback = await run("id, title, excerpt, cover_url, created_at");
-    data = fallback.data as any;
-    error = fallback.error as any;
-  }
-  if (error) data = [];
-
-  const rawPosts = (Array.isArray(data) ? data : []) as unknown as BlogPost[];
-  let posts = rawPosts.map((p) => ({
+  const selectPrimary = "id, slug, title, excerpt, meta_description, cover_url, created_at, reading_time_minutes, categories, tags";
+  const selectFallback = "id, title, excerpt, cover_url, created_at";
+  const mapPost = (p: BlogPost): BlogPost => ({
     ...p,
     meta_description: clampMetaDescription((p as any).meta_description ?? p.excerpt ?? ""),
     reading_time_minutes:
       typeof (p as any).reading_time_minutes === "number"
         ? Number((p as any).reading_time_minutes)
         : estimateReadingTimeMinutes(`${p.title}\n\n${p.excerpt ?? ""}`)
-  }));
+  });
 
-  // Server-side filter for search/category (safe + no query-string injection).
-  if (q) {
-    const needle = normalize(q);
-    posts = posts.filter((p) => {
-      const hay = normalize(`${p.title} ${p.excerpt ?? ""} ${(p.meta_description ?? "")}`);
-      return hay.includes(needle);
-    });
-  }
-  if (cat) {
-    const needle = normalize(cat);
-    posts = posts.filter((p) => {
-      const cats = (p.categories ?? []).map(normalize);
-      const tags = (p.tags ?? []).map(normalize);
-      return cats.includes(needle) || tags.includes(needle);
-    });
-  }
+  let total = 0;
+  let posts: BlogPost[] = [];
 
   // Popular/trending: aggregate last 7 days visits by /blog/{slugOrId}. Falls back to latest if service key missing.
   const svc = supabaseService();
   const counts = new Map<string, number>();
-  if (svc && (sort === "popular" || sort === "trend")) {
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: visits } = await svc
-      .from("page_visits")
-      .select("path, visited_at")
-      .gte("visited_at", since)
-      .like("path", "/blog/%")
-      .limit(4000);
-    (visits ?? []).forEach((v: any) => {
-      const key = String(v.path ?? "").split("?")[0];
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    });
-  }
-
   const score = (p: BlogPost) => {
     const key = `/blog/${(p.slug ?? p.id) as string}`;
     return counts.get(key) ?? 0;
   };
 
-  if (sort === "popular" || sort === "trend") {
-    posts = [...posts].sort((a, b) => score(b) - score(a));
+  const start = (pageNum - 1) * perPage;
+  const end = start + perPage - 1;
+
+  // Fast path for public browsing (most common): latest posts with DB pagination.
+  if (sort === "latest" && !q) {
+    let query = supabase.from("blog_posts").select(selectPrimary, { count: "exact" }).order("created_at", { ascending: false }).range(start, end);
+    if (cat) query = query.contains("categories", [cat]);
+    let { data, error, count } = await query;
+
+    if (error && /(slug|meta_description|reading_time_minutes|categories|tags)/i.test(error.message)) {
+      const fallback = await supabase
+        .from("blog_posts")
+        .select(selectFallback, { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(start, end);
+      data = fallback.data as any;
+      error = fallback.error as any;
+      count = fallback.count;
+    }
+
+    const raw = (Array.isArray(data) && !error ? data : []) as unknown as BlogPost[];
+    posts = raw.map(mapPost);
+    total = Number(count ?? posts.length);
+  } else {
+    const run = async (selectCols: string) =>
+      supabase.from("blog_posts").select(selectCols).order("created_at", { ascending: false }).limit(120);
+
+    let { data, error } = await run(selectPrimary);
+    if (error && /(slug|meta_description|reading_time_minutes|categories|tags)/i.test(error.message)) {
+      const fallback = await run(selectFallback);
+      data = fallback.data as any;
+      error = fallback.error as any;
+    }
+    if (error) data = [];
+
+    let filtered = ((Array.isArray(data) ? data : []) as unknown as BlogPost[]).map(mapPost);
+
+    if (q) {
+      const needle = normalize(q);
+      filtered = filtered.filter((p) => {
+        const hay = normalize(`${p.title} ${p.excerpt ?? ""} ${(p.meta_description ?? "")}`);
+        return hay.includes(needle);
+      });
+    }
+    if (cat) {
+      const needle = normalize(cat);
+      filtered = filtered.filter((p) => {
+        const cats = (p.categories ?? []).map(normalize);
+        const tags = (p.tags ?? []).map(normalize);
+        return cats.includes(needle) || tags.includes(needle);
+      });
+    }
+
+    if (svc && (sort === "popular" || sort === "trend")) {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: visits } = await svc
+        .from("page_visits")
+        .select("path, visited_at")
+        .gte("visited_at", since)
+        .like("path", "/blog/%")
+        .limit(1200);
+      (visits ?? []).forEach((v: any) => {
+        const key = String(v.path ?? "").split("?")[0];
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      });
+      filtered = [...filtered].sort((a, b) => score(b) - score(a));
+    }
+
+    total = filtered.length;
+    posts = filtered.slice(start, start + perPage);
   }
 
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const shownPage = Math.min(pageNum, totalPages);
   const featured = posts[0] ?? null;
   const rest = posts.slice(1);
   const trending = [...posts].sort((a, b) => score(b) - score(a)).slice(0, 5);
@@ -132,17 +165,21 @@ export default async function BlogIndexPage({
     )
   ).slice(0, 12);
 
-  const buildHref = (next: Partial<{ q: string; cat: string; sort: string }>): any => {
+  const buildHref = (next: Partial<{ q: string; cat: string; sort: string; page: string }>): any => {
     const params = new URLSearchParams();
     const nq = (next.q ?? q).trim();
     const ncat = (next.cat ?? cat).trim();
     const nsort = (next.sort ?? sort).trim();
+    const npage = (next.page ?? String(shownPage)).trim();
     if (nq) params.set("q", nq);
     if (ncat) params.set("cat", ncat);
     if (nsort) params.set("sort", nsort);
+    if (npage && npage !== "1") params.set("page", npage);
     const qs = params.toString();
     return qs ? `/blog?${qs}` : "/blog";
   };
+  const prevHref = buildHref({ page: String(Math.max(1, shownPage - 1)) });
+  const nextHref = buildHref({ page: String(Math.min(totalPages, shownPage + 1)) });
 
   return (
     <main className="blog-mag blog-mag-index">
@@ -162,20 +199,21 @@ export default async function BlogIndexPage({
                 <input className="mag-input" name="q" defaultValue={q} placeholder="Buscar tema, nombre o frase..." />
                 {cat ? <input type="hidden" name="cat" value={cat} /> : null}
                 <input type="hidden" name="sort" value={sort} />
+                <input type="hidden" name="page" value="1" />
               </form>
 
               <div className="mag-filters" aria-label="Filtros">
-                <Link className={sort === "latest" ? "mag-chip active" : "mag-chip"} href={buildHref({ sort: "latest" })}>
+                <Link className={sort === "latest" ? "mag-chip active" : "mag-chip"} href={buildHref({ sort: "latest", page: "1" })}>
                   Más reciente
                 </Link>
-                <Link className={sort === "popular" ? "mag-chip active" : "mag-chip"} href={buildHref({ sort: "popular" })}>
+                <Link className={sort === "popular" ? "mag-chip active" : "mag-chip"} href={buildHref({ sort: "popular", page: "1" })}>
                   Popular
                 </Link>
-                <Link className={sort === "trend" ? "mag-chip active" : "mag-chip"} href={buildHref({ sort: "trend" })}>
+                <Link className={sort === "trend" ? "mag-chip active" : "mag-chip"} href={buildHref({ sort: "trend", page: "1" })}>
                   Tendencia
                 </Link>
                 {cat ? (
-                  <Link className="mag-chip" href={buildHref({ cat: "" })} title="Quitar categoria">
+                  <Link className="mag-chip" href={buildHref({ cat: "", page: "1" })} title="Quitar categoria">
                     {cat} ✕
                   </Link>
                 ) : null}
@@ -184,7 +222,7 @@ export default async function BlogIndexPage({
               {categories.length ? (
                 <div className="mag-cats" aria-label="Categorias">
                   {categories.map((c) => (
-                    <Link key={c} className={cat === c ? "mag-chip active" : "mag-chip"} href={buildHref({ cat: c })}>
+                    <Link key={c} className={cat === c ? "mag-chip active" : "mag-chip"} href={buildHref({ cat: c, page: "1" })}>
                       {c}
                     </Link>
                   ))}
@@ -267,6 +305,20 @@ export default async function BlogIndexPage({
                       </article>
                     </div>
                   ))}
+                </div>
+              ) : null}
+
+              {totalPages > 1 ? (
+                <div style={{ display: "flex", gap: 10, justifyContent: "center", alignItems: "center", marginTop: 18 }}>
+                  <Link className="button secondary" href={prevHref} aria-disabled={shownPage <= 1}>
+                    Anterior
+                  </Link>
+                  <span className="muted" style={{ fontSize: 13 }}>
+                    Página {shownPage} de {totalPages}
+                  </span>
+                  <Link className="button secondary" href={nextHref} aria-disabled={shownPage >= totalPages}>
+                    Siguiente
+                  </Link>
                 </div>
               ) : null}
             </div>

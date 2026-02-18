@@ -8,41 +8,63 @@ import { ui } from "@/lib/i18n";
 import { getServerLang } from "@/lib/i18nServer";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const fetchCache = "force-no-store";
+export const revalidate = 300;
 
-export default async function NoticiasPage({ searchParams }: { searchParams: { cat?: string; sort?: string } }) {
+export default async function NoticiasPage({ searchParams }: { searchParams: { cat?: string; sort?: string; page?: string } }) {
   const supabase = supabaseServer();
   const lang = getServerLang();
   const t = ui[lang];
   const category = searchParams?.cat;
   const sort = searchParams?.sort ?? "latest";
+  const pageNumRaw = Number(searchParams?.page ?? "1");
+  const pageNum = Number.isFinite(pageNumRaw) ? Math.max(1, Math.floor(pageNumRaw)) : 1;
+  const perPage = 12;
 
-  let query = supabase
-    .from("news_items")
-    .select("id, title, summary, published_at, cover_url, categories")
-    .order("published_at", { ascending: false });
+  let items: any[] = [];
+  let total = 0;
+  let totalPages = 1;
 
-  if (category) {
-    query = query.contains("categories", [category]);
-  }
-
-  const { data } = await query.limit(50);
-
-  let items = data ?? [];
-
-  if (sort === "comments" && items.length > 0) {
-    const ids = items.map((item) => item.id);
+  if (sort === "comments") {
+    // Ranking by comments over a bounded window (latest 120) to keep response fast.
+    let q = supabase
+      .from("news_items")
+      .select("id, title, summary, published_at, cover_url, categories")
+      .order("published_at", { ascending: false })
+      .limit(120);
+    if (category) q = q.contains("categories", [category]);
+    const { data: rankedBase } = await q;
+    const ranked = rankedBase ?? [];
+    const ids = ranked.map((item) => item.id);
     const { data: comments } = await supabase
       .from("comments")
       .select("id, content_id")
       .eq("content_type", "news")
-      .in("content_id", ids);
+      .in("content_id", ids.length > 0 ? ids : ["00000000-0000-0000-0000-000000000000"]);
 
     const counts = new Map<string, number>();
     (comments ?? []).forEach((c) => counts.set(c.content_id, (counts.get(c.content_id) ?? 0) + 1));
-    items = [...items].sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0));
+    const sorted = [...ranked].sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0));
+    total = sorted.length;
+    totalPages = Math.max(1, Math.ceil(total / perPage));
+    const start = (pageNum - 1) * perPage;
+    items = sorted.slice(start, start + perPage);
+  } else {
+    let countQuery = supabase.from("news_items").select("id", { count: "exact", head: true });
+    if (category) countQuery = countQuery.contains("categories", [category]);
+    const { count } = await countQuery;
+    total = Number(count ?? 0);
+    totalPages = Math.max(1, Math.ceil(total / perPage));
+
+    const start = (pageNum - 1) * perPage;
+    const end = start + perPage - 1;
+    let query = supabase
+      .from("news_items")
+      .select("id, title, summary, published_at, cover_url, categories")
+      .order("published_at", { ascending: false })
+      .range(start, end);
+    if (category) query = query.contains("categories", [category]);
+    const { data } = await query;
+    items = data ?? [];
   }
 
   const tabClass = (active: boolean) => (active ? "news-tab active" : "news-tab");
@@ -50,9 +72,26 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     pathname: "/noticias",
     query: {
       ...(category ? { cat: category } : {}),
-      sort: nextSort
+      sort: nextSort,
+      page: "1"
     }
   });
+  const prevHref = {
+    pathname: "/noticias",
+    query: {
+      ...(category ? { cat: category } : {}),
+      sort,
+      page: String(Math.max(1, pageNum - 1))
+    }
+  };
+  const nextHref = {
+    pathname: "/noticias",
+    query: {
+      ...(category ? { cat: category } : {}),
+      sort,
+      page: String(Math.min(totalPages, pageNum + 1))
+    }
+  };
 
   return (
     <main>
@@ -82,7 +121,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
             </Link>
           </div>
 
-          {items && items.length > 0 ? (
+          {items.length > 0 ? (
             <div style={{ display: "grid", gap: 14, marginTop: 20 }}>
               {items.map((item, idx) => (
                 <div key={item.id} style={{ display: "contents" }}>
@@ -91,7 +130,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                   {item.cover_url ? (
                     <Link href={`/noticias/${item.id}`}>
                       <div className="news-cover-thumb">
-                        <img src={item.cover_url} alt={item.title} />
+                        <img src={item.cover_url} alt={item.title} loading="lazy" decoding="async" />
                       </div>
                     </Link>
                   ) : null}
@@ -134,6 +173,20 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
               <p className="muted">{t.news.noneYet}</p>
             </div>
           )}
+
+          {totalPages > 1 ? (
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", alignItems: "center", marginTop: 18 }}>
+              <Link className="button secondary" href={prevHref} aria-disabled={pageNum <= 1}>
+                Anterior
+              </Link>
+              <span className="muted" style={{ fontSize: 13 }}>
+                Página {pageNum} de {totalPages}
+              </span>
+              <Link className="button secondary" href={nextHref} aria-disabled={pageNum >= totalPages}>
+                Siguiente
+              </Link>
+            </div>
+          ) : null}
         </div>
       </section>
       <Footer />
