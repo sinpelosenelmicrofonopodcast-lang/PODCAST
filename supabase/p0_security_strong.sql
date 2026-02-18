@@ -22,14 +22,14 @@ as $$
   );
 $$;
 
-create or replace function public.is_admin(uid uuid)
+create or replace function public.is_admin(p_uid uuid)
 returns boolean
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select public.has_role(uid, 'admin');
+  select public.has_role(p_uid, 'admin');
 $$;
 
 grant execute on function public.has_role(uuid, text) to authenticated;
@@ -292,4 +292,3 @@ to authenticated
 using (public.is_admin(auth.uid()));
 
 commit;
-

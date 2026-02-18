@@ -15,7 +15,7 @@ begin;
 
 -- 1) Canonical admin-check function.
 -- IMPORTANT: keep parameter name `uid` (you previously hit "cannot change name of input parameter uid").
-create or replace function public.is_admin(uid uuid)
+create or replace function public.is_admin(p_uid uuid)
 returns boolean
 language sql
 stable
@@ -26,7 +26,7 @@ as $$
     select 1
     from public.user_roles ur
     join public.roles r on r.id = ur.role_id
-    where ur.user_id = uid
+    where ur.user_id = p_uid
       and r.name = 'admin'
   );
 $$;
@@ -187,4 +187,3 @@ commit;
 -- delete from public.user_roles ur
 -- using public.roles r
 -- where ur.role_id = r.id and r.name = 'admin' and ur.user_id = 'PUT-USER-UUID-HERE';
-
