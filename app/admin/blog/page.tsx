@@ -23,6 +23,19 @@ type BlogPost = {
   created_at: string | null;
 };
 
+function humanizeBlogError(raw?: string | null) {
+  const msg = String(raw ?? "").trim();
+  if (!msg) return "No se pudo guardar el artículo.";
+  if (
+    msg.includes("blog_posts_source_hash_unique") ||
+    msg.includes("blog_posts_slug_unique") ||
+    msg.toLowerCase().includes("duplicate key value")
+  ) {
+    return "Duplicado detectado: slug o fuente/contenido ya existe.";
+  }
+  return msg;
+}
+
 export default function AdminBlogPage() {
   const [title, setTitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
@@ -155,7 +168,7 @@ export default function AdminBlogPage() {
         const retry = await supabase.from("blog_posts").update(minimal).eq("id", editingId);
         error = retry.error;
       }
-      if (error) return setStatus(error.message), void setLoading(false);
+      if (error) return setStatus(humanizeBlogError(error.message)), void setLoading(false);
       setStatus("Artículo actualizado.");
     } else {
       let { error } = await supabase.from("blog_posts").insert(payloadBase);
@@ -164,7 +177,7 @@ export default function AdminBlogPage() {
         const retry = await supabase.from("blog_posts").insert(minimal);
         error = retry.error;
       }
-      if (error) return setStatus(error.message), void setLoading(false);
+      if (error) return setStatus(humanizeBlogError(error.message)), void setLoading(false);
       setStatus("Artículo publicado.");
     }
 

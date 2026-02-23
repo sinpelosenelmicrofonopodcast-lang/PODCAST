@@ -9,7 +9,8 @@ const ALLOWED_TABLES = new Set([
   "news_items",
   "blog_posts",
   "live_events",
-  "promotions"
+  "promotions",
+  "guest_requests"
 ]);
 
 function isUuid(v: string) {

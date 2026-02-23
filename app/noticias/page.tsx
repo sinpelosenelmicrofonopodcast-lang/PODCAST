@@ -29,10 +29,23 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     let q = supabase
       .from("news_items")
       .select("id, title, summary, published_at, cover_url, categories")
+      .eq("publication_state", "published")
       .order("published_at", { ascending: false })
       .limit(120);
     if (category) q = q.contains("categories", [category]);
-    const { data: rankedBase } = await q;
+    let { data: rankedBase, error: rankedErr } = await q;
+    if (rankedErr && /publication_state/i.test(rankedErr.message)) {
+      let fallback = supabase
+        .from("news_items")
+        .select("id, title, summary, published_at, cover_url, categories")
+        .order("published_at", { ascending: false })
+        .limit(120);
+      if (category) fallback = fallback.contains("categories", [category]);
+      const r = await fallback;
+      rankedBase = r.data;
+      rankedErr = r.error;
+    }
+    if (rankedErr) rankedBase = [];
     const ranked = rankedBase ?? [];
     const ids = ranked.map((item) => item.id);
     const { data: comments } = await supabase
@@ -49,9 +62,17 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     const start = (pageNum - 1) * perPage;
     items = sorted.slice(start, start + perPage);
   } else {
-    let countQuery = supabase.from("news_items").select("id", { count: "exact", head: true });
+    let countQuery = supabase.from("news_items").select("id", { count: "exact", head: true }).eq("publication_state", "published");
     if (category) countQuery = countQuery.contains("categories", [category]);
-    const { count } = await countQuery;
+    let { count, error: countErr } = await countQuery;
+    if (countErr && /publication_state/i.test(countErr.message)) {
+      let fallbackCount = supabase.from("news_items").select("id", { count: "exact", head: true });
+      if (category) fallbackCount = fallbackCount.contains("categories", [category]);
+      const r = await fallbackCount;
+      count = r.count;
+      countErr = r.error;
+    }
+    if (countErr) count = 0;
     total = Number(count ?? 0);
     totalPages = Math.max(1, Math.ceil(total / perPage));
 
@@ -60,10 +81,23 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     let query = supabase
       .from("news_items")
       .select("id, title, summary, published_at, cover_url, categories")
+      .eq("publication_state", "published")
       .order("published_at", { ascending: false })
       .range(start, end);
     if (category) query = query.contains("categories", [category]);
-    const { data } = await query;
+    let { data, error } = await query;
+    if (error && /publication_state/i.test(error.message)) {
+      let fallback = supabase
+        .from("news_items")
+        .select("id, title, summary, published_at, cover_url, categories")
+        .order("published_at", { ascending: false })
+        .range(start, end);
+      if (category) fallback = fallback.contains("categories", [category]);
+      const r = await fallback;
+      data = r.data;
+      error = r.error;
+    }
+    if (error) data = [];
     items = data ?? [];
   }
 

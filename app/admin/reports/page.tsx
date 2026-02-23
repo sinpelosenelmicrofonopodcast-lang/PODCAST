@@ -1,18 +1,45 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-type ReportRow = {
+type PipelineEventRow = {
   id: string;
-  content_id: string;
-  reason: string;
+  job_id: string | null;
+  stage: string;
   status: string;
+  content_type: string | null;
+  content_id: string | null;
+  platform: string | null;
+  message: string | null;
+  meta: Record<string, any> | null;
   created_at: string;
-  users?: { nickname: string | null } | { nickname: string | null }[] | null;
 };
 
-const pickOne = <T,>(value: T | T[] | null | undefined) => (Array.isArray(value) ? value[0] : value);
+type FailedJobRow = {
+  id: string;
+  job_type: string;
+  source: string | null;
+  content_type: string | null;
+  content_id: string | null;
+  title: string | null;
+  error: string | null;
+  finished_at: string | null;
+  updated_at: string;
+};
+
+type ReportsPayload = {
+  ok: boolean;
+  summary: {
+    window: string;
+    totalEvents: number;
+    byStage: Record<string, number>;
+    byStatus: Record<string, number>;
+  };
+  events: PipelineEventRow[];
+  failedJobs: FailedJobRow[];
+  error?: string;
+};
 
 function fmtDate(value?: string | null) {
   if (!value) return "—";
@@ -22,29 +49,45 @@ function fmtDate(value?: string | null) {
 }
 
 export default function AdminReportsPage() {
-  const [rows, setRows] = useState<ReportRow[]>([]);
+  const [events, setEvents] = useState<PipelineEventRow[]>([]);
+  const [failedJobs, setFailedJobs] = useState<FailedJobRow[]>([]);
+  const [summary, setSummary] = useState<ReportsPayload["summary"]>({
+    window: "24h",
+    totalEvents: 0,
+    byStage: {},
+    byStatus: {}
+  });
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
     setStatus(null);
 
-    const { data, error } = await supabase
-      .from("reports")
-      .select("id, content_id, reason, status, created_at, users(nickname)")
-      .order("created_at", { ascending: false })
-      .limit(200);
-
-    if (error) {
-      setRows([]);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
       setLoading(false);
-      setStatus(error.message);
+      setStatus("Sesión inválida. Vuelve a iniciar sesión.");
       return;
     }
 
-    setRows((data as ReportRow[]) ?? []);
+    const res = await fetch("/api/admin/pipeline-events?limit=250", {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const json = (await res.json().catch(() => ({}))) as ReportsPayload;
+    if (!res.ok || !json?.ok) {
+      setStatus(json?.error ?? `No se pudo cargar reportes (HTTP ${res.status}).`);
+      setEvents([]);
+      setFailedJobs([]);
+      setSummary({ window: "24h", totalEvents: 0, byStage: {}, byStatus: {} });
+      setLoading(false);
+      return;
+    }
+
+    setEvents(json.events ?? []);
+    setFailedJobs(json.failedJobs ?? []);
+    setSummary(json.summary ?? { window: "24h", totalEvents: 0, byStage: {}, byStatus: {} });
     setLoading(false);
   };
 
@@ -52,22 +95,13 @@ export default function AdminReportsPage() {
     load();
   }, []);
 
-  const updateStatus = async (report: ReportRow, next: string) => {
-    setBusyId(report.id);
-    setStatus(null);
-    const { error } = await supabase.from("reports").update({ status: next }).eq("id", report.id);
-    setBusyId(null);
-    if (error) {
-      setStatus(error.message);
-      return;
-    }
-    setRows((prev) => prev.map((r) => (r.id === report.id ? { ...r, status: next } : r)));
-  };
+  const stageEntries = useMemo(() => Object.entries(summary.byStage ?? {}), [summary.byStage]);
+  const statusEntries = useMemo(() => Object.entries(summary.byStatus ?? {}), [summary.byStatus]);
 
   return (
     <main>
-      <h1 className="section-title">Reportes Internos</h1>
-      <p className="muted">Datos reales (`reports`). Moderación legal: doxxing, amenazas, acoso repetitivo.</p>
+      <h1 className="section-title">Reportes Operacionales</h1>
+      <p className="muted">Trazabilidad real del pipeline: ingestado → draft → publicado → social.</p>
 
       {status ? (
         <div className="card" style={{ marginTop: 12 }}>
@@ -78,69 +112,112 @@ export default function AdminReportsPage() {
       ) : null}
 
       <div className="card" style={{ marginTop: 16, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <span className="muted">Total: {rows.length}</span>
+        <div className="muted" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <span>Ventana: {summary.window}</span>
+          <span>Total eventos: {summary.totalEvents}</span>
+          <span>Errores: {summary.byStatus?.error ?? 0}</span>
+        </div>
         <button className="button secondary" type="button" onClick={load} disabled={loading}>
           {loading ? "Cargando..." : "Refrescar"}
         </button>
       </div>
 
-      <div className="card" style={{ marginTop: 20 }}>
-        {loading ? <p className="muted">Cargando…</p> : null}
-        {!loading && rows.length === 0 ? <p className="muted">No hay reportes todavía.</p> : null}
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", marginTop: 16 }}>
+        <article className="card">
+          <h3 style={{ marginTop: 0 }}>Por etapa (24h)</h3>
+          {stageEntries.length === 0 ? <p className="muted">Sin eventos.</p> : null}
+          <div className="muted" style={{ display: "grid", gap: 6, fontSize: 13 }}>
+            {stageEntries.map(([k, v]) => (
+              <span key={k}>
+                {k}: {v}
+              </span>
+            ))}
+          </div>
+        </article>
+        <article className="card">
+          <h3 style={{ marginTop: 0 }}>Por estado (24h)</h3>
+          {statusEntries.length === 0 ? <p className="muted">Sin eventos.</p> : null}
+          <div className="muted" style={{ display: "grid", gap: 6, fontSize: 13 }}>
+            {statusEntries.map(([k, v]) => (
+              <span key={k}>
+                {k}: {v}
+              </span>
+            ))}
+          </div>
+        </article>
+      </div>
 
-        {!loading && rows.length > 0 ? (
+      <div className="card" style={{ marginTop: 20 }}>
+        <h3 style={{ marginTop: 0 }}>Eventos recientes</h3>
+        {loading ? <p className="muted">Cargando…</p> : null}
+        {!loading && events.length === 0 ? <p className="muted">No hay eventos recientes.</p> : null}
+
+        {!loading && events.length > 0 ? (
           <table className="table">
             <thead>
               <tr>
                 <th>Fecha</th>
-                <th>Reportado por</th>
-                <th>Contenido ID</th>
-                <th>Razón</th>
-                <th>Status</th>
-                <th>Acción</th>
+                <th>Etapa</th>
+                <th>Estado</th>
+                <th>Contenido</th>
+                <th>Plataforma</th>
+                <th>Mensaje</th>
+                <th>Job</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
-                const reporter = pickOne(r.users) as any;
-                return (
-                  <tr key={r.id}>
-                    <td>{fmtDate(r.created_at)}</td>
-                    <td>@{reporter?.nickname ?? "—"}</td>
-                    <td className="muted">{r.content_id}</td>
-                    <td>{r.reason}</td>
-                    <td>{r.status}</td>
-                    <td>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button
-                          className="button secondary"
-                          type="button"
-                          onClick={() => updateStatus(r, "open")}
-                          disabled={busyId === r.id}
-                        >
-                          Open
-                        </button>
-                        <button
-                          className="button secondary"
-                          type="button"
-                          onClick={() => updateStatus(r, "reviewing")}
-                          disabled={busyId === r.id}
-                        >
-                          Reviewing
-                        </button>
-                        <button
-                          className="button"
-                          type="button"
-                          onClick={() => updateStatus(r, "closed")}
-                          disabled={busyId === r.id}
-                        >
-                          Close
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {events.map((r) => (
+                <tr key={r.id}>
+                  <td>{fmtDate(r.created_at)}</td>
+                  <td>{r.stage}</td>
+                  <td>{r.status}</td>
+                  <td className="muted">
+                    {r.content_type ?? "—"} · {r.content_id ?? "—"}
+                  </td>
+                  <td>{r.platform ?? "—"}</td>
+                  <td className="muted" style={{ maxWidth: 380 }}>
+                    {r.message ?? "—"}
+                  </td>
+                  <td className="muted">{r.job_id ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+      </div>
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <h3 style={{ marginTop: 0 }}>Jobs fallidos</h3>
+        {!loading && failedJobs.length === 0 ? <p className="muted">No hay jobs fallidos.</p> : null}
+        {!loading && failedJobs.length > 0 ? (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Job</th>
+                <th>Contenido</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {failedJobs.map((job) => (
+                <tr key={job.id}>
+                  <td>{fmtDate(job.finished_at ?? job.updated_at)}</td>
+                  <td>
+                    <strong>{job.job_type}</strong>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {job.source ?? "—"}
+                    </div>
+                  </td>
+                  <td className="muted">
+                    {job.title ?? "—"} <br />
+                    {job.content_type ?? "—"} · {job.content_id ?? "—"}
+                  </td>
+                  <td className="muted" style={{ maxWidth: 420 }}>
+                    {job.error ?? "—"}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         ) : null}
@@ -148,4 +225,3 @@ export default function AdminReportsPage() {
     </main>
   );
 }
-

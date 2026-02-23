@@ -139,17 +139,40 @@ export default async function HomePage() {
       .eq("platform", "YouTube")
       .order("posted_at", { ascending: false })
       .limit(18),
-    supabase
-      .from("news_items")
-      .select("id, title, summary, published_at, cover_url")
-      .order("published_at", { ascending: false })
-      .limit(1)
-      .single(),
-    supabase
-      .from("news_items")
-      .select("id, title, summary, published_at, cover_url, categories")
-      .order("published_at", { ascending: false })
-      .limit(24),
+    (async () => {
+      const primary = await supabase
+        .from("news_items")
+        .select("id, title, summary, published_at, cover_url")
+        .eq("publication_state", "published")
+        .order("published_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (primary.error && /publication_state/i.test(primary.error.message)) {
+        return supabase
+          .from("news_items")
+          .select("id, title, summary, published_at, cover_url")
+          .order("published_at", { ascending: false })
+          .limit(1)
+          .single();
+      }
+      return primary;
+    })(),
+    (async () => {
+      const primary = await supabase
+        .from("news_items")
+        .select("id, title, summary, published_at, cover_url, categories")
+        .eq("publication_state", "published")
+        .order("published_at", { ascending: false })
+        .limit(24);
+      if (primary.error && /publication_state/i.test(primary.error.message)) {
+        return supabase
+          .from("news_items")
+          .select("id, title, summary, published_at, cover_url, categories")
+          .order("published_at", { ascending: false })
+          .limit(24);
+      }
+      return primary;
+    })(),
     supabase
       .from("live_events")
       .select("id, title, description, starts_at, join_url")
@@ -209,7 +232,17 @@ export default async function HomePage() {
     { count: threadsToday },
     { count: confessionsToday }
   ] = await Promise.all([
-    supabase.from("news_items").select("id", { count: "exact", head: true }).gte("published_at", since24h),
+    (async () => {
+      const primary = await supabase
+        .from("news_items")
+        .select("id", { count: "exact", head: true })
+        .eq("publication_state", "published")
+        .gte("published_at", since24h);
+      if (primary.error && /publication_state/i.test(primary.error.message)) {
+        return supabase.from("news_items").select("id", { count: "exact", head: true }).gte("published_at", since24h);
+      }
+      return primary;
+    })(),
     supabase.from("threads").select("id", { count: "exact", head: true }).gte("created_at", since24h),
     supabase.from("confessions").select("id", { count: "exact", head: true }).eq("level", "public").gte("created_at", since24h)
   ]);

@@ -13,11 +13,17 @@ const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const supabase = supabaseServer();
-  const { data: item } = await supabase
+  let metaQuery = supabase
     .from("news_items")
     .select("id, title, summary, cover_url")
+    .eq("publication_state", "published")
     .eq("id", params.id)
     .single();
+  let { data: item, error: metaErr } = await metaQuery;
+  if (metaErr && /publication_state/i.test(metaErr.message)) {
+    const fallback = await supabase.from("news_items").select("id, title, summary, cover_url").eq("id", params.id).single();
+    item = fallback.data;
+  }
 
   const title = item?.title ?? "Noticia";
   const description = item?.summary ?? "Noticias Sin Pelos";
@@ -45,11 +51,21 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 export default async function NoticiaDetailPage({ params }: { params: { id: string } }) {
   const supabase = supabaseServer();
 
-  const { data: item } = await supabase
+  let itemQuery = supabase
     .from("news_items")
     .select("id, title, summary, analysis, source_url, cover_url, categories, published_at")
+    .eq("publication_state", "published")
     .eq("id", params.id)
     .single();
+  let { data: item, error: itemErr } = await itemQuery;
+  if (itemErr && /publication_state/i.test(itemErr.message)) {
+    const fallback = await supabase
+      .from("news_items")
+      .select("id, title, summary, analysis, source_url, cover_url, categories, published_at")
+      .eq("id", params.id)
+      .single();
+    item = fallback.data;
+  }
 
   const { data: comments } = await supabase
     .from("comments")

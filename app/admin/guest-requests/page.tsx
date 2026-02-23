@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { toast } from "@/lib/toast";
 
 type GuestRequestStatus = "new" | "contacted" | "closed";
 
@@ -49,6 +50,7 @@ export default function AdminGuestRequestsPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<GuestRequestStatus | "all">("all");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadItems = async () => {
     setLoading(true);
@@ -104,6 +106,60 @@ export default function AdminGuestRequestsPage() {
       return;
     }
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, status: nextStatus } : item)));
+  };
+
+  const deleteRequest = async (item: GuestRequestView) => {
+    const key = fingerprint(item);
+    const duplicateIds = items.filter((x) => fingerprint(x) === key).map((x) => x.id);
+    const total = duplicateIds.length;
+    const confirmText =
+      total > 1
+        ? `¿Eliminar esta solicitud y sus ${total - 1} duplicadas?`
+        : "¿Eliminar esta solicitud de invitado?";
+    if (!window.confirm(confirmText)) return;
+
+    setDeletingId(item.id);
+    setStatusMessage(null);
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      const msg = "No hay sesión activa de admin.";
+      setStatusMessage(msg);
+      toast.error(msg);
+      setDeletingId(null);
+      return;
+    }
+
+    const results = await Promise.all(
+      duplicateIds.map(async (id) => {
+        const res = await fetch("/api/admin/delete", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ table: "guest_requests", id })
+        });
+        const json = await res.json().catch(() => ({}));
+        return { ok: res.ok && json?.ok, error: json?.error as string | undefined, id };
+      })
+    );
+
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length > 0) {
+      const msg = failed[0].error ?? "No se pudieron eliminar una o más solicitudes.";
+      setStatusMessage(msg);
+      toast.error(msg);
+      setDeletingId(null);
+      return;
+    }
+
+    setItems((prev) => prev.filter((x) => !duplicateIds.includes(x.id)));
+    const msg = total > 1 ? `Se eliminaron ${total} solicitudes.` : "Solicitud eliminada.";
+    setStatusMessage(msg);
+    toast.success(msg);
+    setDeletingId(null);
   };
 
   return (
@@ -177,6 +233,14 @@ export default function AdminGuestRequestsPage() {
                   {updatingId === item.id && status !== item.status ? "Actualizando..." : status}
                 </button>
               ))}
+              <button
+                type="button"
+                className="button secondary"
+                disabled={deletingId === item.id}
+                onClick={() => deleteRequest(item)}
+              >
+                {deletingId === item.id ? "Eliminando..." : "Eliminar"}
+              </button>
             </div>
           </article>
         ))}

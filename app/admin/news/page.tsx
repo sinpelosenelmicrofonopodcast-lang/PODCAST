@@ -16,10 +16,22 @@ type NewsItem = {
   cover_url: string | null;
   categories: string[] | null;
   tags: string[] | null;
+  publication_state?: "draft" | "published" | null;
+  ingest_source?: string | null;
+  updated_at?: string | null;
   published_at: string | null;
 };
 
 type NewsItemFull = NewsItem;
+
+function humanizeNewsError(raw?: string | null) {
+  const msg = String(raw ?? "").trim();
+  if (!msg) return "No se pudo guardar la noticia.";
+  if (msg.includes("news_items_source_hash_unique") || msg.toLowerCase().includes("duplicate key value")) {
+    return "Duplicado detectado: ya existe una noticia con la misma fuente/contenido.";
+  }
+  return msg;
+}
 
 export default function AdminNewsPage() {
   const [title, setTitle] = useState("");
@@ -29,6 +41,7 @@ export default function AdminNewsPage() {
   const [coverUrl, setCoverUrl] = useState("");
   const [categories, setCategories] = useState<string[]>([newsCategories[0]]);
   const [tags, setTags] = useState("");
+  const [publishNow, setPublishNow] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,14 +49,23 @@ export default function AdminNewsPage() {
   const [editingPublishedAt, setEditingPublishedAt] = useState<string | null>(null);
   const [items, setItems] = useState<NewsItem[]>([]);
   const [postToFacebook, setPostToFacebook] = useState(true);
+  const [postingFacebookId, setPostingFacebookId] = useState<string | null>(null);
   const router = useRouter();
 
   const loadItems = async () => {
-    const { data } = await supabase
+    const primary = await supabase
       .from("news_items")
-      .select("id, title, summary, analysis, source_url, cover_url, categories, tags, published_at")
+      .select("id, title, summary, analysis, source_url, cover_url, categories, tags, publication_state, ingest_source, updated_at, published_at")
       .order("published_at", { ascending: false });
-    setItems((data as NewsItem[]) ?? []);
+    if (primary.error && /(publication_state|ingest_source|updated_at)/i.test(primary.error.message)) {
+      const fallback = await supabase
+        .from("news_items")
+        .select("id, title, summary, analysis, source_url, cover_url, categories, tags, published_at")
+        .order("published_at", { ascending: false });
+      setItems((fallback.data as NewsItem[]) ?? []);
+      return;
+    }
+    setItems((primary.data as NewsItem[]) ?? []);
   };
 
   useEffect(() => {
@@ -58,6 +80,7 @@ export default function AdminNewsPage() {
     setCoverUrl("");
     setCategories([newsCategories[0]]);
     setTags("");
+    setPublishNow(true);
     setEditingId(null);
     setEditingPublishedAt(null);
     setPostToFacebook(true);
@@ -134,19 +157,24 @@ export default function AdminNewsPage() {
       cover_url: coverUrl ? coverUrl : null,
       categories: categories && categories.length > 0 ? categories : [newsCategories[0]],
       tags: tagList,
+      publication_state: publishNow ? "published" : "draft"
     };
 
     if (editingId) {
       const updatePayload: any = { ...payload };
       // Keep original publish time on edit so sorting/feeds remain stable.
-      if (editingPublishedAt) updatePayload.published_at = editingPublishedAt;
+      if (publishNow) {
+        updatePayload.published_at = editingPublishedAt ?? new Date().toISOString();
+      } else {
+        updatePayload.published_at = null;
+      }
 
       // Do NOT rely on `.single()` / `.maybeSingle()` here.
       // Under some RLS states PostgREST returns 0 rows (empty array) which triggers:
       // "Cannot coerce the result to a single JSON object".
       const u = await supabase.from("news_items").update(updatePayload).eq("id", editingId).select("id");
       if (u.error) {
-        const msg = u.error.message ?? "No se pudo actualizar.";
+        const msg = humanizeNewsError(u.error.message ?? "No se pudo actualizar.");
         setStatus(msg);
         toast.error(msg);
         setLoading(false);
@@ -168,20 +196,21 @@ export default function AdminNewsPage() {
       const createPayload = {
         ...payload,
         author_id: userId,
-        published_at: new Date().toISOString()
+        published_at: publishNow ? new Date().toISOString() : null
       };
       const { data: insertedRows, error } = await supabase.from("news_items").insert(createPayload).select("id").limit(1);
       const inserted = Array.isArray(insertedRows) ? insertedRows[0] : null;
       if (error || !inserted?.id) {
-        setStatus(error?.message ?? "No se pudo publicar la noticia.");
-        toast.error(error?.message ?? "No se pudo publicar la noticia.");
+        const msg = humanizeNewsError(error?.message ?? "No se pudo publicar la noticia.");
+        setStatus(msg);
+        toast.error(msg);
         setLoading(false);
         return;
       }
       setStatus("Noticia publicada.");
       toast.success("Noticia publicada.");
 
-      if (postToFacebook) {
+      if (postToFacebook && publishNow) {
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData.session?.access_token;
         if (!token) {
@@ -228,6 +257,66 @@ export default function AdminNewsPage() {
     setCoverUrl(item.cover_url ?? "");
     setCategories(item.categories && item.categories.length > 0 ? item.categories : [newsCategories[0]]);
     setTags(item.tags?.join(", ") ?? "");
+    setPublishNow((item.publication_state ?? "published") !== "draft");
+  };
+
+  const handleStateChange = async (item: NewsItem, next: "draft" | "published") => {
+    const payload: Record<string, any> = { publication_state: next };
+    payload.published_at = next === "published" ? item.published_at ?? new Date().toISOString() : null;
+    const { error } = await supabase.from("news_items").update(payload).eq("id", item.id);
+    if (error) {
+      const msg = humanizeNewsError(error.message);
+      setStatus(msg);
+      toast.error(msg);
+      return;
+    }
+    toast.success(next === "published" ? "Noticia publicada." : "Noticia pasada a borrador.");
+    await loadItems();
+  };
+
+  const handlePostToFacebookNow = async (item: NewsItem) => {
+    if ((item.publication_state ?? "published") === "draft") {
+      const msg = "Publica la noticia primero antes de enviarla a Facebook.";
+      setStatus(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setPostingFacebookId(item.id);
+    setStatus(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      const msg = "Sesión inválida. Inicia sesión de nuevo.";
+      setStatus(msg);
+      toast.error(msg);
+      setPostingFacebookId(null);
+      return;
+    }
+
+    const res = await fetch("/api/social/meta/facebook/post-news", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        newsId: item.id,
+        title: item.title,
+        summary: item.summary ?? ""
+      })
+    });
+    const json = await res.json().catch(() => ({}));
+    setPostingFacebookId(null);
+    if (!res.ok) {
+      const msg = `Facebook falló: ${json?.error ?? "error"}`;
+      setStatus(msg);
+      toast.error(msg);
+      return;
+    }
+    const msg = "Noticia publicada en Facebook.";
+    setStatus(msg);
+    toast.success(msg);
   };
 
   return (
@@ -288,6 +377,10 @@ export default function AdminNewsPage() {
             Postear también en Facebook (con link a la noticia)
           </label>
         ) : null}
+        <label className="check-row">
+          <input type="checkbox" checked={publishNow} onChange={(e) => setPublishNow(e.target.checked)} />
+          Publicar ahora (si se desmarca, queda como borrador)
+        </label>
         <div className="form-submit-bar">
           <button className="button" type="submit" disabled={loading || uploading}>
             {loading ? "Guardando..." : uploading ? "Subiendo portada..." : editingId ? "Actualizar noticia" : "Publicar noticia"}
@@ -302,22 +395,40 @@ export default function AdminNewsPage() {
       </form>
 
       <div className="card" style={{ marginTop: 24 }}>
-        <h3 style={{ marginTop: 0 }}>Noticias publicadas</h3>
+        <h3 style={{ marginTop: 0 }}>Noticias (publicadas y borradores)</h3>
         {items.length > 0 ? (
           <div className="list" style={{ marginTop: 12 }}>
             {items.map((item) => (
               <div key={item.id} className="card" style={{ display: "grid", gap: 10 }}>
                 <strong>{item.title}</strong>
                 <span className="muted" style={{ fontSize: 12 }}>
-                  {(item.categories ?? []).join(" · ")} · {item.published_at ? new Date(item.published_at).toLocaleDateString("es-PR") : ""}
+                  {(item.categories ?? []).join(" · ")} · {(item.publication_state ?? "published").toUpperCase()} ·{" "}
+                  {item.published_at ? new Date(item.published_at).toLocaleDateString("es-PR") : "sin fecha"}
                 </span>
                 <div className="admin-item-actions">
                   <button className="button secondary" type="button" onClick={() => handleEdit(item)}>
                     Editar
                   </button>
+                  {(item.publication_state ?? "published") === "draft" ? (
+                    <button className="button secondary" type="button" onClick={() => handleStateChange(item, "published")}>
+                      Publicar
+                    </button>
+                  ) : (
+                    <button className="button secondary" type="button" onClick={() => handleStateChange(item, "draft")}>
+                      Borrador
+                    </button>
+                  )}
                   <a className="button secondary" href={`/noticias/${item.id}`} target="_blank" rel="noreferrer">
                     Ver pública
                   </a>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    disabled={postingFacebookId === item.id}
+                    onClick={() => handlePostToFacebookNow(item)}
+                  >
+                    {postingFacebookId === item.id ? "Posteando..." : "Publicar en Facebook"}
+                  </button>
                   <AdminDeleteButton table="news_items" id={item.id} label="Eliminar" />
                 </div>
               </div>

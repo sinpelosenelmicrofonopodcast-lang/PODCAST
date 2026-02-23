@@ -101,6 +101,18 @@ export default function AdminDashboard() {
             Ver solicitudes
           </Link>
         </div>
+        <div className="card">
+          <h3>Fuentes RSS</h3>
+          <p className="muted">Controla fuentes automáticas, región, categorías y frecuencia de escaneo.</p>
+          <div className="admin-item-actions">
+            <Link className="button" href="/admin/news-sources">
+              Gestionar fuentes
+            </Link>
+            <Link className="button secondary" href="/admin/schedule">
+              Ver cola
+            </Link>
+          </div>
+        </div>
         <AdminSyncYouTube />
       </div>
     </main>

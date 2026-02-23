@@ -7,6 +7,7 @@ const links: Array<{ href: Route; label: string }> = [
   { href: "/admin/stats", label: "Estadísticas" },
   { href: "/admin/content", label: "Contenido" },
   { href: "/admin/news", label: "Noticias" },
+  { href: "/admin/news-sources", label: "Fuentes RSS" },
   { href: "/admin/blog", label: "Blog" },
   { href: "/admin/events", label: "Eventos" },
   { href: "/admin/promotions", label: "Promociones" },
