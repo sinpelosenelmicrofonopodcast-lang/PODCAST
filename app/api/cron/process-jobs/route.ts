@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { logPipelineEvent, updateAutomationJob } from "@/lib/pipelineOps";
+import { createAutomationJob, logPipelineEvent, updateAutomationJob } from "@/lib/pipelineOps";
 import { postNewsToFacebook } from "@/lib/socialFacebook";
+import { rewriteNewsWithAI } from "@/lib/newsRewrite";
 
 type QueueJob = {
   id: string;
   job_type: string;
+  source: string | null;
   status: "queued" | "running" | "done" | "failed" | "cancelled";
   payload: Record<string, any> | null;
   content_type: string | null;
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
     const nowIso = new Date().toISOString();
     const { data, error } = await service
       .from("automation_jobs")
-      .select("id, job_type, status, payload, content_type, content_id, attempts, max_attempts")
+      .select("id, job_type, source, status, payload, content_type, content_id, attempts, max_attempts")
       .eq("status", "queued")
       .lte("scheduled_for", nowIso)
       .order("priority", { ascending: true })
@@ -106,6 +108,128 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        if (job.job_type === "rewrite_news") {
+          const newsId = String(job.payload?.newsId ?? job.content_id ?? "").trim();
+          if (!newsId) throw new Error("Job inválido: falta newsId para rewrite_news.");
+
+          const newsResp = await service
+            .from("news_items")
+            .select(
+              "id, title, summary, analysis, source_url, categories, tags, publication_state, published_at, raw_title, raw_summary, raw_body"
+            )
+            .eq("id", newsId)
+            .limit(1)
+            .maybeSingle();
+
+          if (newsResp.error) throw new Error(newsResp.error.message);
+          if (!newsResp.data) throw new Error("No se encontró la noticia para reescritura.");
+
+          const news = newsResp.data as {
+            id: string;
+            title: string | null;
+            summary: string | null;
+            analysis: string | null;
+            source_url: string | null;
+            categories: string[] | null;
+            tags: string[] | null;
+            publication_state: "draft" | "published" | null;
+            published_at: string | null;
+            raw_title?: string | null;
+            raw_summary?: string | null;
+            raw_body?: string | null;
+          };
+
+          await service
+            .from("news_items")
+            .update({ rewrite_status: "processing", rewrite_error: null })
+            .eq("id", newsId);
+
+          const rewritten = await rewriteNewsWithAI({
+            sourceName: String(job.payload?.sourceName ?? job.source ?? "RSS"),
+            sourceUrl: String(news.source_url ?? ""),
+            originalTitle: String(news.raw_title ?? news.title ?? ""),
+            originalSummary: String(news.raw_summary ?? news.summary ?? ""),
+            originalBody: String(news.raw_body ?? ""),
+            currentCategories: news.categories ?? [],
+            currentTags: news.tags ?? []
+          });
+
+          const shouldPublish = job.payload?.shouldPublish === true && rewritten.needsReview !== true;
+          const nextPublishedAt = shouldPublish
+            ? String(job.payload?.publishedAt ?? news.published_at ?? new Date().toISOString())
+            : null;
+
+          const update = await service
+            .from("news_items")
+            .update({
+              title: rewritten.title,
+              summary: rewritten.summary || null,
+              analysis: rewritten.analysis || null,
+              categories: rewritten.categories.length > 0 ? rewritten.categories : news.categories,
+              tags: rewritten.tags.length > 0 ? rewritten.tags : news.tags,
+              publication_state: shouldPublish ? "published" : "draft",
+              published_at: nextPublishedAt,
+              rewrite_status: "done",
+              rewrite_error: null,
+              rewritten_at: new Date().toISOString(),
+              ai_model: rewritten.model,
+              ai_provider: "openai",
+              needs_review: rewritten.needsReview
+            })
+            .eq("id", newsId);
+
+          if (update.error) throw new Error(update.error.message);
+
+          await logPipelineEvent(service, {
+            jobId: job.id,
+            stage: shouldPublish ? "published" : "draft",
+            status: rewritten.needsReview ? "info" : "ok",
+            contentType: "news",
+            contentId: newsId,
+            message: rewritten.needsReview
+              ? "Reescritura IA completada (requiere revisión)"
+              : shouldPublish
+                ? "Reescritura IA completada y publicada"
+                : "Reescritura IA completada"
+          });
+
+          if (shouldPublish && job.payload?.autoPostFacebook === true) {
+            await createAutomationJob(service, {
+              jobType: "facebook_post_news",
+              source: "facebook",
+              title: rewritten.title,
+              contentType: "news",
+              contentId: newsId,
+              payload: { newsId, title: rewritten.title, summary: rewritten.summary },
+              status: "queued",
+              priority: 40,
+              scheduledFor: new Date().toISOString()
+            });
+            await logPipelineEvent(service, {
+              jobId: job.id,
+              stage: "social",
+              status: "info",
+              contentType: "news",
+              contentId: newsId,
+              platform: "Facebook",
+              message: "Post a Facebook en cola tras reescritura IA"
+            });
+          }
+
+          await updateAutomationJob(service, job.id, {
+            status: "done",
+            finishedAt: new Date().toISOString(),
+            payload: {
+              ...(job.payload ?? {}),
+              model: rewritten.model,
+              needsReview: rewritten.needsReview,
+              published: shouldPublish
+            }
+          });
+          done += 1;
+          continue;
+        }
+
         await logPipelineEvent(service, {
           jobId: job.id,
           stage: "failed",
@@ -131,6 +255,16 @@ export async function POST(request: NextRequest) {
           message: e?.message ?? "Error procesando job",
           meta: { attempt: nextAttempts, max_attempts: job.max_attempts }
         });
+        if (job.job_type === "rewrite_news" && job.content_id) {
+          try {
+            await service
+              .from("news_items")
+              .update({ rewrite_status: "failed", rewrite_error: e?.message ?? "Error de reescritura IA" })
+              .eq("id", job.content_id);
+          } catch {
+            // no-op
+          }
+        }
         await updateAutomationJob(service, job.id, {
           status: exceeded ? "failed" : "queued",
           finishedAt: exceeded ? new Date().toISOString() : null,

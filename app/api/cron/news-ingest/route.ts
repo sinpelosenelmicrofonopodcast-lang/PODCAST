@@ -42,6 +42,75 @@ async function queueFacebookPost(service: any, payload: { newsId: string; title:
   });
 }
 
+async function insertNewsWithFallback(
+  service: any,
+  payload: {
+    title: string;
+    summary: string;
+    analysis: string;
+    sourceUrl: string;
+    categories: string[];
+    tags: string[];
+    ingestSource: string;
+    publicationState: "draft" | "published";
+    publishedAt: string | null;
+    rawTitle: string;
+    rawSummary: string;
+    rawBody: string;
+    rewriteStatus: "queued" | "done";
+  }
+) {
+  const primary = await service
+    .from("news_items")
+    .insert({
+      title: payload.title,
+      summary: payload.summary || null,
+      analysis: payload.analysis,
+      source_url: payload.sourceUrl,
+      categories: payload.categories,
+      tags: payload.tags,
+      publication_state: payload.publicationState,
+      published_at: payload.publishedAt,
+      ingest_source: payload.ingestSource,
+      raw_title: payload.rawTitle,
+      raw_summary: payload.rawSummary || null,
+      raw_body: payload.rawBody || null,
+      rewrite_status: payload.rewriteStatus,
+      rewrite_error: null,
+      needs_review: false,
+      raw_payload: {
+        source: payload.ingestSource
+      }
+    })
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+
+  if (!primary.error && primary.data?.id) return primary;
+
+  const missingRewriteColumns = /(raw_title|raw_summary|raw_body|rewrite_status|raw_payload|needs_review)/i.test(
+    primary.error?.message ?? ""
+  );
+  if (!missingRewriteColumns) return primary;
+
+  return service
+    .from("news_items")
+    .insert({
+      title: payload.title,
+      summary: payload.summary || null,
+      analysis: payload.analysis,
+      source_url: payload.sourceUrl,
+      categories: payload.categories,
+      tags: payload.tags,
+      publication_state: payload.publicationState,
+      published_at: payload.publishedAt,
+      ingest_source: payload.ingestSource
+    })
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+}
+
 export async function POST(request: NextRequest) {
   if (!isCronAuthorized(request)) {
     return NextResponse.json({ ok: false, error: "Unauthorized cron call." }, { status: 401 });
@@ -61,11 +130,12 @@ export async function POST(request: NextRequest) {
     }
 
     const sources = (sourcesData ?? []) as NewsSource[];
+    const aiEnabled = Boolean(process.env.OPENAI_API_KEY);
     rootJobId = await createAutomationJob(service, {
       jobType: "news_ingest_run",
       source: "rss",
       title: "Ingesta automática de noticias",
-      payload: { sourceCount: sources.length },
+      payload: { sourceCount: sources.length, aiEnabled },
       status: "running",
       priority: 30
     });
@@ -136,25 +206,25 @@ export async function POST(request: NextRequest) {
           }
 
           const shouldPublish = source.auto_publish !== false;
-          const publishedAt = shouldPublish ? item.publishedAt ?? new Date().toISOString() : null;
-          const publicationState = shouldPublish ? "published" : "draft";
+          const publicationState: "draft" | "published" = aiEnabled ? "draft" : shouldPublish ? "published" : "draft";
+          const publishedAt = publicationState === "published" ? item.publishedAt ?? new Date().toISOString() : null;
+          const rewriteStatus: "queued" | "done" = aiEnabled ? "queued" : "done";
 
-          const insert = await service
-            .from("news_items")
-            .insert({
-              title: item.title,
-              summary: summary || null,
-              analysis,
-              source_url: normalizedUrl,
-              categories,
-              tags,
-              publication_state: publicationState,
-              published_at: publishedAt,
-              ingest_source: source.name
-            })
-            .select("id")
-            .limit(1)
-            .maybeSingle();
+          const insert = await insertNewsWithFallback(service, {
+            title: item.title,
+            summary,
+            analysis,
+            sourceUrl: normalizedUrl,
+            categories,
+            tags,
+            ingestSource: source.name,
+            publicationState,
+            publishedAt,
+            rawTitle: item.title,
+            rawSummary: summary,
+            rawBody: item.description ?? "",
+            rewriteStatus
+          });
 
           if (insert.error || !insert.data?.id) {
             // 23505 = duplicate key (race condition / same run)
@@ -187,19 +257,38 @@ export async function POST(request: NextRequest) {
           });
           await logPipelineEvent(service, {
             jobId: sourceJobId,
-            stage: shouldPublish ? "published" : "draft",
+            stage: publicationState === "published" ? "published" : "draft",
             status: "ok",
             contentType: "news",
             contentId: newsId,
-            message: shouldPublish ? "Noticia publicada automáticamente" : "Noticia guardada como borrador"
+            message:
+              publicationState === "published"
+                ? "Noticia publicada automáticamente"
+                : aiEnabled
+                  ? "Noticia en borrador; reescritura IA en cola"
+                  : "Noticia guardada como borrador"
           });
 
-          if (shouldPublish && source.auto_post_facebook === true) {
-            await queueFacebookPost(service, {
-              newsId,
+          if (aiEnabled) {
+            await createAutomationJob(service, {
+              jobType: "rewrite_news",
+              source: source.name,
               title: item.title,
-              summary
+              contentType: "news",
+              contentId: newsId,
+              payload: {
+                newsId,
+                sourceName: source.name,
+                shouldPublish,
+                autoPostFacebook: source.auto_post_facebook === true,
+                publishedAt: item.publishedAt ?? null
+              },
+              status: "queued",
+              priority: 20,
+              scheduledFor: new Date().toISOString()
             });
+          } else if (shouldPublish && source.auto_post_facebook === true) {
+            await queueFacebookPost(service, { newsId, title: item.title, summary });
             await logPipelineEvent(service, {
               jobId: sourceJobId,
               stage: "social",

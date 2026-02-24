@@ -19,6 +19,10 @@ type NewsItem = {
   publication_state?: "draft" | "published" | null;
   ingest_source?: string | null;
   updated_at?: string | null;
+  rewrite_status?: "none" | "queued" | "processing" | "done" | "failed" | null;
+  rewrite_error?: string | null;
+  needs_review?: boolean | null;
+  rewritten_at?: string | null;
   published_at: string | null;
 };
 
@@ -50,14 +54,22 @@ export default function AdminNewsPage() {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [postToFacebook, setPostToFacebook] = useState(true);
   const [postingFacebookId, setPostingFacebookId] = useState<string | null>(null);
+  const [rewritingId, setRewritingId] = useState<string | null>(null);
   const router = useRouter();
 
   const loadItems = async () => {
     const primary = await supabase
       .from("news_items")
-      .select("id, title, summary, analysis, source_url, cover_url, categories, tags, publication_state, ingest_source, updated_at, published_at")
+      .select(
+        "id, title, summary, analysis, source_url, cover_url, categories, tags, publication_state, ingest_source, updated_at, rewrite_status, rewrite_error, needs_review, rewritten_at, published_at"
+      )
       .order("published_at", { ascending: false });
-    if (primary.error && /(publication_state|ingest_source|updated_at)/i.test(primary.error.message)) {
+    if (
+      primary.error &&
+      /(publication_state|ingest_source|updated_at|rewrite_status|rewrite_error|needs_review|rewritten_at)/i.test(
+        primary.error.message
+      )
+    ) {
       const fallback = await supabase
         .from("news_items")
         .select("id, title, summary, analysis, source_url, cover_url, categories, tags, published_at")
@@ -319,6 +331,46 @@ export default function AdminNewsPage() {
     toast.success(msg);
   };
 
+  const handleRewriteWithAI = async (item: NewsItem) => {
+    setRewritingId(item.id);
+    setStatus(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      const msg = "Sesión inválida. Inicia sesión de nuevo.";
+      setStatus(msg);
+      toast.error(msg);
+      setRewritingId(null);
+      return;
+    }
+
+    const res = await fetch("/api/admin/news/rewrite", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        newsId: item.id,
+        shouldPublish: (item.publication_state ?? "draft") === "published",
+        autoPostFacebook: false,
+        runNow: true
+      })
+    });
+    const json = await res.json().catch(() => ({}));
+    setRewritingId(null);
+    if (!res.ok || !json?.ok) {
+      const msg = json?.error ?? "No se pudo encolar reescritura IA.";
+      setStatus(msg);
+      toast.error(msg);
+      return;
+    }
+    const msg = json?.alreadyQueued ? "Esta noticia ya tiene reescritura en cola." : "Reescritura IA encolada.";
+    setStatus(msg);
+    toast.success(msg);
+    await loadItems();
+  };
+
   return (
     <main>
       <h1 className="section-title">Curaduría de Noticias</h1>
@@ -405,9 +457,22 @@ export default function AdminNewsPage() {
                   {(item.categories ?? []).join(" · ")} · {(item.publication_state ?? "published").toUpperCase()} ·{" "}
                   {item.published_at ? new Date(item.published_at).toLocaleDateString("es-PR") : "sin fecha"}
                 </span>
+                <span className="muted" style={{ fontSize: 12 }}>
+                  IA: {(item.rewrite_status ?? "none").toUpperCase()}
+                  {item.needs_review ? " · REVISIÓN" : ""}
+                  {item.rewrite_error ? ` · ${item.rewrite_error}` : ""}
+                </span>
                 <div className="admin-item-actions">
                   <button className="button secondary" type="button" onClick={() => handleEdit(item)}>
                     Editar
+                  </button>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    disabled={rewritingId === item.id}
+                    onClick={() => handleRewriteWithAI(item)}
+                  >
+                    {rewritingId === item.id ? "Reescribiendo..." : "Reescribir IA"}
                   </button>
                   {(item.publication_state ?? "published") === "draft" ? (
                     <button className="button secondary" type="button" onClick={() => handleStateChange(item, "published")}>
