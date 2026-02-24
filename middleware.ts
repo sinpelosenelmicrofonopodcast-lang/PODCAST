@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ACCESS_TOKEN_COOKIE } from "@/lib/authCookies";
 
 const SOCIAL_ADMIN_APIS = new Set(["/api/social/youtube/sync", "/api/social/meta/facebook/post-news"]);
+const ACCESS_TOKEN_COOKIE = "sp_access_token";
 
 function readBearer(request: NextRequest) {
   const authHeader = request.headers.get("authorization") ?? "";
@@ -75,4 +75,3 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ["/admin/:path*", "/api/admin/:path*", "/api/social/youtube/sync", "/api/social/meta/facebook/post-news"]
 };
-
