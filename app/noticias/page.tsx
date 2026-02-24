@@ -7,8 +7,34 @@ import { newsCategories } from "@/lib/newsCategories";
 import { ui } from "@/lib/i18n";
 import { getServerLang } from "@/lib/i18nServer";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
+import { DesktopSideAdSlot } from "@/components/promotions/DesktopSideAdSlot";
 
 export const revalidate = 300;
+
+const NEWS_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function parseNewsIdFromPath(path: string | null | undefined): string | null {
+  const raw = String(path ?? "").trim();
+  if (!raw) return null;
+  const clean = raw.split("?")[0].split("#")[0];
+  const m = clean.match(/^\/noticias\/([^/]+)$/i);
+  if (!m?.[1]) return null;
+  const id = decodeURIComponent(m[1]);
+  return NEWS_ID_RE.test(id) ? id : null;
+}
+
+function parseNewsIdFromSourceUrl(urlValue: string | null | undefined): string | null {
+  const raw = String(urlValue ?? "").trim();
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    return parseNewsIdFromPath(u.pathname);
+  } catch {
+    const idx = raw.indexOf("/noticias/");
+    if (idx < 0) return null;
+    return parseNewsIdFromPath(raw.slice(idx));
+  }
+}
 
 export default async function NoticiasPage({ searchParams }: { searchParams: { cat?: string; sort?: string; page?: string } }) {
   const supabase = supabaseServer();
@@ -101,6 +127,132 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     items = data ?? [];
   }
 
+  let trendingItems: any[] = [];
+  {
+    const trendingWindowStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    let q = supabase
+      .from("news_items")
+      .select("id, title, summary, published_at, cover_url, categories")
+      .eq("publication_state", "published")
+      .order("published_at", { ascending: false })
+      .limit(120);
+    if (category) q = q.contains("categories", [category]);
+    let { data: base, error } = await q;
+    if (error && /publication_state/i.test(error.message)) {
+      let fallback = supabase
+        .from("news_items")
+        .select("id, title, summary, published_at, cover_url, categories")
+        .order("published_at", { ascending: false })
+        .limit(120);
+      if (category) fallback = fallback.contains("categories", [category]);
+      const r = await fallback;
+      base = r.data;
+      error = r.error;
+    }
+    if (error) base = [];
+    const ranked = base ?? [];
+    const ids = ranked.map((item) => item.id);
+    const idsSet = new Set(ids);
+    const { data: comments } = await supabase
+      .from("comments")
+      .select("id, content_id")
+      .eq("content_type", "news")
+      .in("content_id", ids.length > 0 ? ids : ["00000000-0000-0000-0000-000000000000"]);
+    const counts = new Map<string, number>();
+    (comments ?? []).forEach((c) => counts.set(c.content_id, (counts.get(c.content_id) ?? 0) + 1));
+
+    // Views: real page visits for /noticias/:id within 30d.
+    const viewCounts = new Map<string, number>();
+    {
+      let viewsQuery = supabase
+        .from("page_visits")
+        .select("path, visited_at")
+        .gte("visited_at", trendingWindowStart)
+        .like("path", "/noticias/%")
+        .order("visited_at", { ascending: false })
+        .limit(50000);
+      const { data: pageVisits } = await viewsQuery;
+      (pageVisits ?? []).forEach((row: any) => {
+        const newsId = parseNewsIdFromPath(row.path);
+        if (!newsId) return;
+        if (!idsSet.has(newsId)) return;
+        viewCounts.set(newsId, (viewCounts.get(newsId) ?? 0) + 1);
+      });
+    }
+
+    // Shares: real social metrics.shares linked to noticia URL.
+    const shareCounts = new Map<string, number>();
+    {
+      const { data: posts } = await supabase
+        .from("external_posts")
+        .select("source_url, metrics, posted_at")
+        .gte("posted_at", trendingWindowStart)
+        .like("source_url", "%/noticias/%")
+        .order("posted_at", { ascending: false })
+        .limit(5000);
+
+      (posts ?? []).forEach((row: any) => {
+        const newsId = parseNewsIdFromSourceUrl(row.source_url);
+        if (!newsId) return;
+        if (!idsSet.has(newsId)) return;
+        const shares = Number(row?.metrics?.shares ?? 0);
+        if (!Number.isFinite(shares) || shares <= 0) return;
+        shareCounts.set(newsId, (shareCounts.get(newsId) ?? 0) + shares);
+      });
+    }
+
+    const maxComments = Math.max(1, ...ids.map((id) => counts.get(id) ?? 0));
+    const maxViews = Math.max(1, ...ids.map((id) => viewCounts.get(id) ?? 0));
+    const maxShares = Math.max(1, ...ids.map((id) => shareCounts.get(id) ?? 0));
+
+    const scoreOf = (id: string) => {
+      const cNorm = (counts.get(id) ?? 0) / maxComments;
+      const vNorm = (viewCounts.get(id) ?? 0) / maxViews;
+      const sNorm = (shareCounts.get(id) ?? 0) / maxShares;
+      return cNorm * 0.45 + sNorm * 0.35 + vNorm * 0.2;
+    };
+
+    trendingItems = [...ranked]
+      .sort((a, b) => {
+        const byScore = scoreOf(b.id) - scoreOf(a.id);
+        if (Math.abs(byScore) > 0.0001) return byScore;
+        return new Date(b.published_at ?? 0).getTime() - new Date(a.published_at ?? 0).getTime();
+      })
+      .slice(0, 6)
+      .map((item) => ({
+        ...item,
+        comments_count: counts.get(item.id) ?? 0,
+        views_count: viewCounts.get(item.id) ?? 0,
+        shares_count: shareCounts.get(item.id) ?? 0,
+        trend_score: scoreOf(item.id)
+      }));
+  }
+
+  let breakingItems: any[] = [];
+  {
+    let q = supabase
+      .from("news_items")
+      .select("id, title")
+      .eq("publication_state", "published")
+      .order("published_at", { ascending: false })
+      .limit(10);
+    if (category) q = q.contains("categories", [category]);
+    let { data, error } = await q;
+    if (error && /publication_state/i.test(error.message)) {
+      let fallback = supabase
+        .from("news_items")
+        .select("id, title")
+        .order("published_at", { ascending: false })
+        .limit(10);
+      if (category) fallback = fallback.contains("categories", [category]);
+      const r = await fallback;
+      data = r.data;
+      error = r.error;
+    }
+    if (error) data = [];
+    breakingItems = data ?? [];
+  }
+
   const tabClass = (active: boolean) => (active ? "news-tab active" : "news-tab");
   const buildNewsHref = (nextSort: string) => ({
     pathname: "/noticias",
@@ -127,13 +279,41 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     }
   };
 
+  const lead = items[0] ?? null;
+  const sideItems = items.slice(1, 5);
+  const restItems = items.slice(5);
+  const railItems = (trendingItems.length > 0 ? trendingItems : sideItems).slice(0, 5);
+
   return (
     <main>
       <Navbar />
+      <DesktopSideAdSlot section="noticias" />
       <section className="section">
         <div className="container">
           <h1 className="section-title">Noticias Sin Pelos</h1>
           <p className="muted">{t.news.subtitle}</p>
+
+          {breakingItems.length > 0 ? (
+            <div className="news-breaking card" aria-label="Breaking">
+              <span className="news-breaking-label">Breaking</span>
+              <div className="news-breaking-track">
+                <div className="news-breaking-marquee">
+                  {breakingItems.map((item) => (
+                    <Link key={`b1-${item.id}`} href={`/noticias/${item.id}`} className="news-breaking-link">
+                      {item.title}
+                    </Link>
+                  ))}
+                </div>
+                <div className="news-breaking-marquee" aria-hidden="true">
+                  {breakingItems.map((item) => (
+                    <Link key={`b2-${item.id}`} href={`/noticias/${item.id}`} className="news-breaking-link">
+                      {item.title}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="news-tabs">
             <Link className={tabClass(!category)} href="/noticias">
@@ -156,51 +336,124 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
           </div>
 
           {items.length > 0 ? (
-            <div style={{ display: "grid", gap: 14, marginTop: 20 }}>
-              {items.map((item, idx) => (
-                <div key={item.id} style={{ display: "contents" }}>
-                  {idx === 3 ? <MidContentAdSlot /> : null}
-                  <div className={item.cover_url ? "card news-item-card" : "card"}>
-                  {item.cover_url ? (
-                    <Link href={`/noticias/${item.id}`}>
-                      <div className="news-cover-thumb">
-                        <img src={item.cover_url} alt={item.title} loading="lazy" decoding="async" />
-                      </div>
-                    </Link>
-                  ) : null}
-                  <div style={{ display: "grid", gap: 8 }}>
-                    <div>
+            <div className="news-mag-shell">
+              {lead ? (
+                <div className="news-mag-top">
+                  <article className="card news-mag-lead">
+                    {lead.cover_url ? (
+                      <Link href={`/noticias/${lead.id}`} className="news-mag-lead-cover">
+                        <img src={lead.cover_url} alt={lead.title} loading="eager" decoding="async" />
+                      </Link>
+                    ) : null}
+                    <div className="news-mag-lead-body">
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {(item.categories ?? []).map((cat: string) => (
+                        {(lead.categories ?? []).slice(0, 3).map((cat: string) => (
                           <span key={cat} className="news-badge">
                             {cat}
                           </span>
                         ))}
                         <span className="muted" style={{ fontSize: 12 }}>
-                          {new Date(item.published_at).toLocaleDateString("es-PR")}
+                          {new Date(lead.published_at).toLocaleDateString("es-PR")}
                         </span>
                       </div>
-                      <Link href={`/noticias/${item.id}`}>
-                        <h3 className="news-title-clamp" style={{ margin: "6px 0 0" }}>
-                          {item.title}
-                        </h3>
+                      <Link href={`/noticias/${lead.id}`}>
+                        <h2 className="news-mag-lead-title">{lead.title}</h2>
                       </Link>
+                      {lead.summary ? (
+                        <p className="muted news-summary-clamp" style={{ margin: 0 }}>
+                          {lead.summary}
+                        </p>
+                      ) : null}
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        <Link className="button secondary" href={`/noticias/${lead.id}`}>
+                          {t.common.read}
+                        </Link>
+                        <ShareButtons path={`/noticias/${lead.id}`} text={lead.title} />
+                      </div>
                     </div>
-                    {item.summary ? (
-                      <p className="muted news-summary-clamp" style={{ margin: 0 }}>
-                        {item.summary}
-                      </p>
-                    ) : null}
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      <Link className="button secondary" href={`/noticias/${item.id}`}>
-                        {t.common.read}
-                      </Link>
-                      <ShareButtons path={`/noticias/${item.id}`} text={item.title} />
+                  </article>
+
+                  <aside className="news-mag-rail news-mag-rail-sticky">
+                    <div className="card news-mag-rail-head">
+                      <h3 style={{ margin: 0 }}>Tendencias</h3>
                     </div>
-                  </div>
-                  </div>
+                    {railItems.map((item, idx) => (
+                      <div key={item.id} style={{ display: "contents" }}>
+                        <article className="card news-mag-rail-item">
+                          {item.cover_url ? (
+                            <Link href={`/noticias/${item.id}`} className="news-mag-rail-thumb">
+                              <img src={item.cover_url} alt={item.title} loading="lazy" decoding="async" />
+                            </Link>
+                          ) : null}
+                          <div>
+                            <Link href={`/noticias/${item.id}`}>
+                              <h4 className="news-title-clamp" style={{ margin: 0 }}>
+                                {item.title}
+                              </h4>
+                            </Link>
+                            <p className="muted" style={{ margin: "6px 0 0", fontSize: 12 }}>
+                              {new Date(item.published_at).toLocaleDateString("es-PR")}
+                            </p>
+                            {"comments_count" in item || "views_count" in item || "shares_count" in item ? (
+                              <p className="muted" style={{ margin: "4px 0 0", fontSize: 12 }}>
+                                {Number(item.comments_count ?? 0)} comentarios · {Number(item.views_count ?? 0)} views · {Number(item.shares_count ?? 0)} shares
+                              </p>
+                            ) : null}
+                          </div>
+                        </article>
+                        {idx === 1 ? <MidContentAdSlot /> : null}
+                      </div>
+                    ))}
+                  </aside>
                 </div>
-              ))}
+              ) : null}
+
+              <div className="news-mag-grid">
+                {restItems.map((item, idx) => (
+                  <div key={item.id} style={{ display: "contents" }}>
+                    {idx === 2 ? <MidContentAdSlot /> : null}
+                    <article className={item.cover_url ? "card news-item-card" : "card"}>
+                      {item.cover_url ? (
+                        <Link href={`/noticias/${item.id}`}>
+                          <div className="news-cover-thumb">
+                            <img src={item.cover_url} alt={item.title} loading="lazy" decoding="async" />
+                          </div>
+                        </Link>
+                      ) : null}
+                      <div style={{ display: "grid", gap: 8 }}>
+                        <div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {(item.categories ?? []).map((cat: string) => (
+                              <span key={cat} className="news-badge">
+                                {cat}
+                              </span>
+                            ))}
+                            <span className="muted" style={{ fontSize: 12 }}>
+                              {new Date(item.published_at).toLocaleDateString("es-PR")}
+                            </span>
+                          </div>
+                          <Link href={`/noticias/${item.id}`}>
+                            <h3 className="news-title-clamp" style={{ margin: "6px 0 0" }}>
+                              {item.title}
+                            </h3>
+                          </Link>
+                        </div>
+                        {item.summary ? (
+                          <p className="muted news-summary-clamp" style={{ margin: 0 }}>
+                            {item.summary}
+                          </p>
+                        ) : null}
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <Link className="button secondary" href={`/noticias/${item.id}`}>
+                            {t.common.read}
+                          </Link>
+                          <ShareButtons path={`/noticias/${item.id}`} text={item.title} />
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="card" style={{ marginTop: 20 }}>
