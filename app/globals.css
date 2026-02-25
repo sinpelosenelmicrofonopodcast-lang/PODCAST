@@ -1,21 +1,21 @@
 :root {
-  color-scheme: dark;
-  --bg: #070708;
-  --bg-alt: #101015;
-  --panel: #161620;
-  --panel-2: #1e1e2a;
-  --text: #f8f5f2;
-  --muted: #b1a8a0;
-  --accent: #ff3b3b;
-  --accent-2: #ffcc33;
-  --accent-3: #ff7a18;
-  --accent-4: #2cff63;
-  --border: #2a2330;
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --bg-alt: #eef1f5;
+  --panel: #ffffff;
+  --panel-2: #f7f8fb;
+  --text: #111111;
+  --muted: #5e6470;
+  --accent: #d7262d;
+  --accent-2: #ff5a1f;
+  --accent-3: #ff8a2b;
+  --accent-4: #0ea35d;
+  --border: #e6e8ee;
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
   --radius: 16px;
-  --shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+  --shadow: 0 14px 38px rgba(17, 17, 17, 0.08);
   --news-cover-ratio: 16 / 9;
   --font-display: "Bebas Neue", "Oswald", "Impact", system-ui, sans-serif;
   --font-body: "IBM Plex Sans", "Inter", system-ui, sans-serif;
@@ -29,8 +29,8 @@ html,
 body {
   padding: 0;
   margin: 0;
-  background: radial-gradient(circle at top, rgba(255, 122, 24, 0.12), transparent 55%),
-    radial-gradient(circle at 20% 20%, rgba(255, 204, 51, 0.12), transparent 45%),
+  background: radial-gradient(circle at top, rgba(255, 122, 24, 0.12), transparent 50%),
+    radial-gradient(circle at 20% 20%, rgba(215, 38, 45, 0.08), transparent 42%),
     var(--bg);
   color: var(--text);
   font-family: var(--font-body);
@@ -62,7 +62,7 @@ main {
 }
 
 .card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 60%), var(--panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 248, 251, 0.96)), var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 20px;
@@ -75,8 +75,8 @@ main {
   gap: 8px;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(255, 59, 59, 0.18);
-  color: var(--accent-2);
+  background: rgba(215, 38, 45, 0.1);
+  color: #9f1239;
   font-weight: 600;
   font-size: 12px;
   letter-spacing: 0.5px;
@@ -105,7 +105,7 @@ main {
 }
 
 .button.secondary {
-  background: transparent;
+  background: #ffffff;
   border-color: var(--border);
   color: var(--text);
 }
@@ -117,14 +117,14 @@ main {
   padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: rgba(8, 8, 10, 0.9);
+  background: #ffffff;
   color: var(--text);
 }
 
 .input:focus,
 .select:focus,
 .textarea:focus {
-  outline: 2px solid rgba(255, 59, 59, 0.4);
+  outline: 2px solid rgba(215, 38, 45, 0.3);
   border-color: var(--accent);
 }
 
@@ -133,8 +133,19 @@ main {
   top: 0;
   z-index: 20;
   backdrop-filter: blur(14px);
-  background: rgba(8, 8, 12, 0.84);
-  border-bottom: 1px solid var(--border);
+  background: rgba(8, 8, 12, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f5f6fa;
+}
+
+.nav .muted {
+  color: rgba(245, 246, 250, 0.8);
+}
+
+.nav .button.secondary {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #f5f6fa;
 }
 
 .promo-top-slot {
@@ -813,7 +824,7 @@ main {
   position: sticky;
   top: 72px;
   z-index: 10;
-  background: rgba(8, 8, 12, 0.9);
+  background: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 10px;
@@ -829,12 +840,12 @@ main {
   border: 1px solid var(--border);
   color: var(--text);
   font-size: 13px;
-  background: rgba(255, 255, 255, 0.03);
+  background: #f3f5f8;
 }
 
 .news-tab.active {
-  background: rgba(255, 59, 59, 0.2);
-  border-color: rgba(255, 59, 59, 0.6);
+  background: linear-gradient(120deg, #d7262d, #ff5a1f);
+  border-color: transparent;
   color: #fff;
 }
 
