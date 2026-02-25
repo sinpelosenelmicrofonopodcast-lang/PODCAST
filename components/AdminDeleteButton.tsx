@@ -3,7 +3,20 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { hasAnyPermission, type StaffPermission } from "@/lib/staffPermissions";
 import { toast } from "@/lib/toast";
+
+const TABLE_PERMISSIONS: Record<string, StaffPermission> = {
+  confessions: "moderate_confessions",
+  theories: "moderate_theories",
+  threads: "moderate_community",
+  replies: "moderate_community",
+  news_items: "manage_news",
+  blog_posts: "manage_blog",
+  live_events: "manage_events",
+  promotions: "manage_promotions",
+  guest_requests: "manage_guest_requests"
+};
 
 export function AdminDeleteButton({ table, id, label = "Eliminar" }: { table: string; id: string; label?: string }) {
   const [loading, setLoading] = useState(false);
@@ -20,7 +33,12 @@ export function AdminDeleteButton({ table, id, label = "Eliminar" }: { table: st
       if (!token) return;
       const res = await fetch("/api/admin/me", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
       if (!mounted) return;
-      if (res?.ok) setCanShow(true);
+      if (!res?.ok) return;
+      const json = await res.json().catch(() => ({}));
+      const isAdmin = Boolean(json?.isAdmin);
+      const permissions = Array.isArray(json?.permissions) ? (json.permissions as StaffPermission[]) : [];
+      const required = TABLE_PERMISSIONS[table];
+      if (isAdmin || (required && hasAnyPermission({ isAdmin, permissions }, required))) setCanShow(true);
     };
     run();
     return () => {

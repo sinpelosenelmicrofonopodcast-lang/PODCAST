@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { requireAdminApi } from "@/lib/adminAuth";
+import { requireStaffApi } from "@/lib/adminAuth";
+import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 
 function getClients() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -12,8 +13,9 @@ function getClients() {
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "manage_promotions");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+    const reqMeta = getRequestAuditMeta(request);
 
     const id = String(params.id ?? "").trim();
     if (!id) return NextResponse.json({ ok: false, error: "Falta id." }, { status: 400 });
@@ -27,6 +29,15 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     const { error } = await service.from("promotions").delete().eq("id", id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+
+    await logAdminAudit(auth.service, {
+      actorId: auth.userId,
+      action: "admin.promotions.delete",
+      targetTable: "promotions",
+      targetId: id,
+      meta: { image_path: imagePath || null },
+      ...reqMeta
+    });
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {

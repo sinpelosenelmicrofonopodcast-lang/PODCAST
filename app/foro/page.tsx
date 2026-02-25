@@ -6,8 +6,8 @@ import { Footer } from "@/components/Footer";
 import { ForoComposer } from "@/components/ForoComposer";
 import { ReplyComposer } from "@/components/ReplyComposer";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
-import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { LazyThreadReplies } from "@/components/LazyThreadReplies";
+import { ForumLayout, type ForumCategory, type ForumThread } from "@/components/foro/ForumLayout";
 import { supabase } from "@/lib/supabaseClient";
 import { useProtectedUser } from "@/lib/useProtectedUser";
 
@@ -17,14 +17,18 @@ type ThreadRow = {
   title: string;
   body: string | null;
   created_at: string | null;
+  category_id: string | null;
   users: { nickname?: string | null; bio?: string | null; avatar_url?: string | null } | { nickname?: string | null; bio?: string | null; avatar_url?: string | null }[] | null;
+  categories: { name?: string | null } | { name?: string | null }[] | null;
 };
 
 const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
+const pickCategory = (category: any) => (Array.isArray(category) ? category[0] : category);
 
 export default function ForoPage() {
   const { checking, userId } = useProtectedUser();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [replyCountByThread, setReplyCountByThread] = useState<Map<string, number>>(new Map());
@@ -35,17 +39,29 @@ export default function ForoPage() {
 
     const load = async () => {
       setLoading(true);
-      const [{ data: cats }, { data: threadRows }] = await Promise.all([
+      setError(null);
+
+      const [{ data: cats, error: catsError }, { data: threadRows, error: threadsError }] = await Promise.all([
         supabase.from("categories").select("id, name").eq("space", "foro").order("name"),
         supabase
           .from("threads")
-          .select("id, title, body, created_at, users(nickname, bio, avatar_url)")
+          .select("id, title, body, created_at, category_id, users(nickname, bio, avatar_url), categories(name)")
           .eq("space", "foro")
           .order("created_at", { ascending: false })
-          .limit(20)
+          .limit(40)
       ]);
 
       if (!mounted) return;
+
+      if (catsError || threadsError) {
+        setCategories([]);
+        setThreads([]);
+        setReplyCountByThread(new Map());
+        setError(catsError?.message ?? threadsError?.message ?? "No se pudo cargar el foro.");
+        setLoading(false);
+        return;
+      }
+
       const items = (threadRows as ThreadRow[]) ?? [];
       setCategories((cats as Category[]) ?? []);
       setThreads(items);
@@ -57,13 +73,20 @@ export default function ForoPage() {
         return;
       }
 
-      const { data: replies } = await supabase
+      const { data: replies, error: repliesError } = await supabase
         .from("replies")
         .select("id, thread_id")
         .in("thread_id", ids)
-        .limit(2000);
+        .limit(4000);
 
       if (!mounted) return;
+      if (repliesError) {
+        setError(repliesError.message);
+        setReplyCountByThread(new Map());
+        setLoading(false);
+        return;
+      }
+
       const counts = new Map<string, number>();
       (replies ?? []).forEach((r: any) => counts.set(r.thread_id, (counts.get(r.thread_id) ?? 0) + 1));
       setReplyCountByThread(counts);
@@ -76,73 +99,62 @@ export default function ForoPage() {
     };
   }, [userId]);
 
+  const forumCategories: ForumCategory[] = categories.map((category) => {
+    const count = threads.filter((thread) => thread.category_id === category.id).length;
+    return {
+      id: category.id,
+      name: category.name,
+      count
+    };
+  });
+
+  const forumThreads: ForumThread[] = threads.map((thread) => {
+    const user = pickUser(thread.users);
+    const category = pickCategory(thread.categories);
+    return {
+      id: thread.id,
+      title: thread.title,
+      body: thread.body,
+      created_at: thread.created_at,
+      category_id: thread.category_id,
+      category_name: category?.name ?? null,
+      author: {
+        nickname: user?.nickname ?? "Anónimo",
+        bio: user?.bio ?? null,
+        avatar_url: user?.avatar_url ?? null
+      },
+      repliesCount: replyCountByThread.get(thread.id) ?? 0
+    };
+  });
+
   return (
     <main>
       <Navbar />
-      <section className="section">
-        <div className="container">
-          <h1 className="section-title">Foro Sin Pelos</h1>
-          <p className="muted">No censura ideológica. No doxxing. No amenazas reales.</p>
-          {!checking && userId ? <ForoComposer categories={categories} /> : null}
 
-          {checking || loading ? (
-            <div className="card" style={{ marginTop: 20 }}>
-              <p className="muted">Cargando foro...</p>
-            </div>
-          ) : null}
+      <ForumLayout
+        categories={forumCategories}
+        threads={forumThreads}
+        isLoading={checking || loading}
+        error={error}
+        onCreateTopicHref="#new-topic"
+        renderThreadExtras={(thread) => (
+          <>
+            <AdminDeleteButton table="threads" id={thread.id} label="Eliminar tema" />
+            <LazyThreadReplies threadId={thread.id} initialCount={thread.repliesCount ?? 0} />
+            <ReplyComposer threadId={thread.id} />
+          </>
+        )}
+      />
 
-          {!checking && !loading && threads.length > 0 ? (
-            <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginTop: 20 }}>
-              {threads.map((thread, idx) => {
-                const user = pickUser(thread.users);
-                const repliesCount = replyCountByThread.get(thread.id) ?? 0;
-                return (
-                  <div key={thread.id} style={{ display: "contents" }}>
-                    {idx === 2 ? <MidContentAdSlot /> : null}
-                    <div className="card" style={{ display: "grid", gap: 12 }}>
-                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                        <img
-                          src={user?.avatar_url ?? "/logo.png"}
-                          alt={user?.nickname ?? "avatar"}
-                          width={36}
-                          height={36}
-                          style={{ borderRadius: "50%", objectFit: "cover" }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 700 }}>{user?.nickname ?? "Anónimo"}</div>
-                          <div className="muted" style={{ fontSize: 12 }}>
-                            {user?.bio ?? "Sin bio"}
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <h3 style={{ marginTop: 0 }}>{thread.title}</h3>
-                        <p className="muted">{thread.body ?? ""}</p>
-                      </div>
-                      <AdminDeleteButton table="threads" id={thread.id} label="Eliminar thread" />
-                      <div>
-                        <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-                          Respuestas: {repliesCount}
-                        </div>
-                        <LazyThreadReplies threadId={thread.id} initialCount={repliesCount} />
-                        <ReplyComposer threadId={thread.id} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : null}
+      {!checking && userId ? (
+        <section className="section" id="new-topic">
+          <div className="container foro-premium-shell">
+            <ForoComposer categories={categories} />
+          </div>
+        </section>
+      ) : null}
 
-          {!checking && !loading && threads.length === 0 ? (
-            <div className="card" style={{ marginTop: 20 }}>
-              <p className="muted">Todavía no hay temas en el foro.</p>
-            </div>
-          ) : null}
-        </div>
-      </section>
       <Footer />
     </main>
   );
 }
-

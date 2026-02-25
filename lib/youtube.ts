@@ -28,7 +28,7 @@ function parseIsoDurationToSeconds(iso: string): number {
 
 export function isShorts(durationSeconds?: number | null): boolean {
   const d = Number(durationSeconds ?? 0);
-  return d > 0 && d <= 60;
+  return d > 0 && d <= 180;
 }
 
 export async function fetchYouTubeVideos(limit = 25): Promise<YouTubeVideo[]> {

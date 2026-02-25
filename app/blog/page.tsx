@@ -23,6 +23,11 @@ type BlogPost = {
   tags?: string[] | null;
 };
 
+function postHref(post: { id: string; slug?: string | null }) {
+  const slug = String(post.slug ?? "").trim();
+  return `/blog/${slug || post.id}` as any;
+}
+
 function supabaseService() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -74,7 +79,7 @@ export default async function BlogIndexPage({
   const svc = supabaseService();
   const counts = new Map<string, number>();
   const score = (p: BlogPost) => {
-    const key = `/blog/${(p.slug ?? p.id) as string}`;
+    const key = postHref(p);
     return counts.get(key) ?? 0;
   };
 
@@ -191,7 +196,7 @@ export default async function BlogIndexPage({
             <div className="mag-blog-title">
               <div className="mag-kicker">Editorial</div>
               <h1 className="mag-h1">Blog</h1>
-              <p className="mag-sub">Análisis, cultura y medios. Enfoque PR · TX · USA.</p>
+              <p className="mag-sub">Análisis, cultura y medios en formato revista. Enfoque PR · TX · USA.</p>
             </div>
 
             <div className="mag-blog-tools">
@@ -237,9 +242,14 @@ export default async function BlogIndexPage({
         <div className="container blog-container">
           <div className="mag-blog-layout">
             <div className="mag-blog-main">
+              <div className="mag-results">
+                <span className="mag-small">
+                  Mostrando {posts.length} de {total} artículos
+                </span>
+              </div>
               {featured ? (
                 <article className="mag-hero">
-                  <Link href={`/blog/${featured.slug ?? featured.id}`} className="mag-hero-media" aria-label={featured.title}>
+                  <Link href={postHref(featured)} className="mag-hero-media" aria-label={featured.title}>
                     {featured.cover_url ? <img src={featured.cover_url} alt={featured.title} loading="eager" /> : <div className="mag-hero-fallback" />}
                     <div className="mag-hero-overlay" />
                     <div className="mag-hero-content">
@@ -263,10 +273,10 @@ export default async function BlogIndexPage({
                     </div>
                   </Link>
                   <div className="mag-hero-actions-row">
-                    <Link className="mag-btn mag-btn-primary" href={`/blog/${featured.slug ?? featured.id}`}>
+                    <Link className="mag-btn mag-btn-primary" href={postHref(featured)}>
                       Leer ahora
                     </Link>
-                    <ShareButtons path={`/blog/${featured.slug ?? featured.id}`} text={featured.title} />
+                    <ShareButtons path={postHref(featured)} text={featured.title} />
                   </div>
                 </article>
               ) : (
@@ -279,7 +289,7 @@ export default async function BlogIndexPage({
                     <div key={post.id} style={{ display: "contents" }}>
                       {idx === 4 ? <MidContentAdSlot /> : null}
                       <article className="mag-card">
-                        <Link className="mag-card-media" href={`/blog/${post.slug ?? post.id}`} aria-label={post.title}>
+                        <Link className="mag-card-media" href={postHref(post)} aria-label={post.title}>
                           {post.cover_url ? <img src={post.cover_url} alt={post.title} loading="lazy" /> : <div className="mag-card-fallback" />}
                         </Link>
                         <div className="mag-card-body">
@@ -296,11 +306,16 @@ export default async function BlogIndexPage({
                             </div>
                           </div>
                           <h3 className="mag-h2 clamp-2" style={{ margin: 0 }}>
-                            <Link href={`/blog/${post.slug ?? post.id}`}>{post.title}</Link>
+                            <Link href={postHref(post)}>{post.title}</Link>
                           </h3>
                           <p className="mag-excerpt clamp-2" style={{ margin: "10px 0 0" }}>
                             {post.meta_description ?? ""}
                           </p>
+                          <div className="mag-card-actions">
+                            <Link className="mag-btn mag-btn-ghost" href={postHref(post)}>
+                              Leer artículo
+                            </Link>
+                          </div>
                         </div>
                       </article>
                     </div>
@@ -329,7 +344,7 @@ export default async function BlogIndexPage({
                 {trending.length ? (
                   <div className="mag-side-list">
                     {trending.map((p) => (
-                      <Link key={p.id} href={`/blog/${p.slug ?? p.id}`} className="mag-side-item">
+                      <Link key={p.id} href={postHref(p)} className="mag-side-item">
                         <span className="clamp-2">{p.title}</span>
                         <span className="mag-small">{p.reading_time_minutes} min</span>
                       </Link>

@@ -36,6 +36,21 @@ type ReportsPayload = {
     byStage: Record<string, number>;
     byStatus: Record<string, number>;
   };
+  kpis?: {
+    jobs24h: number;
+    done24h: number;
+    failed24h: number;
+    completionRate: number;
+    jobsByType: Record<string, number>;
+    adminActions24h: number | null;
+  };
+  funnel?: {
+    ingested: number;
+    drafted: number;
+    published: number;
+    social: number;
+    failed: number;
+  };
   events: PipelineEventRow[];
   failedJobs: FailedJobRow[];
   error?: string;
@@ -56,6 +71,21 @@ export default function AdminReportsPage() {
     totalEvents: 0,
     byStage: {},
     byStatus: {}
+  });
+  const [kpis, setKpis] = useState<NonNullable<ReportsPayload["kpis"]>>({
+    jobs24h: 0,
+    done24h: 0,
+    failed24h: 0,
+    completionRate: 0,
+    jobsByType: {},
+    adminActions24h: null
+  });
+  const [funnel, setFunnel] = useState<NonNullable<ReportsPayload["funnel"]>>({
+    ingested: 0,
+    drafted: 0,
+    published: 0,
+    social: 0,
+    failed: 0
   });
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
@@ -81,6 +111,8 @@ export default function AdminReportsPage() {
       setEvents([]);
       setFailedJobs([]);
       setSummary({ window: "24h", totalEvents: 0, byStage: {}, byStatus: {} });
+      setKpis({ jobs24h: 0, done24h: 0, failed24h: 0, completionRate: 0, jobsByType: {}, adminActions24h: null });
+      setFunnel({ ingested: 0, drafted: 0, published: 0, social: 0, failed: 0 });
       setLoading(false);
       return;
     }
@@ -88,6 +120,8 @@ export default function AdminReportsPage() {
     setEvents(json.events ?? []);
     setFailedJobs(json.failedJobs ?? []);
     setSummary(json.summary ?? { window: "24h", totalEvents: 0, byStage: {}, byStatus: {} });
+    setKpis(json.kpis ?? { jobs24h: 0, done24h: 0, failed24h: 0, completionRate: 0, jobsByType: {}, adminActions24h: null });
+    setFunnel(json.funnel ?? { ingested: 0, drafted: 0, published: 0, social: 0, failed: 0 });
     setLoading(false);
   };
 
@@ -122,6 +156,35 @@ export default function AdminReportsPage() {
         </button>
       </div>
 
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", marginTop: 16 }}>
+        <article className="card">
+          <h4 style={{ marginTop: 0, marginBottom: 6 }}>Jobs 24h</h4>
+          <strong style={{ fontSize: 28 }}>{kpis.jobs24h}</strong>
+        </article>
+        <article className="card">
+          <h4 style={{ marginTop: 0, marginBottom: 6 }}>Éxito 24h</h4>
+          <strong style={{ fontSize: 28 }}>{kpis.completionRate}%</strong>
+          <p className="muted" style={{ margin: "6px 0 0" }}>
+            done: {kpis.done24h} · failed: {kpis.failed24h}
+          </p>
+        </article>
+        <article className="card">
+          <h4 style={{ marginTop: 0, marginBottom: 6 }}>Acciones admin</h4>
+          <strong style={{ fontSize: 28 }}>{kpis.adminActions24h ?? "—"}</strong>
+        </article>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3 style={{ marginTop: 0 }}>Embudo 24h</h3>
+        <div className="muted" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <span>Ingestado: {funnel.ingested}</span>
+          <span>Draft: {funnel.drafted}</span>
+          <span>Publicado: {funnel.published}</span>
+          <span>Social: {funnel.social}</span>
+          <span>Errores: {funnel.failed}</span>
+        </div>
+      </div>
+
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", marginTop: 16 }}>
         <article className="card">
           <h3 style={{ marginTop: 0 }}>Por etapa (24h)</h3>
@@ -145,6 +208,21 @@ export default function AdminReportsPage() {
             ))}
           </div>
         </article>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3 style={{ marginTop: 0 }}>Jobs por tipo (24h)</h3>
+        {Object.keys(kpis.jobsByType).length === 0 ? (
+          <p className="muted">Sin jobs en la ventana.</p>
+        ) : (
+          <div className="muted" style={{ display: "grid", gap: 6, fontSize: 13 }}>
+            {Object.entries(kpis.jobsByType).map(([name, count]) => (
+              <span key={name}>
+                {name}: {count}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: 20 }}>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { requireAdminApi } from "@/lib/adminAuth";
+import { requireStaffApi } from "@/lib/adminAuth";
+import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 
 function getClients() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -12,8 +13,9 @@ function getClients() {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "manage_promotions");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+    const reqMeta = getRequestAuditMeta(request);
 
     const body = await request.json().catch(() => ({}));
     const id = String(body?.id ?? "").trim();
@@ -37,6 +39,15 @@ export async function POST(request: NextRequest) {
       .from("promotions")
       .update({ image_url: null, image_path: null, updated_at: new Date().toISOString() })
       .eq("id", id);
+
+    await logAdminAudit(auth.service, {
+      actorId: auth.userId,
+      action: "admin.promotions.cleanup_image",
+      targetTable: "promotions",
+      targetId: id,
+      meta: { removed_path: imagePath || null },
+      ...reqMeta
+    });
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {

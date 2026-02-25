@@ -11,6 +11,8 @@ type StatsPayload = {
     week: { visits: number; unique: number };
     month: { visits: number; unique: number };
     chart14d: Array<{ date: string; visits: number; unique: number }>;
+    countries: Array<{ country: string; visits: number; unique: number }>;
+    cities: Array<{ city: string; country: string; visits: number; unique: number }>;
   };
   platforms: Record<
     string,
@@ -74,16 +76,36 @@ export default function AdminStatsPage() {
   }, []);
 
   const platformRows = useMemo(() => {
-    const rows = Object.entries(data?.platforms ?? {}).map(([platform, agg]) => ({ platform, ...agg }));
-    const order = ["YouTube", "Instagram", "Facebook", "TikTok", "Other"];
-    rows.sort((a, b) => order.indexOf(a.platform) - order.indexOf(b.platform));
-    return rows;
+    const baseOrder = ["YouTube", "Instagram", "Facebook", "TikTok"];
+    const blank = {
+      posts: 0,
+      views: 0,
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      lastPostAt: null as string | null,
+      shorts: 0,
+      long: 0
+    };
+
+    const fromApi = Object.entries(data?.platforms ?? {}).map(([platform, agg]) => ({ platform, ...agg }));
+    const map = new Map<string, (typeof fromApi)[number]>();
+    fromApi.forEach((row) => map.set(row.platform, row));
+
+    const required = baseOrder.map((name) => map.get(name) ?? { platform: name, ...blank });
+    const others = fromApi.filter((row) => !baseOrder.includes(row.platform));
+    return [...required, ...others];
   }, [data]);
 
   const chartMax = useMemo(() => {
     const values = (data?.website?.chart14d ?? []).map((x) => x.visits);
     return Math.max(1, ...values);
   }, [data]);
+
+  const hasAnyPlatformData = useMemo(
+    () => platformRows.some((p) => p.posts > 0 || p.views > 0 || p.likes > 0 || p.comments > 0 || p.shares > 0),
+    [platformRows]
+  );
 
   const handleSyncYT = async () => {
     try {
@@ -161,6 +183,70 @@ export default function AdminStatsPage() {
         </div>
       </div>
 
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginTop: 18 }}>
+        <article className="card">
+          <h3 style={{ marginTop: 0 }}>Visitantes por país (30d)</h3>
+          {(data?.website?.countries?.length ?? 0) === 0 ? (
+            <p className="muted" style={{ marginBottom: 0 }}>
+              Aún no hay datos por país.
+            </p>
+          ) : (
+            <div style={{ maxHeight: 360, overflow: "auto" }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>País</th>
+                    <th>Visitas</th>
+                    <th>Únicos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data?.website?.countries ?? []).map((row) => (
+                    <tr key={row.country}>
+                      <td>{row.country}</td>
+                      <td>{formatNumber(row.visits)}</td>
+                      <td>{formatNumber(row.unique)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </article>
+
+        <article className="card">
+          <h3 style={{ marginTop: 0 }}>Visitantes por ciudad (30d)</h3>
+          {(data?.website?.cities?.length ?? 0) === 0 ? (
+            <p className="muted" style={{ marginBottom: 0 }}>
+              Aún no hay datos por ciudad.
+            </p>
+          ) : (
+            <div style={{ maxHeight: 360, overflow: "auto" }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Ciudad</th>
+                    <th>País</th>
+                    <th>Visitas</th>
+                    <th>Únicos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data?.website?.cities ?? []).map((row) => (
+                    <tr key={`${row.city}-${row.country}`}>
+                      <td>{row.city}</td>
+                      <td>{row.country}</td>
+                      <td>{formatNumber(row.visits)}</td>
+                      <td>{formatNumber(row.unique)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </article>
+      </div>
+
       <h2 className="section-title" style={{ marginTop: 26, fontSize: "clamp(24px,3vw,34px)" }}>
         Redes (feed sincronizado)
       </h2>
@@ -183,7 +269,7 @@ export default function AdminStatsPage() {
             </div>
           </article>
         ))}
-        {platformRows.length === 0 ? (
+        {!hasAnyPlatformData ? (
           <article className="card">
             <span className="badge">Sin datos</span>
             <h3 style={{ marginTop: 0 }}>No hay métricas aún</h3>
@@ -196,4 +282,3 @@ export default function AdminStatsPage() {
     </main>
   );
 }
-

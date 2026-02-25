@@ -23,6 +23,24 @@ type BlogPost = {
   created_at: string | null;
 };
 
+type BlogSchemaCheck = {
+  table: string;
+  healthy: boolean;
+  missingRequired: string[];
+  missingRecommended: string[];
+};
+
+const BLOG_COMPAT_COLUMNS_REGEX = /(slug|meta_description|reading_time_minutes|categories|tags|updated_at|episode_url|episode_title)/i;
+
+function isBlogCompatibilityColumnError(message?: string | null) {
+  return BLOG_COMPAT_COLUMNS_REGEX.test(String(message ?? ""));
+}
+
+function postHref(post: { id: string; slug?: string | null }) {
+  const slug = String(post.slug ?? "").trim();
+  return `/blog/${slug || post.id}`;
+}
+
 function humanizeBlogError(raw?: string | null) {
   const msg = String(raw ?? "").trim();
   if (!msg) return "No se pudo guardar el artículo.";
@@ -52,6 +70,9 @@ export default function AdminBlogPage() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [items, setItems] = useState<BlogPost[]>([]);
+  const [schema, setSchema] = useState<BlogSchemaCheck | null>(null);
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaError, setSchemaError] = useState<string | null>(null);
   const router = useRouter();
 
   const loadItems = async () => {
@@ -62,7 +83,7 @@ export default function AdminBlogPage() {
         "id, slug, title, excerpt, meta_description, body, cover_url, episode_url, episode_title, created_at, reading_time_minutes, categories, tags"
       )
       .order("created_at", { ascending: false });
-    if (primary.error && /(slug|meta_description|reading_time_minutes|categories|tags|episode_url|episode_title)/i.test(primary.error.message)) {
+    if (primary.error && isBlogCompatibilityColumnError(primary.error.message)) {
       const fallback = await supabase
         .from("blog_posts")
         .select("id, title, excerpt, body, cover_url, created_at")
@@ -73,8 +94,32 @@ export default function AdminBlogPage() {
     setItems((primary.data as BlogPost[]) ?? []);
   };
 
+  const checkSchema = async () => {
+    setSchemaLoading(true);
+    setSchemaError(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      setSchemaError("No se pudo validar esquema: sesión inválida.");
+      setSchemaLoading(false);
+      return;
+    }
+
+    const res = await fetch("/api/admin/schema/blog-posts", { headers: { Authorization: `Bearer ${token}` } });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.ok) {
+      setSchemaError(json?.error ?? `No se pudo validar esquema (HTTP ${res.status}).`);
+      setSchemaLoading(false);
+      return;
+    }
+
+    setSchema(json as BlogSchemaCheck);
+    setSchemaLoading(false);
+  };
+
   useEffect(() => {
     loadItems();
+    checkSchema();
   }, []);
 
   const resetForm = () => {
@@ -161,29 +206,37 @@ export default function AdminBlogPage() {
       updated_at: new Date().toISOString()
     };
 
-    if (editingId) {
-      let { error } = await supabase.from("blog_posts").update(payloadBase).eq("id", editingId);
-      if (error && /(slug|meta_description|reading_time_minutes|categories|tags|updated_at|episode_url|episode_title)/i.test(error.message)) {
-        const minimal = { title, excerpt: excerpt || null, body: body || null, cover_url: coverUrl || null, author_id: userId };
-        const retry = await supabase.from("blog_posts").update(minimal).eq("id", editingId);
-        error = retry.error;
-      }
-      if (error) return setStatus(humanizeBlogError(error.message)), void setLoading(false);
-      setStatus("Artículo actualizado.");
+    const minimalPayload = { title, excerpt: excerpt || null, body: body || null, cover_url: coverUrl || null, author_id: userId };
+    const mode = editingId ? "update" : "insert";
+    const primary = editingId
+      ? await supabase.from("blog_posts").update(payloadBase).eq("id", editingId)
+      : await supabase.from("blog_posts").insert(payloadBase);
+    let error = primary.error;
+    let usedFallback = false;
+    let fallbackReason = "";
+
+    if (error && isBlogCompatibilityColumnError(error.message)) {
+      usedFallback = true;
+      fallbackReason = error.message;
+      const fallback = editingId
+        ? await supabase.from("blog_posts").update(minimalPayload).eq("id", editingId)
+        : await supabase.from("blog_posts").insert(minimalPayload);
+      error = fallback.error;
+    }
+
+    if (error) return setStatus(humanizeBlogError(error.message)), void setLoading(false);
+    if (usedFallback) {
+      setStatus(
+        `Artículo ${mode === "update" ? "actualizado" : "publicado"} en modo compatibilidad. Faltan columnas en blog_posts: ${fallbackReason}`
+      );
     } else {
-      let { error } = await supabase.from("blog_posts").insert(payloadBase);
-      if (error && /(slug|meta_description|reading_time_minutes|categories|tags|updated_at|episode_url|episode_title)/i.test(error.message)) {
-        const minimal = { title, excerpt: excerpt || null, body: body || null, cover_url: coverUrl || null, author_id: userId };
-        const retry = await supabase.from("blog_posts").insert(minimal);
-        error = retry.error;
-      }
-      if (error) return setStatus(humanizeBlogError(error.message)), void setLoading(false);
-      setStatus("Artículo publicado.");
+      setStatus(mode === "update" ? "Artículo actualizado." : "Artículo publicado.");
     }
 
     setLoading(false);
     resetForm();
     await loadItems();
+    await checkSchema();
     router.refresh();
   };
 
@@ -205,6 +258,35 @@ export default function AdminBlogPage() {
     <main>
       <h1 className="section-title">Blog (Admin)</h1>
       <p className="muted">Estructura recomendada: usa headings con "##" para H2 y "###" para H3.</p>
+      {schemaError ? (
+        <div className="card" style={{ marginTop: 14, borderColor: "rgba(255, 122, 24, 0.5)" }}>
+          <strong>Validación de esquema no disponible</strong>
+          <p className="muted" style={{ marginBottom: 0 }}>
+            {schemaError}
+          </p>
+        </div>
+      ) : null}
+      {!schemaLoading && schema && (!schema.healthy || schema.missingRecommended.length > 0) ? (
+        <div className="card" style={{ marginTop: 14, borderColor: "rgba(255, 122, 24, 0.5)" }}>
+          <strong>{schema.healthy ? "Faltan columnas recomendadas en blog_posts" : "Faltan columnas críticas en blog_posts"}</strong>
+          <div className="muted" style={{ marginTop: 8, display: "grid", gap: 6 }}>
+            {schema.missingRequired.length > 0 ? (
+              <span>Críticas: {schema.missingRequired.join(", ")}</span>
+            ) : (
+              <span>Críticas: ninguna</span>
+            )}
+            {schema.missingRecommended.length > 0 ? <span>Recomendadas: {schema.missingRecommended.join(", ")}</span> : null}
+            <span>
+              Ejecuta migración en Supabase SQL Editor: <code>supabase/blog_posts_seo.sql</code>
+            </span>
+          </div>
+        </div>
+      ) : null}
+      <div className="form-submit-bar" style={{ marginTop: 14 }}>
+        <button className="button secondary" type="button" onClick={checkSchema} disabled={schemaLoading}>
+          {schemaLoading ? "Revisando esquema..." : "Revisar esquema blog_posts"}
+        </button>
+      </div>
       <form className="card form-stack" style={{ marginTop: 20 }} onSubmit={handleSubmit}>
         <label>
           Título
@@ -316,7 +398,7 @@ export default function AdminBlogPage() {
                   <button className="button secondary" type="button" onClick={() => handleEdit(item)}>
                     Editar
                   </button>
-                  <a className="button secondary" href={`/blog/${(item as any).slug ?? item.id}`} target="_blank" rel="noreferrer">
+                  <a className="button secondary" href={postHref(item)} target="_blank" rel="noreferrer">
                     Ver publico
                   </a>
                   <AdminDeleteButton table="blog_posts" id={item.id} label="Eliminar" />

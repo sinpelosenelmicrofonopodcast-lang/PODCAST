@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { requireAdminApi } from "@/lib/adminAuth";
+import { requireStaffApi } from "@/lib/adminAuth";
 
 function getClients() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -17,6 +17,17 @@ type ExternalPost = {
   metrics: any | null;
 };
 
+type VisitRow = {
+  visitor_id: string;
+  visited_at: string;
+  country_code?: string | null;
+  country?: string | null;
+  city?: string | null;
+};
+
+const VISITS_SELECT_GEO = "visitor_id, visited_at, country_code, country, city";
+const VISITS_SELECT_FALLBACK = "visitor_id, visited_at";
+
 function normalizePlatform(value?: string | null) {
   const raw = String(value ?? "").toLowerCase().trim();
   if (raw.includes("youtube")) return "YouTube";
@@ -30,9 +41,48 @@ function dayKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function toCountryName(code?: string | null) {
+  const normalized = String(code ?? "")
+    .trim()
+    .toUpperCase();
+  if (!normalized) return null;
+  try {
+    const display = new Intl.DisplayNames(["es"], { type: "region" }).of(normalized);
+    return display ?? normalized;
+  } catch {
+    return normalized;
+  }
+}
+
+function isMissingGeoColumnsError(message?: string | null) {
+  const text = String(message ?? "");
+  return /country_code|country|city/i.test(text) && /column/i.test(text);
+}
+
+async function loadVisits(service: any, monthStartIso: string) {
+  const primaryResp = await service
+    .from("page_visits")
+    .select(VISITS_SELECT_GEO)
+    .gte("visited_at", monthStartIso)
+    .order("visited_at", { ascending: false })
+    .limit(50000);
+
+  if (!primaryResp.error) return { error: null as string | null, rows: (primaryResp.data ?? []) as VisitRow[] };
+  if (!isMissingGeoColumnsError(primaryResp.error.message)) return { error: primaryResp.error.message, rows: [] as VisitRow[] };
+
+  const fallbackResp = await service
+    .from("page_visits")
+    .select(VISITS_SELECT_FALLBACK)
+    .gte("visited_at", monthStartIso)
+    .order("visited_at", { ascending: false })
+    .limit(50000);
+  if (fallbackResp.error) return { error: fallbackResp.error.message, rows: [] as VisitRow[] };
+  return { error: null as string | null, rows: (fallbackResp.data ?? []) as VisitRow[] };
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "view_stats");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const { service } = getClients();
@@ -46,21 +96,16 @@ export async function GET(request: NextRequest) {
     const chartStart = new Date(dayStart);
     chartStart.setDate(dayStart.getDate() - 13);
 
-    const [postsResp, visitsResp] = await Promise.all([
+    const [postsResp, visitsLoaded] = await Promise.all([
       service.from("external_posts").select("id, platform, posted_at, metrics").order("posted_at", { ascending: false }).limit(2000),
-      service
-        .from("page_visits")
-        .select("visitor_id, visited_at")
-        .gte("visited_at", monthStart.toISOString())
-        .order("visited_at", { ascending: false })
-        .limit(50000)
+      loadVisits(service, monthStart.toISOString())
     ]);
 
     if (postsResp.error) return NextResponse.json({ ok: false, error: postsResp.error.message }, { status: 400 });
-    if (visitsResp.error) return NextResponse.json({ ok: false, error: visitsResp.error.message }, { status: 400 });
+    if (visitsLoaded.error) return NextResponse.json({ ok: false, error: visitsLoaded.error }, { status: 400 });
 
     const posts = (postsResp.data ?? []) as ExternalPost[];
-    const visits = (visitsResp.data ?? []) as Array<{ visitor_id: string; visited_at: string }>;
+    const visits = visitsLoaded.rows;
 
     const platformAgg: Record<
       string,
@@ -93,6 +138,8 @@ export async function GET(request: NextRequest) {
     let monthVisits = 0;
 
     const visitsByDay = new Map<string, { visits: number; visitors: Set<string> }>();
+    const countries = new Map<string, { label: string; visits: number; visitors: Set<string> }>();
+    const cities = new Map<string, { city: string; country: string; visits: number; visitors: Set<string> }>();
     for (let i = 0; i < 14; i += 1) {
       const d = new Date(chartStart);
       d.setDate(chartStart.getDate() + i);
@@ -122,11 +169,36 @@ export async function GET(request: NextRequest) {
           row.visitors.add(v.visitor_id);
         }
       }
+
+      const countryCode = String(v.country_code ?? "").trim().toUpperCase();
+      const countryName = String(v.country ?? "").trim() || toCountryName(countryCode) || "Desconocido";
+      const countryKey = countryCode || countryName.toLowerCase();
+      if (!countries.has(countryKey)) countries.set(countryKey, { label: countryName, visits: 0, visitors: new Set() });
+      const countryAgg = countries.get(countryKey)!;
+      countryAgg.visits += 1;
+      countryAgg.visitors.add(v.visitor_id);
+
+      const city = String(v.city ?? "").trim();
+      if (city) {
+        const cityKey = `${city.toLowerCase()}::${countryKey}`;
+        if (!cities.has(cityKey)) cities.set(cityKey, { city, country: countryName, visits: 0, visitors: new Set() });
+        const cityAgg = cities.get(cityKey)!;
+        cityAgg.visits += 1;
+        cityAgg.visitors.add(v.visitor_id);
+      }
     }
 
     const chart = Array.from(visitsByDay.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, row]) => ({ date, visits: row.visits, unique: row.visitors.size }));
+    const topCountries = Array.from(countries.values())
+      .map((row) => ({ country: row.label, visits: row.visits, unique: row.visitors.size }))
+      .sort((a, b) => b.visits - a.visits)
+      .slice(0, 25);
+    const topCities = Array.from(cities.values())
+      .map((row) => ({ city: row.city, country: row.country, visits: row.visits, unique: row.visitors.size }))
+      .sort((a, b) => b.visits - a.visits)
+      .slice(0, 25);
 
     return NextResponse.json({
       ok: true,
@@ -134,7 +206,9 @@ export async function GET(request: NextRequest) {
         day: { visits: dayVisits, unique: dayVisitors.size },
         week: { visits: weekVisits, unique: weekVisitors.size },
         month: { visits: monthVisits, unique: monthVisitors.size },
-        chart14d: chart
+        chart14d: chart,
+        countries: topCountries,
+        cities: topCities
       },
       platforms: platformAgg
     });

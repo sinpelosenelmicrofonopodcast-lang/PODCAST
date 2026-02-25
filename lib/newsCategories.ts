@@ -10,5 +10,7 @@ export const newsCategories = [
   "Cultura",
   "Política",
   "Deporte",
-  "Entretenimiento"
+  "Entretenimiento",
+  "Música",
+  "Emprendimiento"
 ];

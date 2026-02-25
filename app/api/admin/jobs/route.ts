@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/adminAuth";
+import { requireStaffApi } from "@/lib/adminAuth";
 
 type JobRow = {
   id: string;
@@ -23,7 +23,7 @@ type JobRow = {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "view_schedule");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const limitRaw = Number(request.nextUrl.searchParams.get("limit") ?? "150");

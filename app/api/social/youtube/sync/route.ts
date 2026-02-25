@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { fetchYouTubeVideos, isShorts } from "@/lib/youtube";
-import { requireAdminApi } from "@/lib/adminAuth";
+import { requireStaffApi } from "@/lib/adminAuth";
 import { createAutomationJob, logPipelineEvent, updateAutomationJob } from "@/lib/pipelineOps";
 
 export async function POST(request: NextRequest) {
   let jobId = "";
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "manage_news_sources");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     jobId = await createAutomationJob(auth.service, {
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     if (jobId) {
       try {
-        const admin = await requireAdminApi(request);
+        const admin = await requireStaffApi(request, "manage_news_sources");
         if (admin.ok) {
           await logPipelineEvent(admin.service, {
             jobId,

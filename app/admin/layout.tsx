@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/AdminShell";
-import { requireAdminPageOrRedirect } from "@/lib/adminAuth";
+import { requireStaffPageOrRedirect } from "@/lib/adminAuth";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await requireAdminPageOrRedirect("/admin");
+  await requireStaffPageOrRedirect("/admin");
 
   return (
     <AdminShell>
@@ -11,7 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <Link className="button secondary" href="/">
           Volver al Home
         </Link>
-        <span className="muted">Modo Admin</span>
+        <span className="muted">Panel editorial</span>
       </div>
       {children}
     </AdminShell>

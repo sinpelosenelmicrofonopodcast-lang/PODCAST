@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/adminAuth";
+import { requireStaffApi } from "@/lib/adminAuth";
 import { createAutomationJob, logPipelineEvent, updateAutomationJob } from "@/lib/pipelineOps";
 import { postNewsToFacebook } from "@/lib/socialFacebook";
+import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 
 export async function POST(request: NextRequest) {
   let jobId = "";
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "manage_news");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+    const reqMeta = getRequestAuditMeta(request);
 
     const body = await request.json().catch(() => ({}));
     const newsId = String(body?.newsId ?? "").trim();
@@ -70,11 +72,20 @@ export async function POST(request: NextRequest) {
       payload: { title, summary, link: posted.link, postId: posted.postId ?? null }
     });
 
+    await logAdminAudit(auth.service, {
+      actorId: auth.userId,
+      action: "admin.news.facebook_post",
+      targetTable: "news_items",
+      targetId: newsId,
+      meta: { post_id: posted.postId ?? null, link: posted.link },
+      ...reqMeta
+    });
+
     return NextResponse.json({ ok: true, result: { id: posted.postId }, link: posted.link });
   } catch (e: any) {
     if (jobId) {
       try {
-        const auth = await requireAdminApi(request);
+        const auth = await requireStaffApi(request, "manage_news");
         if (auth.ok) {
           await logPipelineEvent(auth.service, {
             jobId,

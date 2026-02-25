@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { STAFF_PERMISSIONS, STAFF_PERMISSION_LABELS, type StaffPermission } from "@/lib/staffPermissions";
 
 type FilterStatus = "all" | "active" | "blocked";
 type RoleName = "admin" | "editor" | "moderator";
@@ -17,6 +18,7 @@ type AdminUserRow = {
   plan: string | null;
   membership_status: string | null;
   roles: string[];
+  permissions: StaffPermission[];
 };
 
 async function getSessionToken() {
@@ -127,6 +129,22 @@ export default function AdminUsersPage() {
     );
   };
 
+  const togglePermission = async (user: AdminUserRow, permission: StaffPermission, enabled: boolean) => {
+    setBusyId(user.id);
+    setStatus(null);
+    const result = await updateUser(user.id, { permission, enabled });
+    setBusyId(null);
+    if (!result.ok) return;
+    setItems((prev) =>
+      prev.map((u) => {
+        if (u.id !== user.id) return u;
+        const current = Array.isArray(u.permissions) ? u.permissions : [];
+        const next = enabled ? Array.from(new Set([...current, permission])) : current.filter((p) => p !== permission);
+        return { ...u, permissions: next as StaffPermission[] };
+      })
+    );
+  };
+
   const deleteUser = async (user: AdminUserRow) => {
     if (user.id === currentAdminId) {
       setStatus("No puedes eliminar tu propia cuenta.");
@@ -162,7 +180,7 @@ export default function AdminUsersPage() {
   return (
     <main>
       <h1 className="section-title">Usuarios</h1>
-      <p className="muted">Buscar por nickname/email, filtrar por estado y asignar roles. Nombre legal solo visible aquí.</p>
+      <p className="muted">Buscar por nickname/email, filtrar por estado y asignar roles + permisos por sección. Nombre legal solo visible aquí.</p>
 
       {status ? (
         <div className="card" style={{ marginTop: 12 }}>
@@ -214,6 +232,7 @@ export default function AdminUsersPage() {
               const hasAdmin = roles.includes("admin");
               const hasEditor = roles.includes("editor");
               const hasModerator = roles.includes("moderator");
+              const permissions = Array.isArray(user.permissions) ? user.permissions : [];
 
               return (
                 <div key={user.id} className="card" style={{ display: "grid", gap: 10 }}>
@@ -264,6 +283,25 @@ export default function AdminUsersPage() {
                       />
                       moderator
                     </label>
+                  </div>
+
+                  <div className="admin-item-actions" style={{ display: "grid", gap: 8 }}>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      Permisos por sección:
+                    </span>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
+                      {STAFF_PERMISSIONS.map((permission) => (
+                        <label key={`${user.id}-${permission}`} className="check-row" style={{ margin: 0 }}>
+                          <input
+                            type="checkbox"
+                            checked={permissions.includes(permission)}
+                            onChange={(e) => togglePermission(user, permission, e.target.checked)}
+                            disabled={busyId === user.id}
+                          />
+                          {STAFF_PERMISSION_LABELS[permission]}
+                        </label>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="admin-item-actions">

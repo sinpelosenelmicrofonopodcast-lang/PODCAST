@@ -43,22 +43,23 @@ export default function AdminPromotionsPage() {
   const [uploading, setUploading] = useState(false);
 
   const load = async () => {
-    // Avoid breaking if promo_type hasn't been migrated yet (Supabase schema cache).
-    const primary = await supabase
-      .from("promotions")
-      .select("id, title, description, image_url, image_path, cta_label, cta_url, promo_type, target_sections, placement, display_order, is_active, starts_at, ends_at")
-      .order("display_order", { ascending: true })
-      .order("created_at", { ascending: false });
-    if (primary.error && /(promo_type|target_sections)/i.test(primary.error.message)) {
-      const fallback = await supabase
-        .from("promotions")
-        .select("id, title, description, image_url, image_path, cta_label, cta_url, placement, display_order, is_active, starts_at, ends_at")
-        .order("display_order", { ascending: true })
-        .order("created_at", { ascending: false });
-      setItems((fallback.data as Promotion[]) ?? []);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      setItems([]);
+      setStatus("Sesión inválida.");
       return;
     }
-    setItems((primary.data as Promotion[]) ?? []);
+    const res = await fetch("/api/admin/promotions", {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const json = await res.json().catch(() => ({} as any));
+    if (!res.ok || !json?.ok) {
+      setItems([]);
+      setStatus(json?.error ?? `No se pudieron cargar promociones (HTTP ${res.status}).`);
+      return;
+    }
+    setItems((json.items as Promotion[]) ?? []);
   };
 
   useEffect(() => {
@@ -190,6 +191,7 @@ export default function AdminPromotionsPage() {
       targetSections.includes("all") ? ["all"] : Array.from(new Set(targetSections.map((s) => String(s).trim()).filter(Boolean)));
 
     const payloadBase: any = {
+      id: editingId ?? undefined,
       title,
       description: description || null,
       image_url: imageUrl || null,
@@ -204,28 +206,34 @@ export default function AdminPromotionsPage() {
       updated_at: new Date().toISOString(),
       target_sections: normalizedSections.length ? normalizedSections : null
     };
-    // promo_type is optional until migrated.
     payloadBase.promo_type = promoType;
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      const msg = "Sesión inválida.";
+      toast.error(msg);
+      setStatus(msg);
+      return;
+    }
+
+    const res = await fetch("/api/admin/promotions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payloadBase)
+    });
+    const json = await res.json().catch(() => ({} as any));
+    if (!res.ok || !json?.ok) {
+      const msg = json?.error ?? `No se pudo guardar (HTTP ${res.status}).`;
+      toast.error(msg);
+      setStatus(msg);
+      return;
+    }
+
     if (editingId) {
-      let { error } = await supabase.from("promotions").update(payloadBase).eq("id", editingId);
-      if (error && /(promo_type|target_sections)/i.test(error.message)) {
-        const { promo_type: _ignore, ...withoutType } = payloadBase;
-        delete (withoutType as any).target_sections;
-        const retry = await supabase.from("promotions").update(withoutType).eq("id", editingId);
-        error = retry.error;
-      }
-      if (error) return setStatus(error.message), void toast.error(error.message);
       toast.success("Promoción actualizada.");
       setStatus("Promoción actualizada.");
     } else {
-      let { error } = await supabase.from("promotions").insert(payloadBase);
-      if (error && /(promo_type|target_sections)/i.test(error.message)) {
-        const { promo_type: _ignore, ...withoutType } = payloadBase;
-        delete (withoutType as any).target_sections;
-        const retry = await supabase.from("promotions").insert(withoutType);
-        error = retry.error;
-      }
-      if (error) return setStatus(error.message), void toast.error(error.message);
       toast.success("Promoción creada.");
       setStatus("Promoción creada.");
     }
@@ -250,153 +258,179 @@ export default function AdminPromotionsPage() {
   };
 
   return (
-    <main>
-      <h1 className="section-title">Promociones / Ads</h1>
-      <p className="muted">Gestiona anuncios de marcas visibles en home.</p>
-      <form className="card form-stack" onSubmit={submit} style={{ marginTop: 20 }}>
-        <label>
-          Título
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required />
-        </label>
-        <label>
-          Descripción
-          <textarea className="textarea" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
-        </label>
-        <label>
-          Imagen (URL) (opcional)
-          <input className="input" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
-        </label>
-        {promoType !== "internal" ? (
-          <p className="muted" style={{ margin: "-6px 0 0", fontSize: 12 }}>
-            Sponsor/Affiliate: la imagen es obligatoria (logo o banner).
-          </p>
-        ) : (
-          <p className="muted" style={{ margin: "-6px 0 0", fontSize: 12 }}>
-            Internal: si no subes imagen, se usa el logo del sitio.
-          </p>
-        )}
-        <label>
-          Subir imagen
-          <input
-            className="input"
-            type="file"
-            accept="image/*"
-            disabled={uploading}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) uploadImage(file);
-            }}
-          />
-        </label>
-        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-          <label>
-            CTA label
-            <input className="input" value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} placeholder="Ej: Ver oferta" />
-          </label>
-          <label>
-            CTA URL
-            <input className="input" value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder="https://..." />
-          </label>
+    <main className="admin-promos-page">
+      <header className="card admin-promos-head">
+        <div>
+          <h1 className="section-title admin-promos-title">Promociones / Ads</h1>
+          <p className="muted admin-promos-subhead">Gestiona campañas por formato, ubicación y sección sin afectar la lectura.</p>
         </div>
-        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-          <label>
-            Tipo
-            <select className="select" value={promoType} onChange={(e) => setPromoType(e.target.value as any)}>
-              <option value="sponsor">Sponsor</option>
-              <option value="internal">Internal (SPM)</option>
-              <option value="affiliate">Affiliate</option>
-            </select>
-          </label>
-          <label>
-            Secciones
-            <div className="check-grid" style={{ marginTop: 10 }}>
-              {PROMO_TARGET_SECTIONS.map((s) => (
-                <label key={s.id} className="check-row compact">
-                  <input
-                    type="checkbox"
-                    checked={targetSections.includes(s.id)}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setTargetSections((prev) => {
-                        const next = checked ? [...prev, s.id] : prev.filter((x) => x !== s.id);
-                        // If "all" is selected, force it to be the only option.
-                        if (next.includes("all")) return ["all"];
-                        return next.filter((x) => x !== "all");
-                      });
-                    }}
-                  />
-                  {s.label}
-                </label>
-              ))}
-            </div>
-            <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-              Sponsor/Affiliate: selecciona secciones específicas (no "Global"). Internal puede ser "Global (All)".
-            </p>
-          </label>
-          <label>
-            Placement
-            <select className="select" value={placement} onChange={(e) => setPlacement(e.target.value)}>
-              <option value="top_banner">Top banner (debajo del header)</option>
-              <option value="mid_content">Mid-content (artículos)</option>
-              <option value="bottom_sticky">Barra inferior sticky</option>
-              <option value="popup">Popup controlado</option>
-              <option value="home">Home (sección promociones)</option>
-            </select>
-          </label>
-          <label>
-            Orden
-            <input className="input" type="number" value={displayOrder} onChange={(e) => setDisplayOrder(Number(e.target.value))} />
-          </label>
-        </div>
-        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-          <label>
-            Inicio (opcional)
-            <input className="input" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
-          </label>
-          <label>
-            Fin (opcional)
-            <input className="input" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
-          </label>
-        </div>
-        <label className="check-row">
-          <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-          Activa
-        </label>
-        <div className="form-submit-bar">
-          <button className="button" type="submit" disabled={uploading}>
-            {uploading ? "Subiendo imagen..." : editingId ? "Actualizar promoción" : "Crear promoción"}
-          </button>
-          {editingId ? (
-            <button className="button secondary" type="button" onClick={reset}>
-              Cancelar edición
-            </button>
-          ) : null}
-        </div>
-        {status ? <p className="muted" style={{ margin: 0 }}>{status}</p> : null}
-      </form>
+      </header>
 
-        <div className="card" style={{ marginTop: 24 }}>
-          <h3 style={{ marginTop: 0 }}>Promociones cargadas</h3>
-          <div className="list" style={{ marginTop: 12 }}>
+      <div className="admin-promos-layout">
+        <form className="card form-stack admin-promos-form" onSubmit={submit}>
+          <div className="admin-promos-section">
+            <h2 className="admin-promos-block-title">Editor de promoción</h2>
+            <div className="admin-promos-row">
+              <label className="admin-promos-label">
+                <span>Título</span>
+                <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required />
+              </label>
+              <label className="admin-promos-label">
+                <span>Tipo</span>
+                <select className="select" value={promoType} onChange={(e) => setPromoType(e.target.value as any)}>
+                  <option value="sponsor">Sponsor</option>
+                  <option value="internal">Internal (SPM)</option>
+                  <option value="affiliate">Affiliate</option>
+                </select>
+              </label>
+            </div>
+
+            <label className="admin-promos-label">
+              <span>Descripción</span>
+              <textarea className="textarea" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+            </label>
+          </div>
+
+          <div className="admin-promos-section">
+            <h3 className="admin-promos-subtitle">Arte y CTA</h3>
+            <div className="admin-promos-row">
+              <label className="admin-promos-label">
+                <span>Imagen (URL)</span>
+                <input className="input" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
+              </label>
+              <label className="admin-promos-label">
+                <span>Subir imagen</span>
+                <input
+                  className="input"
+                  type="file"
+                  accept="image/*"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadImage(file);
+                  }}
+                />
+              </label>
+            </div>
+
+            {promoType !== "internal" ? (
+              <p className="muted admin-promos-help">Sponsor/Affiliate: la imagen es obligatoria.</p>
+            ) : (
+              <p className="muted admin-promos-help">Internal: si no subes imagen, se usa el logo del sitio.</p>
+            )}
+
+            {imageUrl ? (
+              <div className="admin-promos-preview" aria-hidden="true">
+                <img src={imageUrl} alt="" loading="lazy" decoding="async" />
+              </div>
+            ) : null}
+
+            <div className="admin-promos-row">
+              <label className="admin-promos-label">
+                <span>CTA label</span>
+                <input className="input" value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} placeholder="Ej: Ver oferta" />
+              </label>
+              <label className="admin-promos-label">
+                <span>CTA URL</span>
+                <input className="input" value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder="https://..." />
+              </label>
+            </div>
+          </div>
+
+          <div className="admin-promos-section">
+            <h3 className="admin-promos-subtitle">Ubicación y alcance</h3>
+            <div className="admin-promos-row admin-promos-row-tight">
+              <label className="admin-promos-label">
+                <span>Placement</span>
+                <select className="select" value={placement} onChange={(e) => setPlacement(e.target.value)}>
+                  <option value="top_banner">Top banner (debajo del header)</option>
+                  <option value="mid_content">Mid-content (artículos)</option>
+                  <option value="bottom_sticky">Barra inferior sticky</option>
+                  <option value="popup">Popup controlado</option>
+                  <option value="home">Home (sección promociones)</option>
+                </select>
+              </label>
+              <label className="admin-promos-label admin-promos-order">
+                <span>Orden</span>
+                <input className="input" type="number" value={displayOrder} onChange={(e) => setDisplayOrder(Number(e.target.value))} />
+              </label>
+            </div>
+
+            <label className="admin-promos-label">
+              <span>Secciones</span>
+              <div className="check-grid admin-promos-check-grid">
+                {PROMO_TARGET_SECTIONS.map((s) => (
+                  <label key={s.id} className="check-row compact">
+                    <input
+                      type="checkbox"
+                      checked={targetSections.includes(s.id)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setTargetSections((prev) => {
+                          const next = checked ? [...prev, s.id] : prev.filter((x) => x !== s.id);
+                          if (next.includes("all")) return ["all"];
+                          return next.filter((x) => x !== "all");
+                        });
+                      }}
+                    />
+                    {s.label}
+                  </label>
+                ))}
+              </div>
+            </label>
+            <p className="muted admin-promos-help">
+              Sponsor/Affiliate: usa secciones específicas. Internal puede usar Global.
+            </p>
+          </div>
+
+          <div className="admin-promos-section">
+            <h3 className="admin-promos-subtitle">Programación</h3>
+            <div className="admin-promos-row">
+              <label className="admin-promos-label">
+                <span>Inicio (opcional)</span>
+                <input className="input" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+              </label>
+              <label className="admin-promos-label">
+                <span>Fin (opcional)</span>
+                <input className="input" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+              </label>
+            </div>
+
+            <label className="check-row">
+              <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+              Activa
+            </label>
+          </div>
+
+          <div className="form-submit-bar admin-promos-submit">
+            <button className="button" type="submit" disabled={uploading}>
+              {uploading ? "Subiendo imagen..." : editingId ? "Actualizar promoción" : "Crear promoción"}
+            </button>
+            {editingId ? (
+              <button className="button secondary" type="button" onClick={reset}>
+                Cancelar edición
+              </button>
+            ) : null}
+          </div>
+          {status ? <p className="muted admin-promos-status">{status}</p> : null}
+        </form>
+
+        <section className="card admin-promos-list">
+          <h2 className="admin-promos-block-title">Promociones cargadas</h2>
+          <div className="list">
             {items.map((item) => (
-              <div key={item.id} className="card" style={{ display: "grid", gap: 10 }}>
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  <img
-                    src={item.image_url ?? "/logo.png"}
-                    alt=""
-                    width={44}
-                    height={44}
-                    style={{ borderRadius: 12, objectFit: "cover", border: "1px solid rgba(255,255,255,0.12)" }}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <div style={{ display: "grid", gap: 2 }}>
+              <article key={item.id} className="card admin-promos-item">
+                <div className="admin-promos-item-head">
+                  <div className="admin-promos-item-thumb">
+                    <img src={item.image_url ?? "/logo.png"} alt="" width={54} height={54} loading="lazy" decoding="async" />
+                  </div>
+                  <div className="admin-promos-item-copy">
                     <strong>{item.title}</strong>
-                    <span className="muted" style={{ fontSize: 12 }}>
+                    <span className="muted">
                       {(item.promo_type ?? "sponsor").toUpperCase()} · {item.placement} · order {item.display_order} ·{" "}
                       {item.is_active ? "activa" : "inactiva"}
                     </span>
-                    <span className="muted" style={{ fontSize: 12 }}>
+                    <span className="muted">
                       Secciones:{" "}
                       {(() => {
                         const ts = ((item as any).target_sections ?? []) as any[];
@@ -416,10 +450,11 @@ export default function AdminPromotionsPage() {
                     Eliminar
                   </button>
                 </div>
-              </div>
+              </article>
             ))}
-          {items.length === 0 ? <p className="muted">No hay promociones.</p> : null}
-        </div>
+            {items.length === 0 ? <p className="muted">No hay promociones.</p> : null}
+          </div>
+        </section>
       </div>
     </main>
   );

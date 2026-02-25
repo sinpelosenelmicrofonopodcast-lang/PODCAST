@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -32,7 +31,9 @@ export function Navbar() {
   const pathname = usePathname() ?? "/";
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarSrc, setAvatarSrc] = useState<string>("/logo.png");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
   const [adminCheckError, setAdminCheckError] = useState<string | null>(null);
   const [lang, setLang] = useState<AppLang>("es");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -61,6 +62,7 @@ export function Navbar() {
           setNickname(null);
           setAvatarUrl(null);
           setIsAdmin(false);
+          setIsStaff(false);
         }
         return;
       }
@@ -75,7 +77,10 @@ export function Navbar() {
       await syncServerSession(sessionData.session ?? null);
       const token = sessionData.session?.access_token;
       if (!token) {
-        if (mounted) setIsAdmin(false);
+        if (mounted) {
+          setIsAdmin(false);
+          setIsStaff(false);
+        }
         return;
       }
       const res = await fetch("/api/admin/me", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
@@ -86,17 +91,21 @@ export function Navbar() {
         return;
       }
       if (res.ok) {
-        setIsAdmin(true);
+        const json = await res.json().catch(() => ({}));
+        setIsAdmin(Boolean(json?.isAdmin));
+        setIsStaff(Boolean(json?.isStaff));
         setAdminCheckError(null);
         return;
       }
       if (res.status === 403) {
         setIsAdmin(false);
+        setIsStaff(false);
         setAdminCheckError(null);
         return;
       }
       const json = await res.json().catch(() => ({}));
       setIsAdmin(false);
+      setIsStaff(false);
       setAdminCheckError(json?.error ?? `No se pudo verificar permisos (HTTP ${res.status}).`);
     };
 
@@ -118,6 +127,10 @@ export function Navbar() {
     setMenuOpen(false);
     setCommunityOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    setAvatarSrc(avatarUrl || "/logo.png");
+  }, [avatarUrl]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -151,7 +164,10 @@ export function Navbar() {
     setNickname(null);
     setAvatarUrl(null);
     setIsAdmin(false);
+    setIsStaff(false);
   };
+
+  const isOverlayOpen = menuOpen || communityOpen;
 
   return (
     <nav className="nav">
@@ -163,7 +179,7 @@ export function Navbar() {
           </div>
         </Link>
         <div className="nav-mid">
-          <div className="nav-tabs" role="navigation" aria-label="Navegación principal">
+          <div className={`nav-tabs${isOverlayOpen ? " is-overlay-open" : ""}`} role="navigation" aria-label="Navegación principal">
             <Link className="nav-link" href="/feed">{t.feed}</Link>
             <Link className="nav-link" href="/noticias">{t.news}</Link>
 
@@ -216,6 +232,12 @@ export function Navbar() {
                   <Link className="nav-menu-link" role="menuitem" href="/blog" onClick={() => setMenuOpen(false)}>
                     {t.blog}
                   </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/musica" onClick={() => setMenuOpen(false)}>
+                    {t.music}
+                  </Link>
+                  <Link className="nav-menu-link" role="menuitem" href="/emprendimiento" onClick={() => setMenuOpen(false)}>
+                    {t.entrepreneurship}
+                  </Link>
                   <Link className="nav-menu-link" role="menuitem" href="/feed?view=episodes" onClick={() => setMenuOpen(false)}>
                     {t.podcast}
                   </Link>
@@ -237,18 +259,13 @@ export function Navbar() {
                   <Link className="nav-menu-link" role="menuitem" href="/terminos" onClick={() => setMenuOpen(false)}>
                     Términos
                   </Link>
-                  {isAdmin ? (
+                  {isStaff ? (
                     <>
                       <div className="nav-menu-divider" role="separator" aria-hidden="true" />
                       <Link className="nav-menu-link" role="menuitem" href="/admin" onClick={() => setMenuOpen(false)}>
                         {t.dashboard}
                       </Link>
                     </>
-                  ) : null}
-                  {!isAdmin && adminCheckError ? (
-                    <p className="muted" style={{ margin: "6px 10px 0", fontSize: 11 }} title={adminCheckError}>
-                      Admin: no se pudo verificar permisos.
-                    </p>
                   ) : null}
                 </div>
               ) : null}
@@ -260,13 +277,26 @@ export function Navbar() {
           <LanguageToggle />
           {nickname ? (
             <div className="nav-user">
-              <Link href="/perfil" className="muted">
+              <Link href="/perfil" className="muted nav-profile-link">
                 {t.profile}
               </Link>
               <div className="nav-avatar">
-                <Image src={avatarUrl ?? "/logo.png"} alt={nickname} width={28} height={28} style={{ objectFit: "cover" }} />
+                <img
+                  src={avatarSrc}
+                  alt={nickname}
+                  width={28}
+                  height={28}
+                  loading="lazy"
+                  decoding="async"
+                  onError={() => setAvatarSrc("/logo.png")}
+                />
               </div>
               <span className="muted nav-hello">{t.hello}, {nickname}</span>
+              {isStaff ? (
+                <Link className="button secondary nav-admin-quick" href="/admin">
+                  {t.dashboard}
+                </Link>
+              ) : null}
               <button className="button secondary" type="button" onClick={handleSignOut}>
                 {t.logout}
               </button>
@@ -284,6 +314,68 @@ export function Navbar() {
         </div>
       </div>
       <TopBannerPromo />
+      <div className="social-strip" role="complementary" aria-label="Redes sociales oficiales">
+        <div className="container social-strip-inner">
+          <span className="social-strip-label">Síguenos:</span>
+          <a
+            className="social-strip-link"
+            href="https://www.facebook.com/sinpelosenelmicrofono"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Facebook Sin Pelos en el Micrófono"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+              <path d="M13 9h3V6h-3c-2.21 0-4 1.79-4 4v2H7v3h2v6h3v-6h3l1-3h-4v-2c0-.55.45-1 1-1Z" fill="currentColor" />
+            </svg>
+            Facebook
+          </a>
+          <a
+            className="social-strip-link"
+            href="https://www.instagram.com/sinpelosenelmicrofono"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Instagram Sin Pelos en el Micrófono"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+              <path
+                d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm8.5 2h-8.5A3.75 3.75 0 0 0 4 7.75v8.5A3.75 3.75 0 0 0 7.75 20h8.5A3.75 3.75 0 0 0 20 16.25v-8.5A3.75 3.75 0 0 0 16.25 4ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm5.25-2.75a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Z"
+                fill="currentColor"
+              />
+            </svg>
+            Instagram
+          </a>
+          <a
+            className="social-strip-link"
+            href="https://www.tiktok.com/@sinpelosenelmicrofono"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="TikTok Sin Pelos en el Micrófono"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+              <path
+                d="M14 3h2.2c.3 1.8 1.7 3.2 3.5 3.5V9c-1.3 0-2.5-.4-3.5-1.1V15a6 6 0 1 1-6-6c.3 0 .5 0 .8.1v2.4a3.6 3.6 0 1 0 2.9 3.5V3Z"
+                fill="currentColor"
+              />
+            </svg>
+            TikTok
+          </a>
+          <a
+            className="social-strip-link"
+            href="https://www.youtube.com/@SinPelosEnElMicrofono"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="YouTube Sin Pelos en el Micrófono"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+              <path
+                d="M22 12c0 2.5-.3 4.3-.6 5.3-.3.8-1 1.5-1.8 1.8-1 .3-3 .6-7.6.6s-6.6-.3-7.6-.6c-.8-.3-1.5-1-1.8-1.8C2.3 16.3 2 14.5 2 12s.3-4.3.6-5.3c.3-.8 1-1.5 1.8-1.8 1-.3 3-.6 7.6-.6s6.6.3 7.6.6c.8.3 1.5 1 1.8 1.8.3 1 .6 2.8.6 5.3Zm-12-3.5v7l6-3.5-6-3.5Z"
+                fill="currentColor"
+              />
+            </svg>
+            YouTube
+          </a>
+        </div>
+      </div>
     </nav>
   );
 }

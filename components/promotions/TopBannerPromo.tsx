@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { usePathname } from "next/navigation";
 import { trackPromoEvent } from "@/lib/promoTracking";
 import { promoSectionFromPath } from "@/lib/promoSection";
@@ -91,14 +91,23 @@ export function TopBannerPromo() {
         onClick
       }
     : {};
+  const rootStyle = imageUrl
+    ? ({
+        ["--promo-bg" as any]: `url("${imageUrl}")`
+      } as CSSProperties)
+    : undefined;
 
   return (
     <div className="promo-top-slot" role="complementary" aria-label="Promoción" data-type={promo?.promo_type ?? "sponsor"}>
       {promo ? (
-        <Root className={`promo-top-inner promo-top-banner ${animate ? "promo-animate-in" : ""}`} aria-label={title || "Promoción"} {...rootProps}>
-          <div className="promo-top-bg" aria-hidden="true">
+        <Root
+          className={`promo-top-inner promo-top-banner ${animate ? "promo-animate-in" : ""}`}
+          aria-label={title || "Promoción"}
+          style={rootStyle}
+          {...rootProps}
+        >
+          <div className="promo-top-media" aria-hidden="true">
             <img src={imageUrl || "/logo.png"} alt="" loading="lazy" decoding="async" />
-            <div className="promo-top-bg-overlay" aria-hidden="true" />
           </div>
 
           <div className="promo-top-content">

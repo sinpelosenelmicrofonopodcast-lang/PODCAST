@@ -64,7 +64,7 @@ export function BottomStickyPromo() {
   }, [promo, section, canShow, closed]);
 
   useEffect(() => {
-    document.documentElement.style.setProperty("--promo-bottom-h", promo && canShow && !closed ? "70px" : "0px");
+    document.documentElement.style.setProperty("--promo-bottom-h", promo && canShow && !closed ? "64px" : "0px");
     return () => {
       document.documentElement.style.setProperty("--promo-bottom-h", "0px");
     };

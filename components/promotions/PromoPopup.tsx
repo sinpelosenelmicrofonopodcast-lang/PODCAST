@@ -32,6 +32,8 @@ export function PromoPopup() {
   const canShow = useMemo(() => {
     if (pathname.startsWith("/admin")) return false;
     if (pathname === "/login" || pathname === "/register" || pathname === "/reset") return false;
+    // Popup only in high-intent surfaces to keep UX non-invasive.
+    if (!(pathname === "/" || pathname.startsWith("/confesiones") || pathname.startsWith("/confesionario"))) return false;
     return true;
   }, [pathname]);
 
@@ -147,7 +149,7 @@ export function PromoPopup() {
         {promo.description ? <div className="muted promo-popup-desc">{promo.description}</div> : null}
         <div className="promo-popup-actions">
           {promo.cta_url ? (
-            <a className="button" href={promo.cta_url} onClick={onClick}>
+            <a className="button" href={promo.cta_url} target="_blank" rel="noreferrer" onClick={onClick}>
               {promo.cta_label ?? "Abrir"}
             </a>
           ) : null}

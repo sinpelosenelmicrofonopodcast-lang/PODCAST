@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdminApi } from "@/lib/adminAuth";
+import { isStaffPermission, type StaffPermission } from "@/lib/staffPermissions";
 
 function getClients() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -34,6 +35,11 @@ type UserRoleRow = {
   roles: { name: string } | { name: string }[] | null;
 };
 
+type UserPermissionRow = {
+  user_id: string;
+  permission: string;
+};
+
 async function listAllAuthUsers(service: any) {
   const users: Array<{ id: string; email: string | null }> = [];
   let page = 1;
@@ -58,11 +64,12 @@ export async function GET(request: NextRequest) {
 
     const { service } = getClients();
 
-    const [usersResp, membershipsResp, privateResp, rolesResp, authUsers] = await Promise.all([
+    const [usersResp, membershipsResp, privateResp, rolesResp, permissionsResp, authUsers] = await Promise.all([
       service.from("users").select("id, nickname, user_status, created_at").order("created_at", { ascending: false }),
       service.from("memberships").select("user_id, plan, status"),
       service.from("user_private_profiles").select("user_id, first_name, last_name"),
       service.from("user_roles").select("user_id, roles(name)"),
+      service.from("user_permissions").select("user_id, permission"),
       listAllAuthUsers(service)
     ]);
 
@@ -88,6 +95,15 @@ export async function GET(request: NextRequest) {
       rolesByUser.set(row.user_id, current);
     });
 
+    const permissionsByUser = new Map<string, StaffPermission[]>();
+    ((permissionsResp.data as UserPermissionRow[]) ?? []).forEach((row) => {
+      const permission = String(row.permission ?? "").trim();
+      if (!isStaffPermission(permission)) return;
+      const current = permissionsByUser.get(row.user_id) ?? [];
+      if (!current.includes(permission)) current.push(permission);
+      permissionsByUser.set(row.user_id, current);
+    });
+
     const items = ((usersResp.data as PublicUser[]) ?? []).map((u) => {
       const membership = membershipsByUser.get(u.id);
       const privateData = privateByUser.get(u.id);
@@ -101,7 +117,8 @@ export async function GET(request: NextRequest) {
         last_name: privateData?.last_name ?? null,
         plan: membership?.plan ?? "free",
         membership_status: membership?.status ?? "active",
-        roles: rolesByUser.get(u.id) ?? []
+        roles: rolesByUser.get(u.id) ?? [],
+        permissions: permissionsByUser.get(u.id) ?? []
       };
     });
 

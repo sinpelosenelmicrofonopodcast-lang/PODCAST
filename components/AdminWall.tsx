@@ -56,7 +56,7 @@ export function AdminWall() {
     return (
       <div className="auth-wall">
         <div className="card auth-wall-card">
-          <h3 style={{ margin: 0 }}>No se pudo validar Admin</h3>
+          <h3 style={{ margin: 0 }}>No se pudo validar acceso</h3>
           <p className="muted" style={{ margin: 0 }}>
             {error}
           </p>
@@ -76,9 +76,9 @@ export function AdminWall() {
   return (
     <div className="auth-wall">
       <div className="card auth-wall-card">
-        <h3 style={{ margin: 0 }}>Verificando permisos de admin…</h3>
+        <h3 style={{ margin: 0 }}>Verificando permisos…</h3>
         <p className="muted" style={{ margin: 0 }}>
-          Si no eres admin, serás redirigido automáticamente.
+          Si no tienes acceso al panel, serás redirigido automáticamente.
         </p>
       </div>
     </div>

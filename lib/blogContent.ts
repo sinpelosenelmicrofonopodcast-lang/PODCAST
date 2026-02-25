@@ -14,6 +14,39 @@ function cleanLine(s: string) {
   return s.replace(/\s+/g, " ").trim();
 }
 
+function splitLongParagraph(text: string) {
+  const clean = cleanLine(text);
+  if (!clean) return [] as string[];
+  if (clean.length <= 280) return [clean];
+
+  const sentences = clean
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => cleanLine(s))
+    .filter(Boolean);
+
+  if (sentences.length <= 1) return [clean];
+
+  const out: string[] = [];
+  let chunk = "";
+  let sentenceCount = 0;
+
+  for (const sentence of sentences) {
+    const next = chunk ? `${chunk} ${sentence}` : sentence;
+    const shouldFlush = chunk && (next.length > 230 || sentenceCount >= 2);
+    if (shouldFlush) {
+      out.push(chunk);
+      chunk = sentence;
+      sentenceCount = 1;
+      continue;
+    }
+    chunk = next;
+    sentenceCount += 1;
+  }
+
+  if (chunk) out.push(chunk);
+  return out;
+}
+
 export function parseBlogBlocks(body: string): { blocks: BlogBlock[]; toc: TocItem[] } {
   const lines = String(body ?? "")
     .replace(/\r\n/g, "\n")
@@ -25,11 +58,21 @@ export function parseBlogBlocks(body: string): { blocks: BlogBlock[]; toc: TocIt
   let listMode: null | "ul" | "ol" = null;
   let listItems: string[] = [];
   let headingCount = 0;
+  let prevNormalized = "";
+  let prevWasBlank = false;
+
+  const pushParagraph = (txt: string) => {
+    const parts = splitLongParagraph(txt);
+    for (const part of parts) {
+      if (!part) continue;
+      blocks.push({ type: "p", text: part });
+    }
+  };
 
   const flushParagraph = () => {
     const txt = cleanLine(buf.join(" "));
     buf = [];
-    if (txt) blocks.push({ type: "p", text: txt });
+    pushParagraph(txt);
   };
 
   const flushList = () => {
@@ -45,10 +88,17 @@ export function parseBlogBlocks(body: string): { blocks: BlogBlock[]; toc: TocIt
     const trimmed = line.trim();
 
     if (!trimmed) {
+      if (prevWasBlank) continue;
+      prevWasBlank = true;
       flushList();
       flushParagraph();
       continue;
     }
+    prevWasBlank = false;
+
+    const normalized = cleanLine(trimmed);
+    if (normalized && normalized === prevNormalized) continue;
+    prevNormalized = normalized;
 
     // Headings (markdown-ish)
     if (trimmed.startsWith("## ")) {
@@ -65,6 +115,18 @@ export function parseBlogBlocks(body: string): { blocks: BlogBlock[]; toc: TocIt
       flushList();
       flushParagraph();
       const text = cleanLine(trimmed.slice(4));
+      headingCount += 1;
+      const id = `${slugify(text)}-${headingCount}`;
+      blocks.push({ type: "h3", id, text });
+      toc.push({ id, text, level: 3 });
+      continue;
+    }
+
+    // Friendly "title:" lines become small subheadings.
+    if (trimmed.length <= 90 && /:$/.test(trimmed) && !/[.!?]$/.test(trimmed)) {
+      flushList();
+      flushParagraph();
+      const text = cleanLine(trimmed.replace(/:$/, ""));
       headingCount += 1;
       const id = `${slugify(text)}-${headingCount}`;
       blocks.push({ type: "h3", id, text });
@@ -109,4 +171,3 @@ export function parseBlogBlocks(body: string): { blocks: BlogBlock[]; toc: TocIt
   flushParagraph();
   return { blocks, toc };
 }
-

@@ -10,6 +10,8 @@ export const navTexts: Record<
     rawZone: string;
     menu: string;
     blog: string;
+    music: string;
+    entrepreneurship: string;
     ads: string;
     guest: string;
     confessional: string;
@@ -32,6 +34,8 @@ export const navTexts: Record<
     rawZone: "Zona Cruda",
     menu: "Menú",
     blog: "Blog",
+    music: "Música",
+    entrepreneurship: "Emprendimiento",
     ads: "Publicidad",
     guest: "Quiero salir",
     confessional: "Confesionario",
@@ -53,6 +57,8 @@ export const navTexts: Record<
     rawZone: "Raw Zone",
     menu: "Menu",
     blog: "Blog",
+    music: "Music",
+    entrepreneurship: "Entrepreneurship",
     ads: "Advertise",
     guest: "Be a guest",
     confessional: "Confessional",

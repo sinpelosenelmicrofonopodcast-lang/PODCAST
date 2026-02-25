@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { requireAdminApi } from "@/lib/adminAuth";
+import { requireStaffApi } from "@/lib/adminAuth";
+import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 
 function getClients() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -18,8 +19,9 @@ function safeExt(name: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "manage_promotions");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+    const reqMeta = getRequestAuditMeta(request);
 
     const form = await request.formData();
     const file = form.get("file");
@@ -50,6 +52,15 @@ export async function POST(request: NextRequest) {
 
     const { data: publicData } = service.storage.from("promotions-media").getPublicUrl(path);
     const publicUrl = publicData?.publicUrl ?? null;
+
+    await logAdminAudit(auth.service, {
+      actorId: auth.userId,
+      action: "admin.promotions.upload_image",
+      targetTable: "promotions",
+      targetId: null,
+      meta: { path, old_path: oldPath || null, content_type: file.type || null },
+      ...reqMeta
+    });
 
     return NextResponse.json({ ok: true, path, publicUrl });
   } catch (e: any) {

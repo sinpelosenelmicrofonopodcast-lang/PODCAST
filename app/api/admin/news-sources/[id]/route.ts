@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/adminAuth";
+import { requireStaffApi } from "@/lib/adminAuth";
+import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 
 type PatchPayload = {
   name?: string;
@@ -27,8 +28,9 @@ function cleanUrl(v: string) {
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "manage_news_sources");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+    const reqMeta = getRequestAuditMeta(request);
 
     const id = String(params.id ?? "").trim();
     if (!id) return NextResponse.json({ ok: false, error: "ID inválido." }, { status: 400 });
@@ -61,6 +63,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     const { data, error } = await auth.service.from("news_sources").update(update).eq("id", id).select("*").single();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    await logAdminAudit(auth.service, {
+      actorId: auth.userId,
+      action: "admin.news_source.update",
+      targetTable: "news_sources",
+      targetId: id,
+      meta: { fields: Object.keys(update) },
+      ...reqMeta
+    });
     return NextResponse.json({ ok: true, item: data });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });
@@ -69,14 +79,23 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "manage_news_sources");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+    const reqMeta = getRequestAuditMeta(request);
 
     const id = String(params.id ?? "").trim();
     if (!id) return NextResponse.json({ ok: false, error: "ID inválido." }, { status: 400 });
 
     const { error } = await auth.service.from("news_sources").delete().eq("id", id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    await logAdminAudit(auth.service, {
+      actorId: auth.userId,
+      action: "admin.news_source.delete",
+      targetTable: "news_sources",
+      targetId: id,
+      meta: {},
+      ...reqMeta
+    });
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });

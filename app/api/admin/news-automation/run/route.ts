@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/adminAuth";
+import { requireStaffApi } from "@/lib/adminAuth";
+import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "manage_news_sources");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+    const reqMeta = getRequestAuditMeta(request);
 
     const body = await request.json().catch(() => ({}));
     const task = String(body?.task ?? "").trim(); // "ingest" | "process"
@@ -29,6 +31,14 @@ export async function POST(request: NextRequest) {
         { status: res.status }
       );
     }
+    await logAdminAudit(auth.service, {
+      actorId: auth.userId,
+      action: "admin.news_automation.run",
+      targetTable: "automation_jobs",
+      targetId: null,
+      meta: { task, result: json?.summary ?? null },
+      ...reqMeta
+    });
     return NextResponse.json({ ok: true, task, result: json });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });

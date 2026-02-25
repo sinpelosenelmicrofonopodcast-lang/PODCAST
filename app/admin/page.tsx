@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { StatCard } from "@/components/StatCard";
 import { AdminSyncYouTube } from "@/components/AdminSyncYouTube";
+import { hasAnyPermission, type StaffPermission } from "@/lib/staffPermissions";
 
 type Counts = {
   news: number;
@@ -25,10 +26,35 @@ export default function AdminDashboard() {
     users: 0
   });
   const [status, setStatus] = useState<string | null>(null);
+  const [access, setAccess] = useState<{ isAdmin: boolean; permissions: StaffPermission[] }>({
+    isAdmin: false,
+    permissions: []
+  });
+
+  const can = (permission: StaffPermission) => hasAnyPermission(access, permission);
 
   useEffect(() => {
     const load = async () => {
       setStatus(null);
+      let localAccess: { isAdmin: boolean; permissions: StaffPermission[] } = { isAdmin: false, permissions: [] };
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token ?? "";
+      if (token) {
+        const meRes = await fetch("/api/admin/me", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+        if (meRes?.ok) {
+          const me = await meRes.json().catch(() => ({}));
+          localAccess = {
+            isAdmin: Boolean(me?.isAdmin),
+            permissions: Array.isArray(me?.permissions) ? (me.permissions as StaffPermission[]) : []
+          };
+          setAccess(localAccess);
+        }
+      }
+
+      if (!hasAnyPermission(localAccess, "view_stats")) {
+        return;
+      }
+
       const [newsR, blogsR, eventsR, promoR, guestR, usersR] = await Promise.all([
         supabase.from("news_items").select("*", { count: "exact", head: true }),
         supabase.from("blog_posts").select("*", { count: "exact", head: true }),
@@ -75,46 +101,69 @@ export default function AdminDashboard() {
         <StatCard label="Usuarios" value={String(counts.users)} />
       </div>
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", marginTop: 28 }}>
-        <div className="card">
-          <h3>Editar Homepage</h3>
-          <p className="muted">Texto principal, módulos visibles y estructura editorial del home.</p>
-          <Link className="button" href="/admin/home">
-            Configurar Home
-          </Link>
-        </div>
-        <div className="card">
-          <h3>Eventos y Promociones</h3>
-          <p className="muted">Crear eventos en vivo y anuncios de marcas para homepage.</p>
-          <div className="admin-item-actions">
-            <Link className="button" href="/admin/events">
-              Gestionar Eventos
-            </Link>
-            <Link className="button secondary" href="/admin/promotions">
-              Gestionar Promociones
+        {can("manage_home") ? (
+          <div className="card">
+            <h3>Editar Homepage</h3>
+            <p className="muted">Texto principal, módulos visibles y estructura editorial del home.</p>
+            <Link className="button" href="/admin/home">
+              Configurar Home
             </Link>
           </div>
-        </div>
-        <div className="card">
-          <h3>Invitados al programa</h3>
-          <p className="muted">Revisa solicitudes nuevas y mueve estado a contacted/closed.</p>
-          <Link className="button secondary" href="/admin/guest-requests">
-            Ver solicitudes
-          </Link>
-        </div>
-        <div className="card">
-          <h3>Fuentes RSS</h3>
-          <p className="muted">Controla fuentes automáticas, región, categorías y frecuencia de escaneo.</p>
-          <div className="admin-item-actions">
-            <Link className="button" href="/admin/news-sources">
-              Gestionar fuentes
-            </Link>
-            <Link className="button secondary" href="/admin/schedule">
-              Ver cola
+        ) : null}
+        {can("manage_events") || can("manage_promotions") ? (
+          <div className="card">
+            <h3>Eventos y Promociones</h3>
+            <p className="muted">Crear eventos en vivo y anuncios de marcas para homepage.</p>
+            <div className="admin-item-actions">
+              {can("manage_events") ? (
+                <Link className="button" href="/admin/events">
+                  Gestionar Eventos
+                </Link>
+              ) : null}
+              {can("manage_promotions") ? (
+                <Link className="button secondary" href="/admin/promotions">
+                  Gestionar Promociones
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        {can("manage_guest_requests") ? (
+          <div className="card">
+            <h3>Invitados al programa</h3>
+            <p className="muted">Revisa solicitudes nuevas y mueve estado a contacted/closed.</p>
+            <Link className="button secondary" href="/admin/guest-requests">
+              Ver solicitudes
             </Link>
           </div>
-        </div>
-        <AdminSyncYouTube />
+        ) : null}
+        {can("manage_news_sources") || can("view_schedule") ? (
+          <div className="card">
+            <h3>Fuentes RSS</h3>
+            <p className="muted">Controla fuentes automáticas, región, categorías y frecuencia de escaneo.</p>
+            <div className="admin-item-actions">
+              {can("manage_news_sources") ? (
+                <Link className="button" href="/admin/news-sources">
+                  Gestionar fuentes
+                </Link>
+              ) : null}
+              {can("view_schedule") ? (
+                <Link className="button secondary" href="/admin/schedule">
+                  Ver cola
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        {can("manage_news_sources") ? <AdminSyncYouTube /> : null}
       </div>
+      {!access.isAdmin && access.permissions.length === 0 ? (
+        <div className="card" style={{ marginTop: 16 }}>
+          <p className="muted" style={{ margin: 0 }}>
+            Tu cuenta no tiene permisos asignados todavía. Un admin debe habilitar secciones desde Admin / Usuarios.
+          </p>
+        </div>
+      ) : null}
     </main>
   );
 }

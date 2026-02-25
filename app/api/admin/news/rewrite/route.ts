@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/adminAuth";
+import { requireStaffApi } from "@/lib/adminAuth";
 import { createAutomationJob, logPipelineEvent } from "@/lib/pipelineOps";
+import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -8,8 +9,9 @@ function isUuid(v: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "manage_news");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+    const reqMeta = getRequestAuditMeta(request);
 
     const body = await request.json().catch(() => ({}));
     const newsId = String(body?.newsId ?? "").trim();
@@ -103,12 +105,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await logAdminAudit(auth.service, {
+      actorId: auth.userId,
+      action: "admin.news.rewrite.enqueue",
+      targetTable: "news_items",
+      targetId: newsId,
+      meta: { job_id: jobId, should_publish: shouldPublishFinal, auto_post_facebook: autoPostFacebook },
+      ...reqMeta
+    });
+
     return NextResponse.json({
       ok: true,
       queued: true,
       jobId,
       worker: workerResult
     });
+
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });
   }

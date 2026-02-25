@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApi } from "@/lib/adminAuth";
+import { requireStaffApi } from "@/lib/adminAuth";
+import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 
 type SourcePayload = {
   name?: string;
@@ -27,7 +28,7 @@ function cleanUrl(v: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "manage_news_sources");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const { data, error } = await auth.service
@@ -47,8 +48,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdminApi(request);
+    const auth = await requireStaffApi(request, "manage_news_sources");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+    const reqMeta = getRequestAuditMeta(request);
 
     const payload = (await request.json().catch(() => ({}))) as SourcePayload;
     const name = String(payload.name ?? "").trim();
@@ -75,6 +77,15 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await auth.service.from("news_sources").insert(insert).select("*").single();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+
+    await logAdminAudit(auth.service, {
+      actorId: auth.userId,
+      action: "admin.news_source.create",
+      targetTable: "news_sources",
+      targetId: String((data as any)?.id ?? ""),
+      meta: { name, rss_url: rssUrl, is_active: insert.is_active },
+      ...reqMeta
+    });
 
     return NextResponse.json({ ok: true, item: data });
   } catch (e: any) {

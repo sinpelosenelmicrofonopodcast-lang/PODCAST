@@ -97,10 +97,12 @@ export function summarizeDescription(text: string) {
 
 const keywordCategories: Array<{ words: string[]; cat: string }> = [
   { words: ["econom", "inflaci", "mercado", "negocio", "finanza"], cat: "Economía" },
+  { words: ["emprend", "pyme", "small business", "comercio local", "negocio pequeño", "startup"], cat: "Emprendimiento" },
   { words: ["salud", "hospital", "medicina", "virus"], cat: "Salud" },
   { words: ["tecnolog", "startup", "ai", "inteligencia artificial"], cat: "Tecnología" },
   { words: ["deporte", "nba", "nfl", "mlb", "futbol", "béisbol"], cat: "Deporte" },
-  { words: ["entreten", "musica", "cine", "artista"], cat: "Entretenimiento" },
+  { words: ["musica", "concierto", "album", "cantante", "artista"], cat: "Música" },
+  { words: ["entreten", "cine", "serie", "espectáculo"], cat: "Entretenimiento" },
   { words: ["gobierno", "eleccion", "senado", "congreso", "ley", "polit"], cat: "Política" },
   { words: ["medios", "prensa", "periodismo"], cat: "Medios" },
   { words: ["cultura", "identidad"], cat: "Cultura" }
