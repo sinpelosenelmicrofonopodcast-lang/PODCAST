@@ -183,7 +183,7 @@ export default function AdminStatsPage() {
         </div>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginTop: 18 }}>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", marginTop: 18 }}>
         <article className="card">
           <h3 style={{ marginTop: 0 }}>Visitantes por país (30d)</h3>
           {(data?.website?.countries?.length ?? 0) === 0 ? (

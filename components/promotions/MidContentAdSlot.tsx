@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { trackPromoEvent } from "@/lib/promoTracking";
-import { promoSectionFromPath } from "@/lib/promoSection";
+import { promoSectionFromPath, type PromoSection } from "@/lib/promoSection";
 
 type Promo = {
   id: string;
@@ -15,9 +15,16 @@ type Promo = {
   promo_type?: "sponsor" | "internal" | "affiliate" | null;
 };
 
-export function MidContentAdSlot() {
+type MidContentAdSlotProps = {
+  placement?: string;
+  section?: PromoSection;
+  className?: string;
+  compact?: boolean;
+};
+
+export function MidContentAdSlot({ placement = "mid_content", section, className, compact = false }: MidContentAdSlotProps = {}) {
   const pathname = usePathname() ?? "/";
-  const section = promoSectionFromPath(pathname);
+  const currentSection = section ?? promoSectionFromPath(pathname);
   const ref = useRef<HTMLDivElement | null>(null);
   const [promo, setPromo] = useState<Promo | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -44,7 +51,7 @@ export function MidContentAdSlot() {
   useEffect(() => {
     if (!loaded) return;
     const run = async () => {
-      const res = await fetch(`/api/promotions/active?placement=mid_content&limit=1&section=${encodeURIComponent(section)}`, {
+      const res = await fetch(`/api/promotions/active?placement=${encodeURIComponent(placement)}&limit=1&section=${encodeURIComponent(currentSection)}`, {
         cache: "no-store"
       }).catch(() => null);
       if (!res?.ok) return;
@@ -54,11 +61,11 @@ export function MidContentAdSlot() {
       sentImpression.current = false;
     };
     run();
-  }, [loaded, section]);
+  }, [loaded, currentSection, placement]);
 
   useEffect(() => {
     if (!promo) return;
-    const key = `spm_promo_seen_mid_${section}_${promo.id}`;
+    const key = `spm_promo_seen_${placement}_${currentSection}_${promo.id}`;
     const seen = sessionStorage.getItem(key) === "1";
     if (!seen) {
       sessionStorage.setItem(key, "1");
@@ -69,18 +76,18 @@ export function MidContentAdSlot() {
     sentImpression.current = true;
     trackPromoEvent({
       promotionId: promo.id,
-      placement: "mid_content",
+      placement,
       event: "impression",
       path: pathname,
       promoType: promo.promo_type ?? null
     });
-  }, [promo, pathname, section]);
+  }, [promo, pathname, currentSection, placement]);
 
   const onClick = () => {
     if (!promo) return;
     trackPromoEvent({
       promotionId: promo.id,
-      placement: "mid_content",
+      placement,
       event: "click",
       path: pathname,
       promoType: promo.promo_type ?? null
@@ -88,9 +95,9 @@ export function MidContentAdSlot() {
   };
 
   return (
-    <div ref={ref} className="mid-ad-slot" aria-label="Promoción">
+    <div ref={ref} className={`mid-ad-slot ${className ?? ""}`.trim()} aria-label="Promoción">
       {promo ? (
-        <div className={`card mid-ad ${animate ? "promo-animate-in" : ""}`} data-type={promo.promo_type ?? "sponsor"}>
+        <div className={`card mid-ad ${compact ? "mid-ad-compact" : ""} ${animate ? "promo-animate-in" : ""}`} data-type={promo.promo_type ?? "sponsor"}>
           <div className="mid-ad-top">
             <span className="badge">
               {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "Recomendado" : "Patrocinado"}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
@@ -65,6 +65,10 @@ export default function AdminBlogPage() {
   const [episodeTitle, setEpisodeTitle] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
   const [tags, setTags] = useState("");
+  const [inlineVideoUrl, setInlineVideoUrl] = useState("");
+  const [inlineVideoTitle, setInlineVideoTitle] = useState("");
+  const [inlineLinkText, setInlineLinkText] = useState("");
+  const [inlineLinkUrl, setInlineLinkUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -73,6 +77,7 @@ export default function AdminBlogPage() {
   const [schema, setSchema] = useState<BlogSchemaCheck | null>(null);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState<string | null>(null);
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
   const router = useRouter();
 
   const loadItems = async () => {
@@ -133,7 +138,55 @@ export default function AdminBlogPage() {
     setEpisodeTitle("");
     setCategories([]);
     setTags("");
+    setInlineVideoUrl("");
+    setInlineVideoTitle("");
+    setInlineLinkText("");
+    setInlineLinkUrl("");
     setEditingId(null);
+  };
+
+  const insertAtCursor = (snippet: string) => {
+    const textarea = bodyRef.current;
+    if (!textarea) {
+      setBody((prev) => `${prev}${prev ? "\n" : ""}${snippet}`);
+      return;
+    }
+
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    setBody((prev) => {
+      const before = prev.slice(0, start);
+      const after = prev.slice(end);
+      return `${before}${snippet}${after}`;
+    });
+
+    const nextPos = start + snippet.length;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextPos, nextPos);
+    });
+  };
+
+  const insertVideoAtCursor = () => {
+    const url = inlineVideoUrl.trim();
+    if (!url) {
+      setStatus("Pega primero el URL del video para insertarlo.");
+      return;
+    }
+    const titlePart = inlineVideoTitle.trim() ? ` | ${inlineVideoTitle.trim()}` : "";
+    insertAtCursor(`\n::video ${url}${titlePart}\n\n`);
+    setStatus("Video insertado en el punto actual del contenido.");
+  };
+
+  const insertLinkAtCursor = () => {
+    const text = inlineLinkText.trim();
+    const url = inlineLinkUrl.trim();
+    if (!text || !url) {
+      setStatus("Completa texto y URL para insertar el enlace.");
+      return;
+    }
+    insertAtCursor(`[${text}](${url})`);
+    setStatus("Enlace insertado en el punto actual del contenido.");
   };
 
   const handleUpload = async (file: File) => {
@@ -337,7 +390,83 @@ export default function AdminBlogPage() {
         </label>
         <label>
           Contenido
-          <textarea className="textarea" rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
+          <div className="blog-editor-tools" style={{ marginTop: 10 }}>
+            <button className="button secondary" type="button" onClick={() => insertAtCursor("\n## Nuevo subtítulo\n\n")}>
+              + H2
+            </button>
+            <button className="button secondary" type="button" onClick={() => insertAtCursor("\n### Subtema\n\n")}>
+              + H3
+            </button>
+            <button className="button secondary" type="button" onClick={() => insertAtCursor("\n> Cita destacada\n\n")}>
+              + Cita
+            </button>
+            <button className="button secondary" type="button" onClick={() => insertAtCursor("\n- Punto 1\n- Punto 2\n\n")}>
+              + Lista
+            </button>
+            <button className="button secondary" type="button" onClick={() => insertAtCursor("\n---\n\n")}>
+              + Línea divisora
+            </button>
+          </div>
+          <div className="blog-editor-video-tools" style={{ marginTop: 10 }}>
+            <input
+              className="input"
+              value={inlineVideoUrl}
+              onChange={(e) => setInlineVideoUrl(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=..."
+            />
+            <input
+              className="input"
+              value={inlineVideoTitle}
+              onChange={(e) => setInlineVideoTitle(e.target.value)}
+              placeholder="Título del video (opcional)"
+            />
+            <button className="button secondary" type="button" onClick={insertVideoAtCursor}>
+              Insertar video en cursor
+            </button>
+          </div>
+          <div className="blog-editor-link-tools" style={{ marginTop: 10 }}>
+            <input
+              className="input"
+              value={inlineLinkText}
+              onChange={(e) => setInlineLinkText(e.target.value)}
+              placeholder="Texto del enlace (ej: ver fuente oficial)"
+            />
+            <input
+              className="input"
+              value={inlineLinkUrl}
+              onChange={(e) => setInlineLinkUrl(e.target.value)}
+              placeholder="https://..."
+            />
+            <button className="button secondary" type="button" onClick={insertLinkAtCursor}>
+              Insertar enlace en cursor
+            </button>
+          </div>
+          <textarea
+            ref={bodyRef}
+            className="textarea"
+            rows={12}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={`Escribe el artículo aquí...
+
+## Sección principal
+Párrafo normal.
+
+[Ver fuente original](https://ejemplo.com/fuente)
+
+::video https://www.youtube.com/watch?v=VIDEO_ID | Título opcional
+
+![Descripción de imagen](https://url-de-imagen.jpg)
+
+---
+
+> Cita o punchline
+`}
+          />
+          <div className="muted" style={{ fontSize: 12 }}>
+            Tipos soportados en el cuerpo: H2/H3 con ##/###, listas, citas (&gt;), divisor (---), enlaces [texto](url), imagen en línea con
+            ![]() y video con ::video URL.
+          </div>
         </label>
         <label>
           Episodio relacionado (URL)

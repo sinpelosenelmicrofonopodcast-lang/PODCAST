@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 type ForumCategory = {
@@ -10,6 +11,7 @@ type ForumCategory = {
 
 type ForumThread = {
   id: string;
+  href?: `/foro/${string}`;
   title: string;
   body: string | null;
   created_at: string | null;
@@ -169,11 +171,27 @@ export function ForumLayout({ categories, threads, isLoading, error, onCreateTop
                       {thread.category_name ? <span className="badge">{thread.category_name}</span> : null}
                     </header>
 
-                    <h3 className="clamp-2" style={{ margin: 0 }}>{thread.title}</h3>
+                    <h3 className="clamp-2" style={{ margin: 0 }}>
+                      {thread.href ? (
+                        <Link href={thread.href} className="mag-link">
+                          {thread.title}
+                        </Link>
+                      ) : (
+                        thread.title
+                      )}
+                    </h3>
                     <p className="muted clamp-3" style={{ margin: 0 }}>{thread.body ?? ""}</p>
 
                     <div className="foro-thread-meta muted">
                       <span>💬 {thread.repliesCount ?? 0} respuestas</span>
+                      {thread.href ? (
+                        <>
+                          <span>·</span>
+                          <Link href={thread.href} className="mag-link">
+                            Ver completo
+                          </Link>
+                        </>
+                      ) : null}
                     </div>
 
                     {renderThreadExtras ? <div className="foro-thread-extras">{renderThreadExtras(thread)}</div> : null}

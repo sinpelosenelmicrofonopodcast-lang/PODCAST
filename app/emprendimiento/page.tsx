@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 export const revalidate = 300;
@@ -113,7 +114,9 @@ export default async function EmprendimientoPage() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
+          <MidContentAdSlot placement="section_header" section="emprendimiento" className="section-ad-slot" compact />
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", gap: 14 }}>
             <div className="card">
               <h2 style={{ marginTop: 0 }}>Últimas noticias</h2>
               {newsItems.length === 0 ? <p className="muted">No hay noticias de emprendimiento todavía.</p> : null}

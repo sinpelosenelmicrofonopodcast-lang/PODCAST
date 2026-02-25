@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { TocItem } from "@/lib/blogContent";
+import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 
 export function TableOfContents({ items }: { items: TocItem[] }) {
   const [open, setOpen] = useState(false);
@@ -24,6 +25,7 @@ export function TableOfContents({ items }: { items: TocItem[] }) {
             ))}
           </ul>
         </nav>
+        <MidContentAdSlot placement="blog_toc" section="blog" className="toc-ad-slot" compact />
       </div>
 
       <div className="toc-mobile">
@@ -49,6 +51,7 @@ export function TableOfContents({ items }: { items: TocItem[] }) {
                 ))}
               </ul>
             </nav>
+            <MidContentAdSlot placement="blog_toc" section="blog" className="toc-ad-slot" compact />
           </div>
         ) : null}
       </div>

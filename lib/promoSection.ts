@@ -1,6 +1,8 @@
 export type PromoSection =
   | "home"
   | "blog"
+  | "musica"
+  | "emprendimiento"
   | "noticias"
   | "confesionario"
   | "confesiones"
@@ -17,6 +19,8 @@ export const PROMO_TARGET_SECTIONS: Array<{ id: PromoSection | "all"; label: str
   { id: "all", label: "Global (All)" },
   { id: "home", label: "Home" },
   { id: "blog", label: "Blog" },
+  { id: "musica", label: "Música" },
+  { id: "emprendimiento", label: "Emprendimiento" },
   { id: "noticias", label: "Noticias" },
   { id: "confesionario", label: "Confesionario (landing)" },
   { id: "confesiones", label: "Confesiones" },
@@ -33,6 +37,8 @@ export function promoSectionFromPath(pathname: string): PromoSection {
   const p = String(pathname ?? "").trim() || "/";
   if (p === "/") return "home";
   if (p.startsWith("/blog")) return "blog";
+  if (p.startsWith("/musica")) return "musica";
+  if (p.startsWith("/emprendimiento")) return "emprendimiento";
   if (p.startsWith("/noticias")) return "noticias";
   if (p.startsWith("/confesionario")) return "confesionario";
   if (p.startsWith("/confesiones")) return "confesiones";

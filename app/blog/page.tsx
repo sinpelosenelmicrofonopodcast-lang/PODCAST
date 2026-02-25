@@ -240,6 +240,7 @@ export default async function BlogIndexPage({
 
       <section className="mag-blog-body">
         <div className="container blog-container">
+          <MidContentAdSlot placement="section_header" section="blog" className="section-ad-slot" compact />
           <div className="mag-blog-layout">
             <div className="mag-blog-main">
               <div className="mag-results">

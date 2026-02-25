@@ -270,6 +270,34 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
           {renderRichText(b.text)}
         </blockquote>
       );
+    if (b.type === "divider")
+      return <hr key={`hr-${idx}`} className="mag-content-divider" aria-hidden="true" />;
+    if (b.type === "image")
+      return (
+        <figure key={`img-${idx}`} className="mag-inline-image">
+          <img src={String(b.url ?? "")} alt={String(b.alt ?? data.title)} loading="lazy" />
+          {b.alt ? <figcaption>{String(b.alt)}</figcaption> : null}
+        </figure>
+      );
+    if (b.type === "video") {
+      const url = String(b.url ?? "").trim();
+      const videoId = getYouTubeVideoId(url);
+      return (
+        <div key={`video-${idx}`} className="mag-inline-video">
+          {videoId ? (
+            <YouTubeInlinePlayer videoId={videoId} title={String(b.title ?? data.title)} className="yt-inline yt-inline-article" />
+          ) : (
+            <a className="mag-btn mag-btn-ghost" href={url} target="_blank" rel="noreferrer">
+              Ver video
+            </a>
+          )}
+          <div className="mag-inline-video-meta">
+            <span className="mag-inline-video-kicker">Video relacionado</span>
+            {b.title ? <span className="mag-inline-video-title">{String(b.title)}</span> : null}
+          </div>
+        </div>
+      );
+    }
     if (b.type === "ul")
       return (
         <ul key={`ul-${idx}`}>
@@ -379,6 +407,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
               <div className="mag-reading">
                 {readingBlocks.map((b, idx) => (
                   <div key={`${b.type}-${idx}`} className={`mag-reading-block mag-reading-block-${b.type}`}>
+                    {b.type === "h2" && idx > 0 ? <div className="mag-section-divider" aria-hidden="true" /> : null}
                     {renderBlock(b, idx)}
                     {insertAfter >= 0 && idx === insertAfter ? <MidContentAdSlot /> : null}
                   </div>

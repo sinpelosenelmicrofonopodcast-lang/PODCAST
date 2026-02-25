@@ -344,7 +344,9 @@ export default function AdminPromotionsPage() {
                 <span>Placement</span>
                 <select className="select" value={placement} onChange={(e) => setPlacement(e.target.value)}>
                   <option value="top_banner">Top banner (debajo del header)</option>
+                  <option value="section_header">Header de sección (slot dedicado)</option>
                   <option value="mid_content">Mid-content (artículos)</option>
+                  <option value="blog_toc">Blog: debajo del índice (TOC)</option>
                   <option value="bottom_sticky">Barra inferior sticky</option>
                   <option value="popup">Popup controlado</option>
                   <option value="home">Home (sección promociones)</option>

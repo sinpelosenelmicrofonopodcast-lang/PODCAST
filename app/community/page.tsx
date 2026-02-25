@@ -85,7 +85,7 @@ export default function CommunityPage() {
           ) : null}
 
           {!checking && !loading && threads.length > 0 ? (
-            <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginTop: 20 }}>
+            <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", marginTop: 20 }}>
               {threads.map((thread) => {
                 const user = pickUser(thread.users);
                 const repliesCount = replyCountByThread.get(thread.id) ?? 0;
@@ -135,4 +135,3 @@ export default function CommunityPage() {
     </main>
   );
 }
-

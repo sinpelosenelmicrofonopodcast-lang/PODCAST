@@ -35,6 +35,7 @@ body {
   color: var(--text);
   font-family: var(--font-body);
   padding-bottom: var(--promo-bottom-h, 0px);
+  overflow-x: hidden;
 }
 
 a {
@@ -474,6 +475,41 @@ main {
   font-size: 13px;
 }
 
+.mid-ad-compact {
+  padding: 8px;
+}
+
+.mid-ad-compact .mid-ad-media {
+  aspect-ratio: 28 / 8;
+  max-height: 92px;
+  margin-top: 6px;
+}
+
+.mid-ad-compact .mid-ad-title {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.mid-ad-compact .mid-ad-desc {
+  font-size: 12px;
+}
+
+.section-ad-slot {
+  margin: 2px 0 14px;
+}
+
+.toc-ad-slot {
+  margin: 14px 0 0;
+}
+
+.toc-ad-slot .mid-ad {
+  border-style: solid;
+}
+
+.toc-ad-slot .mid-ad .button {
+  width: 100%;
+}
+
 .article-body p {
   margin: 10px 0;
   line-height: 1.7;
@@ -540,7 +576,7 @@ main {
 
 .nav-mid {
   flex: 1;
-  min-width: 260px;
+  min-width: 0;
 }
 
 .nav-tabs {
@@ -554,15 +590,10 @@ main {
 
 @media (max-width: 900px) {
   .nav-tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    white-space: nowrap;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-  }
-
-  .nav-tabs::-webkit-scrollbar {
-    display: none;
+    flex-wrap: wrap;
+    overflow: visible;
+    white-space: normal;
+    row-gap: 8px;
   }
 
   .nav-link,
@@ -701,6 +732,9 @@ main {
 
 .nav-hello {
   white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .social-strip {
@@ -754,6 +788,24 @@ main {
   border-color: rgba(255, 160, 0, 0.36);
   background: rgba(255, 160, 0, 0.1);
   color: #fff3c4;
+}
+
+@media (max-width: 720px) {
+  .social-strip-inner {
+    flex-wrap: wrap;
+    overflow: visible;
+    white-space: normal;
+    row-gap: 6px;
+    padding: 8px 0;
+  }
+
+  .social-strip-label {
+    width: 100%;
+  }
+
+  .nav-hello {
+    max-width: 120px;
+  }
 }
 
 .hero {
@@ -3135,13 +3187,115 @@ body {
 }
 
 .mag-reading-block-h2 {
-  margin-top: 10px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 8px;
+  padding-top: 6px;
 }
 
 .mag-reading-block-h3 {
   margin-top: 6px;
+}
+
+.mag-content-divider {
+  border: 0;
+  height: 1px;
+  width: min(100%, 68ch);
+  margin: 10px 0 16px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 210, 59, 0.5), rgba(255, 255, 255, 0.08));
+}
+
+.mag-inline-image {
+  margin: 8px 0 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.mag-inline-image img {
+  width: 100%;
+  max-width: min(100%, 68ch);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  object-fit: cover;
+}
+
+.mag-inline-image figcaption {
+  font-size: 12px;
+  color: rgba(248, 245, 242, 0.72);
+}
+
+.mag-inline-video {
+  margin: 8px 0 14px;
+  display: grid;
+  gap: 8px;
+  max-width: min(100%, 68ch);
+}
+
+.yt-inline-article {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.mag-inline-video-meta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.mag-inline-video-kicker {
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: rgba(255, 210, 59, 0.84);
+}
+
+.mag-inline-video-title {
+  font-size: 13px;
+  color: rgba(248, 245, 242, 0.9);
+}
+
+.mag-section-divider {
+  width: min(100%, 68ch);
+  height: 1px;
+  margin: 6px 0 16px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.2) 12%,
+    rgba(255, 210, 59, 0.42) 50%,
+    rgba(255, 255, 255, 0.2) 88%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+.blog-editor-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.blog-editor-video-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.blog-editor-link-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .blog-editor-video-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .blog-editor-link-tools {
+    grid-template-columns: 1fr;
+  }
 }
 
 .mag-reading p {
@@ -4905,7 +5059,7 @@ body {
 }
 
 .conf-grid {
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
 }
 
 .conf-card {

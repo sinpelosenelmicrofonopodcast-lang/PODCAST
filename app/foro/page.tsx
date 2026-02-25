@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ForoComposer } from "@/components/ForoComposer";
-import { ReplyComposer } from "@/components/ReplyComposer";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
-import { LazyThreadReplies } from "@/components/LazyThreadReplies";
 import { ForumLayout, type ForumCategory, type ForumThread } from "@/components/foro/ForumLayout";
 import { supabase } from "@/lib/supabaseClient";
 import { useProtectedUser } from "@/lib/useProtectedUser";
@@ -113,6 +111,7 @@ export default function ForoPage() {
     const category = pickCategory(thread.categories);
     return {
       id: thread.id,
+      href: `/foro/${thread.id}` as `/foro/${string}`,
       title: thread.title,
       body: thread.body,
       created_at: thread.created_at,
@@ -140,8 +139,6 @@ export default function ForoPage() {
         renderThreadExtras={(thread) => (
           <>
             <AdminDeleteButton table="threads" id={thread.id} label="Eliminar tema" />
-            <LazyThreadReplies threadId={thread.id} initialCount={thread.repliesCount ?? 0} />
-            <ReplyComposer threadId={thread.id} />
           </>
         )}
       />

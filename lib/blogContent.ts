@@ -8,7 +8,10 @@ export type BlogBlock =
   | { type: "p"; text: string }
   | { type: "ul"; items: string[] }
   | { type: "ol"; items: string[] }
-  | { type: "quote"; text: string };
+  | { type: "quote"; text: string }
+  | { type: "image"; url: string; alt?: string }
+  | { type: "video"; url: string; title?: string }
+  | { type: "divider" };
 
 function cleanLine(s: string) {
   return s.replace(/\s+/g, " ").trim();
@@ -140,6 +143,45 @@ export function parseBlogBlocks(body: string): { blocks: BlogBlock[]; toc: TocIt
       flushParagraph();
       const text = cleanLine(trimmed.replace(/^>+\s?/, ""));
       blocks.push({ type: "quote", text });
+      continue;
+    }
+
+    // Horizontal divider
+    if (/^-{3,}$/.test(trimmed)) {
+      flushList();
+      flushParagraph();
+      blocks.push({ type: "divider" });
+      continue;
+    }
+
+    // Image embed: ![alt](https://...)
+    const imageMatch = trimmed.match(/^!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)$/i);
+    if (imageMatch) {
+      flushList();
+      flushParagraph();
+      blocks.push({
+        type: "image",
+        alt: cleanLine(imageMatch[1] ?? ""),
+        url: cleanLine(imageMatch[2] ?? "")
+      });
+      continue;
+    }
+
+    // Video embed: [video](https://...) OR ::video https://... | optional title
+    const markdownVideoMatch = trimmed.match(/^\[video\]\((https?:\/\/[^\s)]+)\)$/i);
+    const commandVideoMatch = trimmed.match(/^::video\s+(https?:\/\/\S+?)(?:\s*\|\s*(.+))?$/i);
+    if (markdownVideoMatch || commandVideoMatch) {
+      flushList();
+      flushParagraph();
+      const url = cleanLine(markdownVideoMatch?.[1] ?? commandVideoMatch?.[1] ?? "");
+      const title = cleanLine(commandVideoMatch?.[2] ?? "");
+      if (url) {
+        blocks.push({
+          type: "video",
+          url,
+          title: title || undefined
+        });
+      }
       continue;
     }
 
