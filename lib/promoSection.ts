@@ -26,7 +26,7 @@ export const PROMO_TARGET_SECTIONS: Array<{ id: PromoSection | "all"; label: str
   { id: "teorias", label: "Teorias" },
   { id: "feed", label: "Feed" },
   { id: "publicidad", label: "Publicidad" },
-  { id: "quiero_salir", label: "Quiero salir" }
+  { id: "quiero_salir", label: "Quiero ser parte del panel" }
 ];
 
 export function promoSectionFromPath(pathname: string): PromoSection {

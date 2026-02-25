@@ -3,6 +3,7 @@ import type { AppLang } from "@/lib/language";
 export const navTexts: Record<
   AppLang,
   {
+    home: string;
     feed: string;
     podcast: string;
     community: string;
@@ -27,6 +28,7 @@ export const navTexts: Record<
   }
 > = {
   es: {
+    home: "Inicio",
     feed: "Feed",
     podcast: "Podcast",
     community: "Comunidad",
@@ -37,7 +39,7 @@ export const navTexts: Record<
     music: "Música",
     entrepreneurship: "Emprendimiento",
     ads: "Publicidad",
-    guest: "Quiero salir",
+    guest: "Quiero ser parte del panel",
     confessional: "Confesionario",
     forum: "Foro",
     events: "Eventos",
@@ -50,6 +52,7 @@ export const navTexts: Record<
     logout: "Salir"
   },
   en: {
+    home: "Home",
     feed: "Feed",
     podcast: "Podcast",
     community: "Community",
@@ -60,7 +63,7 @@ export const navTexts: Record<
     music: "Music",
     entrepreneurship: "Entrepreneurship",
     ads: "Advertise",
-    guest: "Be a guest",
+    guest: "Join the panel",
     confessional: "Confessional",
     forum: "Forum",
     events: "Events",
@@ -195,7 +198,7 @@ export const ui: Record<
     guest: {
       title: "Invitado especial",
       subtitle: "Cuéntanos tu disponibilidad y el tema que quieres traer. Si encaja con la línea editorial, te contactamos.",
-      cta: "Quiero salir en Sin Pelos",
+      cta: "Quiero ser parte del panel",
       close: "Cerrar"
     }
   },
@@ -256,7 +259,7 @@ export const ui: Record<
     guest: {
       title: "Featured guest",
       subtitle: "Share your availability and the topic you want to bring. If it fits, we will contact you.",
-      cta: "Be a guest on Sin Pelos",
+      cta: "Join the panel",
       close: "Close"
     }
   }

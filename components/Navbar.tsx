@@ -180,8 +180,9 @@ export function Navbar() {
         </Link>
         <div className="nav-mid">
           <div className={`nav-tabs${isOverlayOpen ? " is-overlay-open" : ""}`} role="navigation" aria-label="Navegación principal">
-            <Link className="nav-link" href="/feed">{t.feed}</Link>
+            <Link className="nav-link" href="/">{t.home}</Link>
             <Link className="nav-link" href="/noticias">{t.news}</Link>
+            <Link className="nav-link" href="/podcast">{t.podcast}</Link>
 
             <div className="nav-submenu" ref={communityRef}>
               <Link className="nav-link" href="/community">
@@ -237,12 +238,6 @@ export function Navbar() {
                   </Link>
                   <Link className="nav-menu-link" role="menuitem" href="/emprendimiento" onClick={() => setMenuOpen(false)}>
                     {t.entrepreneurship}
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/feed?view=episodes" onClick={() => setMenuOpen(false)}>
-                    {t.podcast}
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/confesiones" onClick={() => setMenuOpen(false)}>
-                    Confesiones
                   </Link>
                   <Link className="nav-menu-link" role="menuitem" href="/eventos" onClick={() => setMenuOpen(false)}>
                     {t.events}

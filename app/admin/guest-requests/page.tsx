@@ -165,7 +165,7 @@ export default function AdminGuestRequestsPage() {
   return (
     <main>
       <h1 className="section-title">Solicitudes de invitados</h1>
-      <p className="muted">Gestiona quién quiere salir en Sin Pelos y su estado de contacto.</p>
+      <p className="muted">Gestiona quién quiere ser parte del panel y su estado de contacto.</p>
 
       <div className="card" style={{ marginTop: 18, display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button className={`news-tab ${activeFilter === "all" ? "active" : ""}`} onClick={() => setActiveFilter("all")} type="button">

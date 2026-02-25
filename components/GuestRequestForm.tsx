@@ -82,7 +82,7 @@ export function GuestRequestForm() {
   return (
     <form className="card" onSubmit={onSubmit} style={{ display: "grid", gap: 14 }}>
       <h2 className="section-title" style={{ margin: 0 }}>
-        Quiero salir en Sin Pelos
+        Quiero ser parte del panel
       </h2>
       <p className="muted" style={{ marginTop: -4 }}>
         Deja tus datos, disponibilidad y tema. Revisamos propuestas semanalmente.
