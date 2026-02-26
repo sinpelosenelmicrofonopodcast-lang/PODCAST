@@ -37,6 +37,23 @@ const PREVIEW_EPISODES = 3;
 const PREVIEW_SHORTS = 4;
 const PREVIEW_VIRAL = 3;
 
+function uniqueExternalPosts(items: ExternalPost[]): ExternalPost[] {
+  const seen = new Set<string>();
+  const out: ExternalPost[] = [];
+  for (const item of items) {
+    const key = [
+      String(item.platform ?? "").trim().toLowerCase(),
+      String((item as any).external_id ?? "").trim().toLowerCase(),
+      String(item.source_url ?? "").trim().toLowerCase(),
+      String(item.id ?? "").trim().toLowerCase()
+    ].join("|");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
 function normalizeView(input?: string): View {
   if (input === "episodes" || input === "shorts" || input === "audio" || input === "all") return input;
   return "all";
@@ -140,10 +157,15 @@ export default async function FeedPage({
     .order("posted_at", { ascending: false })
     .limit(FEED_LIMIT);
 
-  const allPosts = ((rows ?? []) as ExternalPost[]).filter((p) => p.source_url);
+  const allPosts = uniqueExternalPosts(((rows ?? []) as ExternalPost[]).filter((p) => p.source_url));
   const episodes = allPosts.filter((p) => !isShortPost(p)).slice(0, 12);
   const shorts = allPosts.filter((p) => isShortPost(p)).slice(0, 16);
-  const viral = [...shorts].sort((a, b) => Number(b.metrics?.views ?? 0) - Number(a.metrics?.views ?? 0)).slice(0, 6);
+  const shortsPreview = shorts.slice(0, PREVIEW_SHORTS);
+  const shortsPreviewIds = new Set(shortsPreview.map((p) => p.id));
+  const viral = shorts
+    .filter((p) => !shortsPreviewIds.has(p.id))
+    .sort((a, b) => Number(b.metrics?.views ?? 0) - Number(a.metrics?.views ?? 0))
+    .slice(0, 6);
 
   return (
     <main>
@@ -210,22 +232,24 @@ export default async function FeedPage({
                   </Link>
                 </div>
                 <div className="feed-v4-grid shorts">
-                  {shorts.slice(0, PREVIEW_SHORTS).map((post) => (
+                  {shortsPreview.map((post) => (
                     <FeedCard key={post.id} post={post} label="Short" />
                   ))}
                 </div>
               </section>
 
-              <section className="feed-v4-block">
-                <div className="feed-v4-block-head">
-                  <h2 className="section-title">Clips virales</h2>
-                </div>
-                <div className="feed-v4-grid viral">
-                  {viral.slice(0, PREVIEW_VIRAL).map((post) => (
-                    <FeedCard key={post.id} post={post} label="Viral" />
-                  ))}
-                </div>
-              </section>
+              {viral.length > 0 ? (
+                <section className="feed-v4-block">
+                  <div className="feed-v4-block-head">
+                    <h2 className="section-title">Clips virales</h2>
+                  </div>
+                  <div className="feed-v4-grid viral">
+                    {viral.slice(0, PREVIEW_VIRAL).map((post) => (
+                      <FeedCard key={post.id} post={post} label="Viral" />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
               <section className="feed-v4-block card feed-v4-audio">
                 <div className="feed-v4-block-head" style={{ marginBottom: 8 }}>

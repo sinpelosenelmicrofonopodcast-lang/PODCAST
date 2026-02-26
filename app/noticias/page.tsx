@@ -36,6 +36,18 @@ function parseNewsIdFromSourceUrl(urlValue: string | null | undefined): string |
   }
 }
 
+function uniqueById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    const id = String(item.id ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(item);
+  }
+  return out;
+}
+
 export default async function NoticiasPage({ searchParams }: { searchParams: { cat?: string; sort?: string; page?: string } }) {
   const supabase = supabaseServer();
   const lang = getServerLang();
@@ -279,10 +291,16 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     }
   };
 
-  const lead = items[0] ?? null;
-  const sideItems = items.slice(1, 5);
-  const restItems = items.slice(5);
-  const railItems = (trendingItems.length > 0 ? trendingItems : sideItems).slice(0, 5);
+  const pageItems = uniqueById(items);
+  const lead = pageItems[0] ?? null;
+  const sideItems = pageItems.slice(1, 5);
+  const restItems = pageItems.slice(5);
+
+  const usedInMain = new Set(pageItems.map((item) => item.id));
+  const trendingUnique = uniqueById(trendingItems);
+  const railFromTrending = trendingUnique.filter((item) => !usedInMain.has(item.id));
+  const railItems = (railFromTrending.length > 0 ? railFromTrending : sideItems).slice(0, 5);
+  const breakingUnique = uniqueById(breakingItems);
 
   return (
     <main>
@@ -293,19 +311,19 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
           <h1 className="section-title">Noticias Sin Pelos</h1>
           <p className="muted">{t.news.subtitle}</p>
 
-          {breakingItems.length > 0 ? (
+          {breakingUnique.length > 0 ? (
             <div className="news-breaking card" aria-label="Breaking">
               <span className="news-breaking-label">Breaking</span>
               <div className="news-breaking-track">
                 <div className="news-breaking-marquee">
-                  {breakingItems.map((item) => (
+                  {breakingUnique.map((item) => (
                     <Link key={`b1-${item.id}`} href={`/noticias/${item.id}`} className="news-breaking-link">
                       {item.title}
                     </Link>
                   ))}
                 </div>
                 <div className="news-breaking-marquee" aria-hidden="true">
-                  {breakingItems.map((item) => (
+                  {breakingUnique.map((item) => (
                     <Link key={`b2-${item.id}`} href={`/noticias/${item.id}`} className="news-breaking-link">
                       {item.title}
                     </Link>
@@ -335,7 +353,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
             </Link>
           </div>
 
-          {items.length > 0 ? (
+          {pageItems.length > 0 ? (
             <div className="news-mag-shell">
               {lead ? (
                 <div className="news-mag-top">
