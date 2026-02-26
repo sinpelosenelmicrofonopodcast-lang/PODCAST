@@ -423,7 +423,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                       unoptimized
                       priority
                       sizes="(max-width: 920px) 100vw, 1100px"
-                      style={{ objectFit: "cover", objectPosition: "center center" }}
+                      style={{ objectFit: "contain", objectPosition: "center center", background: "#09090d" }}
                     />
                   ) : (
                     <div className="news-article-cover-fallback" />
@@ -530,7 +530,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                                   fill
                                   unoptimized
                                   sizes="120px"
-                                  style={{ objectFit: "cover" }}
+                                  style={{ objectFit: "contain", background: "#09090d" }}
                                 />
                               ) : (
                                 <div className="news-side-thumb-fallback" />
@@ -560,7 +560,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                                   fill
                                   unoptimized
                                   sizes="120px"
-                                  style={{ objectFit: "cover" }}
+                                  style={{ objectFit: "contain", background: "#09090d" }}
                                 />
                               ) : (
                                 <div className="news-side-thumb-fallback" />
