@@ -39,6 +39,9 @@ export function promoSectionFromPath(pathname: string): PromoSection {
   if (p.startsWith("/blog")) return "blog";
   if (p.startsWith("/musica")) return "musica";
   if (p.startsWith("/emprendimiento")) return "emprendimiento";
+  if (p.startsWith("/tema/musica")) return "musica";
+  if (p.startsWith("/tema/emprendimiento")) return "emprendimiento";
+  if (p.startsWith("/tema/")) return "noticias";
   if (p.startsWith("/noticias")) return "noticias";
   if (p.startsWith("/confesionario")) return "confesionario";
   if (p.startsWith("/confesiones")) return "confesiones";

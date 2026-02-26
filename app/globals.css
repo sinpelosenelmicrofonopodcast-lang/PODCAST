@@ -2267,6 +2267,50 @@ body {
   color: rgba(255, 212, 95, 0.9);
 }
 
+.home-heat-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.home-heat-item {
+  min-height: 110px;
+}
+
+.home-heat-item strong {
+  font-size: 17px;
+  line-height: 1.15;
+}
+
+.home-opinion-card {
+  display: grid;
+  gap: 12px;
+}
+
+.home-opinion-card p {
+  margin: 0;
+  font-size: clamp(18px, 2.2vw, 26px);
+  line-height: 1.38;
+  color: rgba(255, 255, 255, 0.9);
+  max-width: 54ch;
+}
+
+.home-topic-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.home-topic-item {
+  min-height: 112px;
+}
+
+.home-topic-item strong {
+  font-size: 18px;
+  line-height: 1.12;
+}
+
+.home-topic-item .muted {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .home-podcast-wrap {
   background: linear-gradient(180deg, rgba(7, 7, 9, 0.96), rgba(7, 7, 9, 0.88));
   border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -2280,6 +2324,40 @@ body {
 
 .home-podcast-summary {
   margin: 0;
+}
+
+.home-editorial-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.home-editorial-card {
+  display: grid;
+  gap: 10px;
+}
+
+.home-events-list {
+  display: grid;
+  gap: 8px;
+}
+
+.home-event-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.home-event-link {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 213, 97, 0.94);
+  text-decoration: none;
 }
 
 .home-debate-card {
@@ -2383,6 +2461,18 @@ body {
   }
 
   .home-ranking-row {
+    grid-template-columns: 1fr;
+  }
+
+  .home-editorial-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-topic-row {
+    grid-template-columns: 1fr;
+  }
+
+  .home-heat-row {
     grid-template-columns: 1fr;
   }
 
@@ -4562,6 +4652,35 @@ body {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.section-divider {
+  height: 1px;
+  border: 0;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+.split-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.split-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 860px) {
+  .split-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .split-3 {
+    grid-template-columns: 1fr;
+  }
 }
 
 .form-submit {
