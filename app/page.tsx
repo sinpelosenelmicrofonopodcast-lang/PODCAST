@@ -53,6 +53,34 @@ type Thread = {
   created_at: string | null;
 };
 
+function uniqueById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    const id = String(item.id ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(item);
+  }
+  return out;
+}
+
+function dedupePromotions(items: Promotion[]): Promotion[] {
+  const seen = new Set<string>();
+  const out: Promotion[] = [];
+  for (const promo of items) {
+    const fingerprint = [
+      String(promo.title ?? "").trim().toLowerCase(),
+      String(promo.image_url ?? "").trim().toLowerCase(),
+      String(promo.cta_url ?? "").trim().toLowerCase()
+    ].join("|");
+    if (!fingerprint || seen.has(fingerprint)) continue;
+    seen.add(fingerprint);
+    out.push(promo);
+  }
+  return out;
+}
+
 const formatDate = (value?: string | null) => {
   if (!value) return "";
   return new Date(value).toLocaleDateString("es-PR", {
@@ -207,9 +235,10 @@ export default async function HomePage() {
   const clips = posts.filter((post) => isShort(post)).slice(0, 3);
   const latestYtId = latestEpisode?.source_url ? getYouTubeVideoId(latestEpisode.source_url) : null;
 
-  const hotNews = (hotNewsList ?? []) as NewsItem[];
-  const primaryHot = hotNews[0] ?? null;
-  const sideHot = hotNews.slice(1, 3);
+  const hotNews = uniqueById((hotNewsList ?? []) as NewsItem[]);
+  const topHotNews = hotNews.slice(0, 3);
+  const primaryHot = topHotNews[0] ?? null;
+  const sideHot = topHotNews.slice(1, 3);
 
   const [
     { count: newsToday },
@@ -258,24 +287,31 @@ export default async function HomePage() {
     mostReadNewsIds = [];
   }
 
-  const mostReadHot = mostReadNewsIds.length
+  const topIds = new Set(topHotNews.map((n) => n.id));
+  const mostReadHotBase = mostReadNewsIds.length
     ? hotNews.filter((n) => mostReadNewsIds.includes(n.id)).sort((a, b) => mostReadNewsIds.indexOf(a.id) - mostReadNewsIds.indexOf(b.id))
-    : hotNews.slice(0, 3);
+    : hotNews.slice(3, 9);
+  const mostReadHot = mostReadHotBase.filter((n) => !topIds.has(n.id)).slice(0, 3);
 
   const debateQuestion = debateThread?.title?.trim()
     ? `“${debateThread.title}”`
     : "¿La gente está demasiado sensible o simplemente estamos evolucionando?";
 
-  const promotions = ((promosHome ?? []) as Promotion[]).filter((p) => {
+  const homePromotionsRaw = ((promosHome ?? []) as Promotion[]).filter((p) => {
     const ts = (p as any).target_sections;
     if (!ts || (Array.isArray(ts) && ts.length === 0)) return true;
     if (!Array.isArray(ts)) return true;
     const normalized = (ts as any[]).map((x) => String(x).toLowerCase());
     return normalized.includes("home") || normalized.includes("all") || normalized.includes("global");
-  }).slice(0, 3);
+  });
+  const promotions = dedupePromotions(homePromotionsRaw).slice(0, 3);
 
-  const byRegion = (key: "PR" | "TX" | "USA" | "Mundo") =>
-    hotNews.filter((n) => (n.categories ?? []).map((c) => c.toUpperCase()).includes(key.toUpperCase())).slice(0, 9);
+  const usedNewsIds = new Set<string>([...topHotNews.map((n) => n.id), ...mostReadHot.map((n) => n.id)]);
+  const byRegion = (key: "PR" | "TX" | "USA" | "Mundo") => {
+    const regionAll = hotNews.filter((n) => (n.categories ?? []).map((c) => c.toUpperCase()).includes(key.toUpperCase()));
+    const regionUnique = regionAll.filter((n) => !usedNewsIds.has(n.id));
+    return (regionUnique.length > 0 ? regionUnique : regionAll).slice(0, 9);
+  };
 
   return (
     <main className="app-enter home-final">
@@ -396,11 +432,6 @@ export default async function HomePage() {
             </div>
           ) : null}
 
-          <div style={{ marginTop: 14 }}>
-            <Link className="button" href="/noticias">
-              Ver todas las noticias
-            </Link>
-          </div>
         </div>
       </section>
 
