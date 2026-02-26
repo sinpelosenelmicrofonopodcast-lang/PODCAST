@@ -3,7 +3,7 @@ import { fetchYouTubeVideos, isShorts } from "@/lib/youtube";
 
 export async function GET() {
   try {
-    const videos = await fetchYouTubeVideos(25);
+    const videos = await fetchYouTubeVideos(25, { noStore: true });
     const payload = videos.map((video) => ({
       id: video.id,
       title: video.title,

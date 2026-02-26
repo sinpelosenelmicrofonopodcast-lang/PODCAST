@@ -6,7 +6,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { PODCAST_RSS_URL } from "@/lib/podcastRss";
 import { getYouTubeVideoId } from "@/lib/youtube";
 
-export const revalidate = 600;
+export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: "Feed – Últimos episodios y shorts | Sin Pelos en el Micrófono",

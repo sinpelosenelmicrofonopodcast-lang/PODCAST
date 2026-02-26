@@ -10,6 +10,11 @@ export type YouTubeVideo = {
   durationSeconds: number;
 };
 
+type FetchYouTubeVideosOptions = {
+  noStore?: boolean;
+  revalidateSeconds?: number;
+};
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is required.`);
@@ -31,7 +36,7 @@ export function isShorts(durationSeconds?: number | null): boolean {
   return d > 0 && d <= 180;
 }
 
-export async function fetchYouTubeVideos(limit = 25): Promise<YouTubeVideo[]> {
+export async function fetchYouTubeVideos(limit = 25, options?: FetchYouTubeVideosOptions): Promise<YouTubeVideo[]> {
   const apiKey = requireEnv("YOUTUBE_API_KEY");
   const channelId = requireEnv("YOUTUBE_CHANNEL_ID");
   const maxResults = Math.min(Math.max(1, limit), 50);
@@ -45,7 +50,11 @@ export async function fetchYouTubeVideos(limit = 25): Promise<YouTubeVideo[]> {
   searchUrl.searchParams.set("type", "video");
   searchUrl.searchParams.set("maxResults", String(maxResults));
 
-  const searchRes = await fetch(searchUrl.toString(), { next: { revalidate: 3600 } });
+  const fetchOptions = options?.noStore
+    ? ({ cache: "no-store" } as const)
+    : ({ next: { revalidate: Math.max(30, Number(options?.revalidateSeconds ?? 300)) } } as const);
+
+  const searchRes = await fetch(searchUrl.toString(), fetchOptions);
   if (!searchRes.ok) throw new Error(`YouTube search failed (${searchRes.status}).`);
   const searchJson = await searchRes.json();
 
@@ -61,7 +70,7 @@ export async function fetchYouTubeVideos(limit = 25): Promise<YouTubeVideo[]> {
   videosUrl.searchParams.set("key", apiKey);
   videosUrl.searchParams.set("id", ids.join(","));
   videosUrl.searchParams.set("part", "snippet,contentDetails,statistics");
-  const vidsRes = await fetch(videosUrl.toString(), { next: { revalidate: 3600 } });
+  const vidsRes = await fetch(videosUrl.toString(), fetchOptions);
   if (!vidsRes.ok) throw new Error(`YouTube videos failed (${vidsRes.status}).`);
   const vidsJson = await vidsRes.json();
   const vids = Array.isArray(vidsJson.items) ? vidsJson.items : [];

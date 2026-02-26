@@ -10,7 +10,7 @@ import { NewsletterForm } from "@/components/newsletter/NewsletterForm";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getYouTubeVideoId } from "@/lib/youtube";
 
-export const revalidate = 600;
+export const revalidate = 120;
 
 type ExternalPost = {
   id: string;
