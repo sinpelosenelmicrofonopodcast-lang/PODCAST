@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { GAME_CONFIG, type MicBrawlInputPacket, type MicBrawlInputState, type MicBrawlSkin } from "@/lib/micBrawl";
 
@@ -103,6 +103,7 @@ export function GameCanvas({ mode, roomId, meId, players, hostId, canFinalize = 
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [presenceCount, setPresenceCount] = useState(1);
   const [connected, setConnected] = useState(mode === "practice");
+  const [showTouchControls, setShowTouchControls] = useState(false);
 
   const me = players.find((p) => p.id === meId) ?? players[0];
   const enemy = players.find((p) => p.id !== meId) ?? players[1];
@@ -110,6 +111,15 @@ export function GameCanvas({ mode, roomId, meId, players, hostId, canFinalize = 
   const enemyPalette = useMemo(() => parsePalette(enemy.skin), [enemy.skin]);
   const hostPlayerId = hostId || players[0].id;
   const isHost = meId === hostPlayerId;
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(pointer: coarse)");
+    const update = () => setShowTouchControls(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -463,6 +473,25 @@ export function GameCanvas({ mode, roomId, meId, players, hostId, canFinalize = 
     setWinnerId(null);
   };
 
+  const setVirtualInput = (key: keyof MicBrawlInputState, pressed: boolean) => {
+    localInputsRef.current[key] = pressed;
+  };
+
+  const bindVirtualKey = (key: keyof MicBrawlInputState) => {
+    return {
+      onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => {
+        event.preventDefault();
+        setVirtualInput(key, true);
+      },
+      onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => {
+        event.preventDefault();
+        setVirtualInput(key, false);
+      },
+      onPointerLeave: () => setVirtualInput(key, false),
+      onPointerCancel: () => setVirtualInput(key, false)
+    };
+  };
+
   return (
     <div className="card mic-brawl-canvas-wrap">
       <div className="mic-brawl-canvas-head">
@@ -490,7 +519,28 @@ export function GameCanvas({ mode, roomId, meId, players, hostId, canFinalize = 
       <p className="muted" style={{ marginTop: 10 }}>
         Controles: A/←, D/→, W/↑, Space.
       </p>
-      <p className="muted mic-brawl-mobile-note">Desktop recommended.</p>
+      <p className="muted mic-brawl-mobile-note">Controles táctiles activados.</p>
+
+      {showTouchControls ? (
+        <div className="mic-brawl-touch-pad" aria-label="Controles táctiles">
+          <div className="mic-brawl-touch-move">
+            <button className="mic-brawl-touch-btn" type="button" aria-label="Mover izquierda" {...bindVirtualKey("left")}>
+              ←
+            </button>
+            <button className="mic-brawl-touch-btn" type="button" aria-label="Mover derecha" {...bindVirtualKey("right")}>
+              →
+            </button>
+          </div>
+          <div className="mic-brawl-touch-actions">
+            <button className="mic-brawl-touch-btn" type="button" aria-label="Saltar" {...bindVirtualKey("jump")}>
+              ⤒
+            </button>
+            <button className="mic-brawl-touch-btn mic-brawl-touch-attack" type="button" aria-label="Atacar" {...bindVirtualKey("attack")}>
+              MIC
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {winnerId ? (
         <div className="mic-brawl-overlay">
@@ -505,4 +555,3 @@ export function GameCanvas({ mode, roomId, meId, players, hostId, canFinalize = 
     </div>
   );
 }
-

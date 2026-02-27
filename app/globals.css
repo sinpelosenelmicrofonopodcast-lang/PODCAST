@@ -4739,6 +4739,44 @@ body {
   display: none;
 }
 
+.mic-brawl-touch-pad {
+  display: none;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.mic-brawl-touch-move,
+.mic-brawl-touch-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mic-brawl-touch-btn {
+  min-height: 52px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 122, 24, 0.35);
+  background: #141624;
+  color: #f5f7ff;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.mic-brawl-touch-btn:active {
+  transform: translateY(1px);
+  background: #1a2035;
+}
+
+.mic-brawl-touch-attack {
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  color: #ffca3a;
+}
+
 .mic-brawl-table {
   width: 100%;
   border-collapse: collapse;
@@ -4806,6 +4844,10 @@ body {
   .mic-brawl-mobile-note {
     display: block;
     margin-top: -6px;
+  }
+
+  .mic-brawl-touch-pad {
+    display: grid;
   }
 
   .mic-brawl-table {
