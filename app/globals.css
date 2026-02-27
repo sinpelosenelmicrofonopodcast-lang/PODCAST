@@ -4676,6 +4676,143 @@ body {
   gap: 14px;
 }
 
+/* ===== Mic Brawl ===== */
+.mic-brawl-matchmaking {
+  display: grid;
+  gap: 14px;
+}
+
+.mic-brawl-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mic-brawl-profile-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mic-brawl-canvas-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.mic-brawl-canvas-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mic-brawl-pill-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mic-brawl-canvas {
+  width: 100%;
+  max-width: 960px;
+  height: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 122, 24, 0.26);
+  background: #08080b;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.mic-brawl-overlay {
+  border: 1px solid rgba(255, 122, 24, 0.3);
+  background: rgba(10, 10, 12, 0.85);
+  border-radius: 14px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.mic-brawl-mobile-note {
+  display: none;
+}
+
+.mic-brawl-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+
+.mic-brawl-table th,
+.mic-brawl-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  padding: 10px;
+  white-space: nowrap;
+}
+
+.mic-brawl-table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.badge.warn {
+  background: rgba(255, 210, 59, 0.16);
+  color: #ffd23b;
+}
+
+.mic-brawl-skins-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.mic-brawl-skin-card {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.mic-brawl-skin-swatch {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  position: relative;
+}
+
+.mic-brawl-skin-swatch span {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+@media (max-width: 900px) {
+  .mic-brawl-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .mic-brawl-mobile-note {
+    display: block;
+    margin-top: -6px;
+  }
+
+  .mic-brawl-table {
+    min-width: 560px;
+  }
+}
+
 .check-row {
   display: flex;
   gap: 10px;

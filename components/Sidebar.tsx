@@ -30,6 +30,7 @@ const links: LinkItem[] = [
   { href: "/admin/promotions", label: "Promociones", required: "manage_promotions" },
   { href: "/admin/newsletter", label: "Newsletter", required: "manage_newsletter" },
   { href: "/admin/guest-requests", label: "Invitados", required: "manage_guest_requests" },
+  { href: "/admin/mic-brawl", label: "Mic Brawl", adminOnly: true },
   { href: "/admin/users", label: "Usuarios", adminOnly: true },
   { href: "/admin/reports", label: "Reportes", required: "view_reports" },
   { href: "/admin/schedule", label: "Programación", required: "view_schedule" }

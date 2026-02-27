@@ -156,6 +156,15 @@ export default function AdminDashboard() {
           </div>
         ) : null}
         {can("manage_news_sources") ? <AdminSyncYouTube /> : null}
+        {access.isAdmin ? (
+          <div className="card">
+            <h3>SPM Arcade / Mic Brawl</h3>
+            <p className="muted">Monitorea salas activas, leaderboard, resets y skins del juego.</p>
+            <Link className="button secondary" href="/admin/mic-brawl">
+              Abrir Mic Brawl Admin
+            </Link>
+          </div>
+        ) : null}
       </div>
       {!access.isAdmin && access.permissions.length === 0 ? (
         <div className="card" style={{ marginTop: 16 }}>
