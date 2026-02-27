@@ -3,11 +3,13 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { newsHref } from "@/lib/newsRoute";
 
 export const revalidate = 300;
 
 type NewsItem = {
   id: string;
+  slug?: string | null;
   title: string;
   summary: string | null;
   cover_url: string | null;
@@ -54,7 +56,7 @@ export default async function MusicaPage() {
   {
     let query = supabase
       .from("news_items")
-      .select("id, title, summary, cover_url, published_at")
+      .select("id, slug, title, summary, cover_url, published_at")
       .eq("publication_state", "published")
       .contains("categories", ["Música"])
       .order("published_at", { ascending: false })
@@ -63,7 +65,7 @@ export default async function MusicaPage() {
     if (error && /publication_state/i.test(error.message)) {
       const fallback = await supabase
         .from("news_items")
-        .select("id, title, summary, cover_url, published_at")
+        .select("id, slug, title, summary, cover_url, published_at")
         .contains("categories", ["Música"])
         .order("published_at", { ascending: false })
         .limit(16);
@@ -135,7 +137,7 @@ export default async function MusicaPage() {
                     <p className="muted" style={{ marginBottom: 8 }}>
                       {formatDate(item.published_at)}
                     </p>
-                    <Link className="button secondary" href={`/noticias/${item.id}`}>
+                    <Link className="button secondary" href={newsHref(item)}>
                       Leer noticia
                     </Link>
                   </article>

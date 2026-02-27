@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -8,33 +9,25 @@ import { ui } from "@/lib/i18n";
 import { getServerLang } from "@/lib/i18nServer";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { DesktopSideAdSlot } from "@/components/promotions/DesktopSideAdSlot";
+import { extractNewsPathSegment, extractNewsPathSegmentFromUrl, newsHref } from "@/lib/newsRoute";
 
 export const revalidate = 300;
 
-const NEWS_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const metadata: Metadata = {
+  title: "Noticias Sin Pelos | Puerto Rico, Texas, USA y Mundo",
+  description: "Noticias analizadas sin filtro. Cobertura en Puerto Rico, Texas, USA y Mundo con enfoque editorial de Sin Pelos.",
+  alternates: { canonical: "/noticias" }
+};
 
-function parseNewsIdFromPath(path: string | null | undefined): string | null {
-  const raw = String(path ?? "").trim();
-  if (!raw) return null;
-  const clean = raw.split("?")[0].split("#")[0];
-  const m = clean.match(/^\/noticias\/([^/]+)$/i);
-  if (!m?.[1]) return null;
-  const id = decodeURIComponent(m[1]);
-  return NEWS_ID_RE.test(id) ? id : null;
-}
-
-function parseNewsIdFromSourceUrl(urlValue: string | null | undefined): string | null {
-  const raw = String(urlValue ?? "").trim();
-  if (!raw) return null;
-  try {
-    const u = new URL(raw);
-    return parseNewsIdFromPath(u.pathname);
-  } catch {
-    const idx = raw.indexOf("/noticias/");
-    if (idx < 0) return null;
-    return parseNewsIdFromPath(raw.slice(idx));
-  }
-}
+type NewsItem = {
+  id: string;
+  slug?: string | null;
+  title: string;
+  summary: string | null;
+  published_at: string | null;
+  cover_url: string | null;
+  categories: string[] | null;
+};
 
 function uniqueById<T extends { id: string }>(items: T[]): T[] {
   const seen = new Set<string>();
@@ -66,7 +59,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     // Ranking by comments over a bounded window (latest 120) to keep response fast.
     let q = supabase
       .from("news_items")
-      .select("id, title, summary, published_at, cover_url, categories")
+      .select("id, slug, title, summary, published_at, cover_url, categories")
       .eq("publication_state", "published")
       .order("published_at", { ascending: false })
       .limit(120);
@@ -75,7 +68,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     if (rankedErr && /publication_state/i.test(rankedErr.message)) {
       let fallback = supabase
         .from("news_items")
-        .select("id, title, summary, published_at, cover_url, categories")
+        .select("id, slug, title, summary, published_at, cover_url, categories")
         .order("published_at", { ascending: false })
         .limit(120);
       if (category) fallback = fallback.contains("categories", [category]);
@@ -118,7 +111,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     const end = start + perPage - 1;
     let query = supabase
       .from("news_items")
-      .select("id, title, summary, published_at, cover_url, categories")
+      .select("id, slug, title, summary, published_at, cover_url, categories")
       .eq("publication_state", "published")
       .order("published_at", { ascending: false })
       .range(start, end);
@@ -127,7 +120,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     if (error && /publication_state/i.test(error.message)) {
       let fallback = supabase
         .from("news_items")
-        .select("id, title, summary, published_at, cover_url, categories")
+        .select("id, slug, title, summary, published_at, cover_url, categories")
         .order("published_at", { ascending: false })
         .range(start, end);
       if (category) fallback = fallback.contains("categories", [category]);
@@ -144,7 +137,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     const trendingWindowStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     let q = supabase
       .from("news_items")
-      .select("id, title, summary, published_at, cover_url, categories")
+      .select("id, slug, title, summary, published_at, cover_url, categories")
       .eq("publication_state", "published")
       .order("published_at", { ascending: false })
       .limit(120);
@@ -153,7 +146,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     if (error && /publication_state/i.test(error.message)) {
       let fallback = supabase
         .from("news_items")
-        .select("id, title, summary, published_at, cover_url, categories")
+        .select("id, slug, title, summary, published_at, cover_url, categories")
         .order("published_at", { ascending: false })
         .limit(120);
       if (category) fallback = fallback.contains("categories", [category]);
@@ -162,9 +155,14 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
       error = r.error;
     }
     if (error) base = [];
-    const ranked = base ?? [];
+    const ranked = (base ?? []) as NewsItem[];
     const ids = ranked.map((item) => item.id);
-    const idsSet = new Set(ids);
+    const keyToId = new Map<string, string>();
+    ranked.forEach((item) => {
+      keyToId.set(item.id, item.id);
+      const slug = String(item.slug ?? "").trim();
+      if (slug) keyToId.set(slug, item.id);
+    });
     const { data: comments } = await supabase
       .from("comments")
       .select("id, content_id")
@@ -185,9 +183,9 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
         .limit(50000);
       const { data: pageVisits } = await viewsQuery;
       (pageVisits ?? []).forEach((row: any) => {
-        const newsId = parseNewsIdFromPath(row.path);
+        const key = extractNewsPathSegment(row.path);
+        const newsId = key ? keyToId.get(key) ?? null : null;
         if (!newsId) return;
-        if (!idsSet.has(newsId)) return;
         viewCounts.set(newsId, (viewCounts.get(newsId) ?? 0) + 1);
       });
     }
@@ -204,9 +202,9 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
         .limit(5000);
 
       (posts ?? []).forEach((row: any) => {
-        const newsId = parseNewsIdFromSourceUrl(row.source_url);
+        const key = extractNewsPathSegmentFromUrl(row.source_url);
+        const newsId = key ? keyToId.get(key) ?? null : null;
         if (!newsId) return;
-        if (!idsSet.has(newsId)) return;
         const shares = Number(row?.metrics?.shares ?? 0);
         if (!Number.isFinite(shares) || shares <= 0) return;
         shareCounts.set(newsId, (shareCounts.get(newsId) ?? 0) + shares);
@@ -244,7 +242,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
   {
     let q = supabase
       .from("news_items")
-      .select("id, title")
+      .select("id, slug, title")
       .eq("publication_state", "published")
       .order("published_at", { ascending: false })
       .limit(10);
@@ -253,7 +251,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     if (error && /publication_state/i.test(error.message)) {
       let fallback = supabase
         .from("news_items")
-        .select("id, title")
+        .select("id, slug, title")
         .order("published_at", { ascending: false })
         .limit(10);
       if (category) fallback = fallback.contains("categories", [category]);
@@ -317,14 +315,14 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
               <div className="news-breaking-track">
                 <div className="news-breaking-marquee">
                   {breakingUnique.map((item) => (
-                    <Link key={`b1-${item.id}`} href={`/noticias/${item.id}`} className="news-breaking-link">
+                    <Link key={`b1-${item.id}`} href={newsHref(item)} className="news-breaking-link">
                       {item.title}
                     </Link>
                   ))}
                 </div>
                 <div className="news-breaking-marquee" aria-hidden="true">
                   {breakingUnique.map((item) => (
-                    <Link key={`b2-${item.id}`} href={`/noticias/${item.id}`} className="news-breaking-link">
+                    <Link key={`b2-${item.id}`} href={newsHref(item)} className="news-breaking-link">
                       {item.title}
                     </Link>
                   ))}
@@ -359,7 +357,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                 <div className="news-mag-top">
                   <article className="card news-mag-lead">
                     {lead.cover_url ? (
-                      <Link href={`/noticias/${lead.id}`} className="news-mag-lead-cover">
+                      <Link href={newsHref(lead)} className="news-mag-lead-cover">
                         <img src={lead.cover_url} alt={lead.title} loading="eager" decoding="async" />
                       </Link>
                     ) : null}
@@ -374,7 +372,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                           {new Date(lead.published_at).toLocaleDateString("es-PR")}
                         </span>
                       </div>
-                      <Link href={`/noticias/${lead.id}`}>
+                      <Link href={newsHref(lead)}>
                         <h2 className="news-mag-lead-title">{lead.title}</h2>
                       </Link>
                       {lead.summary ? (
@@ -383,10 +381,10 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                         </p>
                       ) : null}
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        <Link className="button secondary" href={`/noticias/${lead.id}`}>
+                        <Link className="button secondary" href={newsHref(lead)}>
                           {t.common.read}
                         </Link>
-                        <ShareButtons path={`/noticias/${lead.id}`} text={lead.title} />
+                        <ShareButtons path={newsHref(lead)} text={lead.title} />
                       </div>
                     </div>
                   </article>
@@ -399,12 +397,12 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                       <div key={item.id} style={{ display: "contents" }}>
                         <article className="card news-mag-rail-item">
                           {item.cover_url ? (
-                            <Link href={`/noticias/${item.id}`} className="news-mag-rail-thumb">
+                            <Link href={newsHref(item)} className="news-mag-rail-thumb">
                               <img src={item.cover_url} alt={item.title} loading="lazy" decoding="async" />
                             </Link>
                           ) : null}
                           <div>
-                            <Link href={`/noticias/${item.id}`}>
+                            <Link href={newsHref(item)}>
                               <h4 className="news-title-clamp" style={{ margin: 0 }}>
                                 {item.title}
                               </h4>
@@ -432,7 +430,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                     {idx === 2 ? <MidContentAdSlot /> : null}
                     <article className={item.cover_url ? "card news-item-card" : "card"}>
                       {item.cover_url ? (
-                        <Link href={`/noticias/${item.id}`}>
+                        <Link href={newsHref(item)}>
                           <div className="news-cover-thumb">
                             <img src={item.cover_url} alt={item.title} loading="lazy" decoding="async" />
                           </div>
@@ -450,7 +448,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                               {new Date(item.published_at).toLocaleDateString("es-PR")}
                             </span>
                           </div>
-                          <Link href={`/noticias/${item.id}`}>
+                          <Link href={newsHref(item)}>
                             <h3 className="news-title-clamp" style={{ margin: "6px 0 0" }}>
                               {item.title}
                             </h3>
@@ -462,10 +460,10 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                           </p>
                         ) : null}
                         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                          <Link className="button secondary" href={`/noticias/${item.id}`}>
+                          <Link className="button secondary" href={newsHref(item)}>
                             {t.common.read}
                           </Link>
-                          <ShareButtons path={`/noticias/${item.id}`} text={item.title} />
+                          <ShareButtons path={newsHref(item)} text={item.title} />
                         </div>
                       </div>
                     </article>

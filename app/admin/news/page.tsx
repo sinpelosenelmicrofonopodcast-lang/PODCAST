@@ -6,9 +6,11 @@ import { supabase } from "@/lib/supabaseClient";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
 import { newsCategories } from "@/lib/newsCategories";
 import { toast } from "@/lib/toast";
+import { newsHref } from "@/lib/newsRoute";
 
 type NewsItem = {
   id: string;
+  slug?: string | null;
   title: string;
   summary: string | null;
   analysis: string | null;
@@ -61,12 +63,12 @@ export default function AdminNewsPage() {
     const primary = await supabase
       .from("news_items")
       .select(
-        "id, title, summary, analysis, source_url, cover_url, categories, tags, publication_state, ingest_source, updated_at, rewrite_status, rewrite_error, needs_review, rewritten_at, published_at"
+        "id, slug, title, summary, analysis, source_url, cover_url, categories, tags, publication_state, ingest_source, updated_at, rewrite_status, rewrite_error, needs_review, rewritten_at, published_at"
       )
       .order("published_at", { ascending: false });
     if (
       primary.error &&
-      /(publication_state|ingest_source|updated_at|rewrite_status|rewrite_error|needs_review|rewritten_at)/i.test(
+      /(slug|publication_state|ingest_source|updated_at|rewrite_status|rewrite_error|needs_review|rewritten_at)/i.test(
         primary.error.message
       )
     ) {
@@ -210,8 +212,9 @@ export default function AdminNewsPage() {
         author_id: userId,
         published_at: publishNow ? new Date().toISOString() : null
       };
-      const { data: insertedRows, error } = await supabase.from("news_items").insert(createPayload).select("id").limit(1);
-      const inserted = Array.isArray(insertedRows) ? insertedRows[0] : null;
+      const insertRes = await supabase.from("news_items").insert(createPayload).select().limit(1);
+      const inserted = Array.isArray(insertRes.data) ? (insertRes.data[0] as { id: string; slug?: string | null } | undefined) : undefined;
+      const error = insertRes.error;
       if (error || !inserted?.id) {
         const msg = humanizeNewsError(error?.message ?? "No se pudo publicar la noticia.");
         setStatus(msg);
@@ -237,6 +240,7 @@ export default function AdminNewsPage() {
             },
             body: JSON.stringify({
               newsId: inserted.id,
+              newsSlug: inserted.slug ?? null,
               title,
               summary
             })
@@ -314,6 +318,7 @@ export default function AdminNewsPage() {
       },
       body: JSON.stringify({
         newsId: item.id,
+        newsSlug: item.slug ?? null,
         title: item.title,
         summary: item.summary ?? ""
       })
@@ -483,7 +488,7 @@ export default function AdminNewsPage() {
                       Borrador
                     </button>
                   )}
-                  <a className="button secondary" href={`/noticias/${item.id}`} target="_blank" rel="noreferrer">
+                  <a className="button secondary" href={newsHref(item)} target="_blank" rel="noreferrer">
                     Ver pública
                   </a>
                   <button

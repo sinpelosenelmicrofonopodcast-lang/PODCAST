@@ -1,5 +1,6 @@
 export type FacebookPostNewsInput = {
   newsId: string;
+  newsSlug?: string | null;
   title?: string | null;
   summary?: string | null;
 };
@@ -21,10 +22,12 @@ export async function postNewsToFacebook(input: FacebookPostNewsInput) {
 
   const newsId = String(input.newsId ?? "").trim();
   if (!newsId) throw new Error("newsId requerido.");
+  const newsSlug = String(input.newsSlug ?? "").trim();
 
   const title = String(input.title ?? "").trim();
   const summary = String(input.summary ?? "").trim();
-  const link = `${baseUrl.replace(/\/$/, "")}/noticias/${encodeURIComponent(newsId)}`;
+  const linkKey = newsSlug || newsId;
+  const link = `${baseUrl.replace(/\/$/, "")}/noticias/${encodeURIComponent(linkKey)}`;
   const message = summary ? `${title}\n\n${summary}` : title || "Nueva noticia";
 
   const form = new URLSearchParams();

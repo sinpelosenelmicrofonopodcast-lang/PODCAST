@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ShareButtons } from "@/components/ShareButtons";
@@ -9,6 +10,11 @@ import { clampMetaDescription, estimateReadingTimeMinutes } from "@/lib/blogSeo"
 import { createClient } from "@supabase/supabase-js";
 
 export const revalidate = 300;
+export const metadata: Metadata = {
+  title: "Blog | Sin Pelos en el Micrófono",
+  description: "Análisis, opinión y cultura en formato editorial con estilo Sin Pelos.",
+  alternates: { canonical: "/blog" }
+};
 
 type BlogPost = {
   id: string;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ShareButtons } from "@/components/ShareButtons";
@@ -8,11 +9,13 @@ import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { DesktopSideAdSlot } from "@/components/promotions/DesktopSideAdSlot";
 import { supabaseServer } from "@/lib/supabaseServer";
 import type { PromoSection } from "@/lib/promoSection";
+import { extractNewsPathSegment, extractNewsPathSegmentFromUrl, newsHref } from "@/lib/newsRoute";
 
 export const revalidate = 300;
 
 type NewsItem = {
   id: string;
+  slug?: string | null;
   title: string;
   summary: string | null;
   cover_url: string | null;
@@ -58,8 +61,6 @@ const SLUG_ALIASES = new Map<string, string>([
   ["música", "musica"]
 ]);
 
-const NEWS_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 function dayWindowIso(hours: number) {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 }
@@ -72,29 +73,6 @@ function normalizeSlug(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-}
-
-function parseNewsIdFromPath(path: string | null | undefined): string | null {
-  const raw = String(path ?? "").trim();
-  if (!raw) return null;
-  const clean = raw.split("?")[0].split("#")[0];
-  const m = clean.match(/^\/noticias\/([^/]+)$/i);
-  if (!m?.[1]) return null;
-  const id = decodeURIComponent(m[1]);
-  return NEWS_ID_RE.test(id) ? id : null;
-}
-
-function parseNewsIdFromSourceUrl(urlValue: string | null | undefined): string | null {
-  const raw = String(urlValue ?? "").trim();
-  if (!raw) return null;
-  try {
-    const url = new URL(raw);
-    return parseNewsIdFromPath(url.pathname);
-  } catch {
-    const idx = raw.indexOf("/noticias/");
-    if (idx < 0) return null;
-    return parseNewsIdFromPath(raw.slice(idx));
-  }
 }
 
 function normalizeWeights(input?: {
@@ -130,6 +108,21 @@ function resolveHub(slugParam: string): TopicHub | null {
   return HUB_BY_SLUG.get(alias) ?? null;
 }
 
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const hub = resolveHub(params.slug);
+  if (!hub) {
+    return {
+      title: "Tema no encontrado | Sin Pelos",
+      alternates: { canonical: "/noticias" }
+    };
+  }
+  return {
+    title: `${hub.label} | Noticias Sin Pelos`,
+    description: hub.description,
+    alternates: { canonical: `/tema/${hub.slug}` }
+  };
+}
+
 export default async function TemaHubPage({ params }: { params: { slug: string } }) {
   const hub = resolveHub(params.slug);
   if (!hub) notFound();
@@ -141,7 +134,7 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
     (async () => {
       const primary = await supabase
         .from("news_items")
-        .select("id, title, summary, cover_url, categories, published_at")
+        .select("id, slug, title, summary, cover_url, categories, published_at")
         .eq("publication_state", "published")
         .contains("categories", [hub.category])
         .order("published_at", { ascending: false })
@@ -149,7 +142,7 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
       if (primary.error && /publication_state/i.test(primary.error.message)) {
         return supabase
           .from("news_items")
-          .select("id, title, summary, cover_url, categories, published_at")
+          .select("id, slug, title, summary, cover_url, categories, published_at")
           .contains("categories", [hub.category])
           .order("published_at", { ascending: false })
           .limit(48);
@@ -175,7 +168,12 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
 
   const items = (itemsData ?? []) as NewsItem[];
   const newsIds = items.map((item) => item.id);
-  const newsIdSet = new Set(newsIds);
+  const keyToId = new Map<string, string>();
+  items.forEach((item) => {
+    keyToId.set(item.id, item.id);
+    const slug = String(item.slug ?? "").trim();
+    if (slug) keyToId.set(slug, item.id);
+  });
   const weights = normalizeWeights({
     comments: (homeSettingsData as any)?.trending_weight_comments,
     shares: (homeSettingsData as any)?.trending_weight_shares,
@@ -204,9 +202,9 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
       .order("posted_at", { ascending: false })
       .limit(5000);
     (shareRows ?? []).forEach((row: any) => {
-      const newsId = parseNewsIdFromSourceUrl(row.source_url);
+      const key = extractNewsPathSegmentFromUrl(row.source_url);
+      const newsId = key ? keyToId.get(key) ?? null : null;
       if (!newsId) return;
-      if (!newsIdSet.has(newsId)) return;
       const shares = Number(row?.metrics?.shares ?? 0);
       if (!Number.isFinite(shares) || shares <= 0) return;
       sharesCountByNews.set(newsId, (sharesCountByNews.get(newsId) ?? 0) + shares);
@@ -225,9 +223,9 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
         .order("visited_at", { ascending: false })
         .limit(50000);
       (viewRows ?? []).forEach((row: any) => {
-        const newsId = parseNewsIdFromPath(row.path);
+        const key = extractNewsPathSegment(row.path);
+        const newsId = key ? keyToId.get(key) ?? null : null;
         if (!newsId) return;
-        if (!newsIdSet.has(newsId)) return;
         viewsCountByNews.set(newsId, (viewsCountByNews.get(newsId) ?? 0) + 1);
       });
     }
@@ -291,7 +289,7 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
             <div className="news-mag-top" style={{ marginTop: 14 }}>
               <article className="card news-mag-lead">
                 {lead.cover_url ? (
-                  <Link href={`/noticias/${lead.id}`} className="news-mag-lead-cover">
+                  <Link href={newsHref(lead)} className="news-mag-lead-cover">
                     <img src={lead.cover_url} alt={lead.title} loading="eager" decoding="async" />
                   </Link>
                 ) : null}
@@ -302,7 +300,7 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
                       {lead.published_at ? new Date(lead.published_at).toLocaleDateString("es-PR") : ""}
                     </span>
                   </div>
-                  <Link href={`/noticias/${lead.id}`}>
+                  <Link href={newsHref(lead)}>
                     <h2 className="news-mag-lead-title">{lead.title}</h2>
                   </Link>
                   {lead.summary ? (
@@ -311,10 +309,10 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
                     </p>
                   ) : null}
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <Link className="button secondary" href={`/noticias/${lead.id}`}>
+                    <Link className="button secondary" href={newsHref(lead)}>
                       Leer noticia
                     </Link>
-                    <ShareButtons path={`/noticias/${lead.id}`} text={lead.title} />
+                    <ShareButtons path={newsHref(lead)} text={lead.title} />
                   </div>
                 </div>
               </article>
@@ -326,12 +324,12 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
                 {trending.map((item) => (
                   <article key={item.id} className="card news-mag-rail-item">
                     {item.cover_url ? (
-                      <Link href={`/noticias/${item.id}`} className="news-mag-rail-thumb">
+                      <Link href={newsHref(item)} className="news-mag-rail-thumb">
                         <img src={item.cover_url} alt={item.title} loading="lazy" decoding="async" />
                       </Link>
                     ) : null}
                     <div>
-                      <Link href={`/noticias/${item.id}`}>
+                      <Link href={newsHref(item)}>
                         <h4 className="news-title-clamp" style={{ margin: 0 }}>
                           {item.title}
                         </h4>
@@ -363,7 +361,7 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
                   {index === 2 ? <MidContentAdSlot section={hub.promoSection} /> : null}
                   <article className={item.cover_url ? "card news-item-card" : "card"}>
                     {item.cover_url ? (
-                      <Link href={`/noticias/${item.id}`}>
+                      <Link href={newsHref(item)}>
                         <div className="news-cover-thumb">
                           <img src={item.cover_url} alt={item.title} loading="lazy" decoding="async" />
                         </div>
@@ -377,7 +375,7 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
                             {item.published_at ? new Date(item.published_at).toLocaleDateString("es-PR") : ""}
                           </span>
                         </div>
-                        <Link href={`/noticias/${item.id}`}>
+                        <Link href={newsHref(item)}>
                           <h3 className="news-title-clamp" style={{ margin: "6px 0 0" }}>
                             {item.title}
                           </h3>
@@ -389,10 +387,10 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
                         </p>
                       ) : null}
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        <Link className="button secondary" href={`/noticias/${item.id}`}>
+                        <Link className="button secondary" href={newsHref(item)}>
                           Leer noticia
                         </Link>
-                        <ShareButtons path={`/noticias/${item.id}`} text={item.title} />
+                        <ShareButtons path={newsHref(item)} text={item.title} />
                       </div>
                     </div>
                   </article>

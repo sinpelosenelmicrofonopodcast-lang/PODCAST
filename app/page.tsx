@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { YouTubeInlinePlayer } from "@/components/YouTubeInlinePlayer";
@@ -9,8 +10,14 @@ import { RegionalTabs } from "@/components/home/RegionalTabs";
 import { NewsletterForm } from "@/components/newsletter/NewsletterForm";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getYouTubeVideoId } from "@/lib/youtube";
+import { extractNewsPathSegment, extractNewsPathSegmentFromUrl, newsHref } from "@/lib/newsRoute";
 
 export const revalidate = 120;
+export const metadata: Metadata = {
+  title: "Sin Pelos en el Micrófono | Noticias, debate y comunidad",
+  description: "La plaza pública privada donde se dice lo que otros callan. Noticias, podcast y comunidad real.",
+  alternates: { canonical: "/" }
+};
 
 type ExternalPost = {
   id: string;
@@ -29,6 +36,7 @@ type ExternalPost = {
 
 type NewsItem = {
   id: string;
+  slug?: string | null;
   title: string;
   summary: string | null;
   cover_url: string | null;
@@ -124,31 +132,6 @@ function dedupePromotions(items: Promotion[]): Promotion[] {
     out.push(promo);
   }
   return out;
-}
-
-const NEWS_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function parseNewsIdFromPath(path: string | null | undefined): string | null {
-  const raw = String(path ?? "").trim();
-  if (!raw) return null;
-  const clean = raw.split("?")[0].split("#")[0];
-  const m = clean.match(/^\/noticias\/([^/]+)$/i);
-  if (!m?.[1]) return null;
-  const id = decodeURIComponent(m[1]);
-  return NEWS_ID_RE.test(id) ? id : null;
-}
-
-function parseNewsIdFromSourceUrl(urlValue: string | null | undefined): string | null {
-  const raw = String(urlValue ?? "").trim();
-  if (!raw) return null;
-  try {
-    const u = new URL(raw);
-    return parseNewsIdFromPath(u.pathname);
-  } catch {
-    const idx = raw.indexOf("/noticias/");
-    if (idx < 0) return null;
-    return parseNewsIdFromPath(raw.slice(idx));
-  }
 }
 
 const formatDate = (value?: string | null) => {
@@ -276,7 +259,7 @@ export default async function HomePage() {
     (async () => {
       const primary = await supabase
         .from("news_items")
-        .select("id, title, summary, published_at, cover_url")
+        .select("id, slug, title, summary, published_at, cover_url")
         .eq("publication_state", "published")
         .order("published_at", { ascending: false })
         .limit(1)
@@ -284,7 +267,7 @@ export default async function HomePage() {
       if (primary.error && /publication_state/i.test(primary.error.message)) {
         return supabase
           .from("news_items")
-          .select("id, title, summary, published_at, cover_url")
+          .select("id, slug, title, summary, published_at, cover_url")
           .order("published_at", { ascending: false })
           .limit(1)
           .single();
@@ -311,14 +294,14 @@ export default async function HomePage() {
     (async () => {
       const primary = await supabase
         .from("news_items")
-        .select("id, title, summary, published_at, cover_url, categories")
+        .select("id, slug, title, summary, published_at, cover_url, categories")
         .eq("publication_state", "published")
         .order("published_at", { ascending: false })
         .limit(24);
       if (primary.error && /publication_state/i.test(primary.error.message)) {
         return supabase
           .from("news_items")
-          .select("id, title, summary, published_at, cover_url, categories")
+          .select("id, slug, title, summary, published_at, cover_url, categories")
           .order("published_at", { ascending: false })
           .limit(24);
       }
@@ -441,7 +424,12 @@ export default async function HomePage() {
   const newToday = Number(newsToday ?? 0) + Number(threadsToday ?? 0) + Number(confessionsToday ?? 0);
 
   const newsIds = hotNews.map((item) => item.id);
-  const newsIdSet = new Set(newsIds);
+  const newsKeyToId = new Map<string, string>();
+  hotNews.forEach((item) => {
+    newsKeyToId.set(item.id, item.id);
+    const slug = String(item.slug ?? "").trim();
+    if (slug) newsKeyToId.set(slug, item.id);
+  });
   const commentsCountByNews = new Map<string, number>();
   if (newsIds.length > 0) {
     const { data: commentsRows } = await supabase
@@ -465,9 +453,9 @@ export default async function HomePage() {
       .order("posted_at", { ascending: false })
       .limit(5000);
     (shareRows ?? []).forEach((row: any) => {
-      const newsId = parseNewsIdFromSourceUrl(row.source_url);
+      const key = extractNewsPathSegmentFromUrl(row.source_url);
+      const newsId = key ? newsKeyToId.get(key) ?? null : null;
       if (!newsId) return;
-      if (!newsIdSet.has(newsId)) return;
       const shares = Number(row?.metrics?.shares ?? 0);
       if (!Number.isFinite(shares) || shares <= 0) return;
       sharesCountByNews.set(newsId, (sharesCountByNews.get(newsId) ?? 0) + shares);
@@ -485,9 +473,9 @@ export default async function HomePage() {
         .like("path", "/noticias/%")
         .limit(50000);
       (visits ?? []).forEach((v: any) => {
-        const newsId = parseNewsIdFromPath(v.path);
+        const key = extractNewsPathSegment(v.path);
+        const newsId = key ? newsKeyToId.get(key) ?? null : null;
         if (!newsId) return;
-        if (!newsIdSet.has(newsId)) return;
         viewsCountByNews.set(newsId, (viewsCountByNews.get(newsId) ?? 0) + 1);
       });
     }
@@ -527,7 +515,7 @@ export default async function HomePage() {
       key: `read-${topRead.id}`,
       label: "Más leído",
       title: topRead.title,
-      href: `/noticias/${topRead.id}`,
+      href: newsHref(topRead),
       meta: `${formatMetric(viewsCountByNews.get(topRead.id) ?? 0)} views`
     });
   }
@@ -536,7 +524,7 @@ export default async function HomePage() {
       key: `commented-${topCommented.id}`,
       label: "Más comentado",
       title: topCommented.title,
-      href: `/noticias/${topCommented.id}`,
+      href: newsHref(topCommented),
       meta: `${formatMetric(commentsCountByNews.get(topCommented.id) ?? 0)} comentarios`
     });
   }
@@ -545,7 +533,7 @@ export default async function HomePage() {
       key: `shared-${topShared.id}`,
       label: "Más compartido",
       title: topShared.title,
-      href: `/noticias/${topShared.id}`,
+      href: newsHref(topShared),
       meta: `${formatMetric(sharesCountByNews.get(topShared.id) ?? 0)} shares`
     });
   }
@@ -589,7 +577,7 @@ export default async function HomePage() {
           {latestNews?.id ? (
             <div className="home-breaking" role="status" aria-live="polite">
               <span className="home-breaking-label">Última hora</span>
-              <Link className="home-breaking-link" href={`/noticias/${latestNews.id}`}>
+              <Link className="home-breaking-link" href={newsHref(latestNews)}>
                 {latestNews.title}
               </Link>
             </div>
@@ -632,7 +620,7 @@ export default async function HomePage() {
 
           <div className="home-hot-grid">
             {primaryHot ? (
-              <Link href={`/noticias/${primaryHot.id}`} className="card home-hot-main">
+              <Link href={newsHref(primaryHot)} className="card home-hot-main">
                 <div className="home-hot-media">
                   {primaryHot.cover_url ? (
                     <img src={primaryHot.cover_url} alt={primaryHot.title} loading="lazy" />
@@ -659,7 +647,7 @@ export default async function HomePage() {
             )}
 
             {sideHot.map((item) => (
-              <Link key={item.id} href={`/noticias/${item.id}`} className="card home-hot-side">
+              <Link key={item.id} href={newsHref(item)} className="card home-hot-side">
                 <div className="home-hot-side-media">
                   {item.cover_url ? (
                     <img src={item.cover_url} alt={item.title} loading="lazy" />
@@ -689,7 +677,7 @@ export default async function HomePage() {
           {mostReadHot.length > 0 ? (
             <div className="home-ranking-row" aria-label="Tendencias de noticias">
               {mostReadHot.map((item, index) => (
-                <Link key={item.id} href={`/noticias/${item.id}`} className="home-ranking-item">
+                <Link key={item.id} href={newsHref(item)} className="home-ranking-item">
                   <span className="home-ranking-kicker">{index === 0 ? "En tendencia" : "Subiendo"}</span>
                   <span className="clamp-2">{item.title}</span>
                 </Link>

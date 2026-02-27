@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const newsId = String(body?.newsId ?? "").trim();
+    const newsSlug = String(body?.newsSlug ?? "").trim();
     const title = String(body?.title ?? "").trim();
     const summary = String(body?.summary ?? "").trim();
 
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
       title: title || "Publicar noticia en Facebook",
       contentType: "news",
       contentId: newsId,
-      payload: { title, summary },
+      payload: { title, summary, newsSlug: newsSlug || null },
       status: "running",
       createdBy: auth.userId
     });
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
       message: "Inicio de publicación en Facebook",
       actorId: auth.userId
     });
-    const posted = await postNewsToFacebook({ newsId, title, summary });
+    const posted = await postNewsToFacebook({ newsId, newsSlug: newsSlug || null, title, summary });
 
     await auth.service.from("external_posts").upsert(
       {

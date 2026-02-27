@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { permanentRedirect } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ShareButtons } from "@/components/ShareButtons";
@@ -162,6 +163,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       title,
       description,
       type: "article",
+      url: canonical,
       images: [{ url: image }]
     },
     twitter: {
@@ -175,6 +177,11 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
 export default async function BlogPostPage({ params }: { params: { id: string } }) {
   const data = await loadPost(String(params?.id ?? ""));
+  const key = normalizeKey(String(params?.id ?? ""));
+
+  if (data && UUID_RE.test(key) && data.slug && data.slug !== key) {
+    permanentRedirect(postHref(data));
+  }
 
   if (!data) {
     return (

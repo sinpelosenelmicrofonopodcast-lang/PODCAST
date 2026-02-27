@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { newsHref } from "@/lib/newsRoute";
 
 type NewsCard = {
   id: string;
+  slug?: string | null;
   title: string;
   summary: string | null;
   cover_url: string | null;
@@ -67,7 +69,7 @@ export function RegionalTabs({ items }: { items: Record<TabKey, NewsCard[]> }) {
         ) : (
           <div className="home-grid-3" style={{ marginTop: 12 }}>
             {(list ?? []).slice(0, 6).map((n) => (
-              <Link key={n.id} href={`/noticias/${n.id}`} className="card news-card">
+              <Link key={n.id} href={newsHref(n)} className="card news-card">
                 <div className="news-thumb">
                   {n.cover_url ? <img src={n.cover_url} alt={n.title} loading="lazy" /> : <div className="news-thumb-fallback" aria-hidden="true" />}
                   <div className="news-thumb-overlay" aria-hidden="true" />
@@ -92,4 +94,3 @@ export function RegionalTabs({ items }: { items: Record<TabKey, NewsCard[]> }) {
     </section>
   );
 }
-

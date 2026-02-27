@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { permanentRedirect } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { supabaseServer } from "@/lib/supabaseServer";
@@ -9,11 +10,13 @@ import { ShareButtons } from "@/components/ShareButtons";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { getServerLang } from "@/lib/i18nServer";
 import type { AppLang } from "@/lib/language";
+import { isUuid, newsHref, normalizeNewsKey } from "@/lib/newsRoute";
 
 export const revalidate = 180;
 
 type NewsItem = {
   id: string;
+  slug?: string | null;
   title: string;
   summary: string | null;
   analysis: string | null;
@@ -21,10 +24,12 @@ type NewsItem = {
   cover_url: string | null;
   categories: string[] | null;
   published_at: string | null;
+  updated_at?: string | null;
 };
 
 type RelatedNewsItem = {
   id: string;
+  slug?: string | null;
   title: string;
   cover_url: string | null;
   categories: string[] | null;
@@ -203,23 +208,43 @@ function buildEditorialTags(item: NewsItem, lang: AppLang) {
 }
 
 async function loadItem(supabase: ReturnType<typeof supabaseServer>, id: string) {
-  let query = supabase
-    .from("news_items")
-    .select("id, title, summary, analysis, source_url, cover_url, categories, published_at")
-    .eq("publication_state", "published")
-    .eq("id", id)
-    .maybeSingle();
+  const key = normalizeNewsKey(id);
+  if (!key) return null;
 
-  let { data, error } = await query;
-  if (error && /publication_state/i.test(error.message)) {
+  const byIdFirst = isUuid(key);
+  const candidates: Array<"id" | "slug"> = byIdFirst ? ["id", "slug"] : ["slug", "id"];
+  const selectVariants = [
+    "id, slug, title, summary, analysis, source_url, cover_url, categories, published_at, updated_at",
+    "id, slug, title, summary, analysis, source_url, cover_url, categories, published_at",
+    "id, title, summary, analysis, source_url, cover_url, categories, published_at"
+  ];
+
+  for (const column of candidates) {
+    if (column === "id" && !isUuid(key)) continue;
+
+    for (const selectCols of selectVariants) {
+      for (const withPublicationState of [true, false]) {
+        let query = supabase.from("news_items").select(selectCols).order("published_at", { ascending: false }).limit(1);
+        if (withPublicationState) query = query.eq("publication_state", "published");
+        query = column === "slug" ? query.ilike("slug", key) : query.eq("id", key);
+
+        const result = await query;
+        const rows = (result.data as unknown as NewsItem[] | null) ?? [];
+        if (!result.error && rows.length > 0) return rows[0];
+        if (result.error && !/(slug|updated_at|publication_state)/i.test(result.error.message)) break;
+      }
+    }
+  }
+
+  if (isUuid(key)) {
     const fallback = await supabase
       .from("news_items")
       .select("id, title, summary, analysis, source_url, cover_url, categories, published_at")
-      .eq("id", id)
+      .eq("id", key)
       .maybeSingle();
-    data = fallback.data;
+    return (fallback.data as NewsItem | null) ?? null;
   }
-  return (data as NewsItem | null) ?? null;
+  return null;
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
@@ -229,15 +254,18 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const description = item?.summary ?? "Noticias Sin Pelos";
   const image = item?.cover_url ?? "/logo.png";
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const canonical = item ? newsHref(item) : `/noticias/${encodeURIComponent(params.id)}`;
 
   return {
     title,
     description,
+    alternates: { canonical },
     metadataBase: new URL(baseUrl),
     openGraph: {
       title,
       description,
       type: "article",
+      url: canonical,
       images: [{ url: image }]
     },
     twitter: {
@@ -255,12 +283,15 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
   const copy = t[lang];
 
   const item = await loadItem(supabase, params.id);
+  if (item && isUuid(params.id) && item.slug && item.slug !== params.id) {
+    permanentRedirect(newsHref(item));
+  }
 
   const { data: commentsRaw } = await supabase
     .from("comments")
     .select("id, body, created_at, users(nickname, avatar_url)")
     .eq("content_type", "news")
-    .eq("content_id", params.id)
+    .eq("content_id", item?.id ?? "")
     .order("created_at", { ascending: true });
 
   const comments = (commentsRaw ?? []) as CommentRow[];
@@ -275,7 +306,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
 
     let relatedQuery = supabase
       .from("news_items")
-      .select("id, title, cover_url, categories, published_at")
+      .select("id, slug, title, cover_url, categories, published_at")
       .eq("publication_state", "published")
       .neq("id", item.id)
       .order("published_at", { ascending: false })
@@ -285,7 +316,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
     if (relatedErr && /publication_state/i.test(relatedErr.message)) {
       let fallback = supabase
         .from("news_items")
-        .select("id, title, cover_url, categories, published_at")
+        .select("id, slug, title, cover_url, categories, published_at")
         .neq("id", item.id)
         .order("published_at", { ascending: false })
         .limit(12);
@@ -299,7 +330,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
 
     let trendingQuery = supabase
       .from("news_items")
-      .select("id, title, cover_url, categories, published_at")
+      .select("id, slug, title, cover_url, categories, published_at")
       .eq("publication_state", "published")
       .neq("id", item.id)
       .order("published_at", { ascending: false })
@@ -308,7 +339,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
     if (trendingErr && /publication_state/i.test(trendingErr.message)) {
       const fallback = await supabase
         .from("news_items")
-        .select("id, title, cover_url, categories, published_at")
+        .select("id, slug, title, cover_url, categories, published_at")
         .neq("id", item.id)
         .order("published_at", { ascending: false })
         .limit(10);
@@ -345,7 +376,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
     if (item.published_at) {
       let prevQuery = supabase
         .from("news_items")
-        .select("id, title, cover_url, categories, published_at")
+        .select("id, slug, title, cover_url, categories, published_at")
         .eq("publication_state", "published")
         .lt("published_at", item.published_at)
         .order("published_at", { ascending: false })
@@ -355,7 +386,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
       if (prevRes.error && /publication_state/i.test(prevRes.error.message)) {
         prevRes = await supabase
           .from("news_items")
-          .select("id, title, cover_url, categories, published_at")
+          .select("id, slug, title, cover_url, categories, published_at")
           .lt("published_at", item.published_at)
           .order("published_at", { ascending: false })
           .limit(1)
@@ -365,7 +396,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
 
       let nextQuery = supabase
         .from("news_items")
-        .select("id, title, cover_url, categories, published_at")
+        .select("id, slug, title, cover_url, categories, published_at")
         .eq("publication_state", "published")
         .gt("published_at", item.published_at)
         .order("published_at", { ascending: true })
@@ -375,7 +406,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
       if (nextRes.error && /publication_state/i.test(nextRes.error.message)) {
         nextRes = await supabase
           .from("news_items")
-          .select("id, title, cover_url, categories, published_at")
+          .select("id, slug, title, cover_url, categories, published_at")
           .gt("published_at", item.published_at)
           .order("published_at", { ascending: true })
           .limit(1)
@@ -457,7 +488,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                     </span>
                   </div>
                   <div className="news-article-meta-actions">
-                    <ShareButtons path={`/noticias/${item.id}`} text={item.title} />
+                    <ShareButtons path={newsHref(item)} text={item.title} />
                   </div>
                 </div>
               </article>
@@ -521,7 +552,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                       </h3>
                       <div className="news-side-list">
                         {related.map((story) => (
-                          <Link key={story.id} href={`/noticias/${story.id}`} className="news-side-item">
+                          <Link key={story.id} href={newsHref(story)} className="news-side-item">
                             <div className="news-side-thumb">
                               {story.cover_url ? (
                                 <Image
@@ -551,7 +582,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                       <h3>{copy.trending}</h3>
                       <div className="news-side-list">
                         {trending.map((story) => (
-                          <Link key={story.id} href={`/noticias/${story.id}`} className="news-side-item">
+                          <Link key={story.id} href={newsHref(story)} className="news-side-item">
                             <div className="news-side-thumb">
                               {story.cover_url ? (
                                 <Image
@@ -620,13 +651,13 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                   <p className="muted">{copy.firstComment}</p>
                 )}
 
-                <CommentComposer contentId={params.id} contentType="news" />
+                <CommentComposer contentId={item.id} contentType="news" />
               </section>
 
               {prevItem || nextItem ? (
                 <nav className="card news-next-prev" aria-label="Navegación de noticias">
                   {prevItem ? (
-                    <Link href={`/noticias/${prevItem.id}`} className="news-nav-link">
+                    <Link href={newsHref(prevItem)} className="news-nav-link">
                       <span className="muted">{copy.previous}</span>
                       <span className="news-nav-title">{prevItem.title}</span>
                     </Link>
@@ -634,7 +665,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                     <div className="news-nav-link news-nav-empty" />
                   )}
                   {nextItem ? (
-                    <Link href={`/noticias/${nextItem.id}`} className="news-nav-link news-nav-link-right">
+                    <Link href={newsHref(nextItem)} className="news-nav-link news-nav-link-right">
                       <span className="muted">{copy.next}</span>
                       <span className="news-nav-title">{nextItem.title}</span>
                     </Link>

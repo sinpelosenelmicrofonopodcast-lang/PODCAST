@@ -10,7 +10,8 @@ export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: "Feed – Últimos episodios y shorts | Sin Pelos en el Micrófono",
-  description: "Últimos capítulos, shorts y audio podcast de Sin Pelos en el Micrófono."
+  description: "Últimos capítulos, shorts y audio podcast de Sin Pelos en el Micrófono.",
+  alternates: { canonical: "/feed" }
 };
 
 type View = "all" | "episodes" | "shorts" | "audio";
