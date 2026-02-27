@@ -4597,6 +4597,62 @@ body {
   margin: 0;
 }
 
+.terms-gate-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(0, 0, 0, 0.78);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.terms-gate-card {
+  width: min(560px, 96vw);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 122, 24, 0.32);
+  background: linear-gradient(180deg, rgba(255, 122, 24, 0.08), rgba(255, 59, 59, 0.04)), var(--panel);
+  box-shadow: var(--shadow);
+  padding: 22px;
+  display: grid;
+  gap: 12px;
+}
+
+.terms-gate-card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 0.98;
+}
+
+.terms-gate-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-weight: 600;
+}
+
+.terms-gate-check input {
+  margin-top: 3px;
+}
+
+.terms-gate-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.terms-gate-actions .button[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.terms-gate-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .form-screen {
   padding-top: 24px;
 }

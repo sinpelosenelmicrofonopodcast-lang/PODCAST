@@ -4,6 +4,7 @@ import { PageViewTracker } from "@/components/PageViewTracker";
 import { Toaster } from "@/components/Toaster";
 import { BottomStickyPromo } from "@/components/promotions/BottomStickyPromo";
 import { PromoPopup } from "@/components/promotions/PromoPopup";
+import { TermsConsentPopup } from "@/components/TermsConsentPopup";
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.sinpelosenelmicrofono.com").replace(/\/+$/, "");
 const ogImage = `${siteUrl}/logo.png`;
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="splash-logo" />
         </div>
         <PageViewTracker />
+        <TermsConsentPopup />
         <BottomStickyPromo />
         <PromoPopup />
         <Toaster />
