@@ -22,6 +22,7 @@ type NewsItem = {
   analysis: string | null;
   source_url: string | null;
   cover_url: string | null;
+  video_url: string | null;
   categories: string[] | null;
   published_at: string | null;
   updated_at?: string | null;
@@ -62,6 +63,7 @@ const t: Record<
     keyPoints: string;
     source: string;
     sourceCta: string;
+    video: string;
     commentsTitle: string;
     commentsHint: string;
     firstComment: string;
@@ -82,6 +84,7 @@ const t: Record<
     keyPoints: "Puntos clave",
     source: "Fuente",
     sourceCta: "Ver fuente original",
+    video: "Video relacionado",
     commentsTitle: "Comunidad",
     commentsHint: "Debate ideas sin ataques personales.",
     firstComment: "Sé el primero en comentar.",
@@ -101,6 +104,7 @@ const t: Record<
     keyPoints: "Key points",
     source: "Source",
     sourceCta: "View original source",
+    video: "Related video",
     commentsTitle: "Community",
     commentsHint: "Debate ideas without personal attacks.",
     firstComment: "Be the first to comment.",
@@ -135,6 +139,54 @@ function estimateReadMinutes(text: string) {
     .split(/\s+/)
     .filter(Boolean).length;
   return Math.max(1, Math.ceil(words / 220));
+}
+
+function getSupportedVideoEmbedUrl(raw?: string | null) {
+  const value = String(raw ?? "").trim();
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    const path = url.pathname;
+
+    const isDrive = host === "drive.google.com" || host === "www.drive.google.com";
+    if (isDrive) {
+      const fileMatch = path.match(/\/file\/d\/([^/]+)/i);
+      const pathMatch = path.match(/\/d\/([^/]+)/i);
+      const idFromQuery = url.searchParams.get("id");
+      const fileId = fileMatch?.[1] ?? pathMatch?.[1] ?? idFromQuery ?? null;
+      if (!fileId) return null;
+      return `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/preview`;
+    }
+
+    const isYoutube = host === "youtu.be" || host.endsWith("youtube.com") || host.endsWith("youtube-nocookie.com");
+    if (isYoutube) {
+      let videoId: string | null = null;
+      if (host === "youtu.be") {
+        videoId = path.split("/").filter(Boolean)[0] ?? null;
+      } else if (path.startsWith("/watch")) {
+        videoId = url.searchParams.get("v");
+      } else if (path.startsWith("/shorts/")) {
+        videoId = path.split("/").filter(Boolean)[1] ?? null;
+      } else if (path.startsWith("/embed/")) {
+        videoId = path.split("/").filter(Boolean)[1] ?? null;
+      }
+      if (!videoId) return null;
+      return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?rel=0&modestbranding=1`;
+    }
+
+    const isVimeo = host === "vimeo.com" || host === "www.vimeo.com" || host === "player.vimeo.com";
+    if (isVimeo) {
+      const match = path.match(/\/(?:video\/)?(\d+)/i);
+      const videoId = match?.[1] ?? null;
+      if (!videoId) return null;
+      return `https://player.vimeo.com/video/${encodeURIComponent(videoId)}`;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function parseContentBlocks(raw: string): ContentBlock[] {
@@ -214,7 +266,8 @@ async function loadItem(supabase: ReturnType<typeof supabaseServer>, id: string)
   const byIdFirst = isUuid(key);
   const candidates: Array<"id" | "slug"> = byIdFirst ? ["id", "slug"] : ["slug", "id"];
   const selectVariants = [
-    "id, slug, title, summary, analysis, source_url, cover_url, categories, published_at, updated_at",
+    "id, slug, title, summary, analysis, source_url, cover_url, video_url, categories, published_at, updated_at",
+    "id, slug, title, summary, analysis, source_url, cover_url, video_url, categories, published_at",
     "id, slug, title, summary, analysis, source_url, cover_url, categories, published_at",
     "id, title, summary, analysis, source_url, cover_url, categories, published_at"
   ];
@@ -231,7 +284,7 @@ async function loadItem(supabase: ReturnType<typeof supabaseServer>, id: string)
         const result = await query;
         const rows = (result.data as unknown as NewsItem[] | null) ?? [];
         if (!result.error && rows.length > 0) return rows[0];
-        if (result.error && !/(slug|updated_at|publication_state)/i.test(result.error.message)) break;
+        if (result.error && !/(slug|video_url|updated_at|publication_state)/i.test(result.error.message)) break;
       }
     }
   }
@@ -432,6 +485,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
           : -1;
   const readTime = estimateReadMinutes(`${item?.title ?? ""}\n${item?.summary ?? ""}\n${item?.analysis ?? ""}`);
   const editorialTags = item ? buildEditorialTags(item, lang) : [];
+  const videoEmbedUrl = getSupportedVideoEmbedUrl(item?.video_url);
 
   return (
     <main>
@@ -503,6 +557,21 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                           <li key={`${idx}-${point.slice(0, 20)}`}>{point}</li>
                         ))}
                       </ul>
+                    </section>
+                  ) : null}
+
+                  {videoEmbedUrl ? (
+                    <section className="news-video-section">
+                      <h2 className="news-video-title">{copy.video}</h2>
+                      <div className="news-video-player">
+                        <iframe
+                          src={videoEmbedUrl}
+                          title={`${copy.video}: ${item.title}`}
+                          loading="lazy"
+                          allow="autoplay; encrypted-media; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
                     </section>
                   ) : null}
 

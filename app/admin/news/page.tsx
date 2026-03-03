@@ -16,6 +16,7 @@ type NewsItem = {
   analysis: string | null;
   source_url: string | null;
   cover_url: string | null;
+  video_url: string | null;
   categories: string[] | null;
   tags: string[] | null;
   publication_state?: "draft" | "published" | null;
@@ -45,6 +46,7 @@ export default function AdminNewsPage() {
   const [analysis, setAnalysis] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [categories, setCategories] = useState<string[]>([newsCategories[0]]);
   const [tags, setTags] = useState("");
   const [publishNow, setPublishNow] = useState(true);
@@ -63,12 +65,12 @@ export default function AdminNewsPage() {
     const primary = await supabase
       .from("news_items")
       .select(
-        "id, slug, title, summary, analysis, source_url, cover_url, categories, tags, publication_state, ingest_source, updated_at, rewrite_status, rewrite_error, needs_review, rewritten_at, published_at"
+        "id, slug, title, summary, analysis, source_url, cover_url, video_url, categories, tags, publication_state, ingest_source, updated_at, rewrite_status, rewrite_error, needs_review, rewritten_at, published_at"
       )
       .order("published_at", { ascending: false });
     if (
       primary.error &&
-      /(slug|publication_state|ingest_source|updated_at|rewrite_status|rewrite_error|needs_review|rewritten_at)/i.test(
+      /(slug|video_url|publication_state|ingest_source|updated_at|rewrite_status|rewrite_error|needs_review|rewritten_at)/i.test(
         primary.error.message
       )
     ) {
@@ -92,6 +94,7 @@ export default function AdminNewsPage() {
     setAnalysis("");
     setSourceUrl("");
     setCoverUrl("");
+    setVideoUrl("");
     setCategories([newsCategories[0]]);
     setTags("");
     setPublishNow(true);
@@ -169,6 +172,7 @@ export default function AdminNewsPage() {
       analysis: analysis ? analysis : null,
       source_url: sourceUrl ? sourceUrl : null,
       cover_url: coverUrl ? coverUrl : null,
+      video_url: videoUrl ? videoUrl : null,
       categories: categories && categories.length > 0 ? categories : [newsCategories[0]],
       tags: tagList,
       publication_state: publishNow ? "published" : "draft"
@@ -187,6 +191,27 @@ export default function AdminNewsPage() {
       // Under some RLS states PostgREST returns 0 rows (empty array) which triggers:
       // "Cannot coerce the result to a single JSON object".
       const u = await supabase.from("news_items").update(updatePayload).eq("id", editingId).select("id");
+      if (u.error && /video_url/i.test(String(u.error.message ?? ""))) {
+        const legacyPayload = { ...updatePayload };
+        delete (legacyPayload as any).video_url;
+        const retry = await supabase.from("news_items").update(legacyPayload).eq("id", editingId).select("id");
+        if (retry.error) {
+          const msg = humanizeNewsError(retry.error.message ?? "No se pudo actualizar.");
+          setStatus(msg);
+          toast.error(msg);
+          setLoading(false);
+          return;
+        }
+        const warn =
+          "Noticia actualizada, pero falta la columna video_url en news_items. Ejecuta `supabase/news_items_video_url.sql` para habilitar video en noticias.";
+        setStatus(warn);
+        toast.error("Falta migración video_url en news_items.");
+        setLoading(false);
+        await loadItems();
+        resetForm();
+        router.refresh();
+        return;
+      }
       if (u.error) {
         const msg = humanizeNewsError(u.error.message ?? "No se pudo actualizar.");
         setStatus(msg);
@@ -213,8 +238,22 @@ export default function AdminNewsPage() {
         published_at: publishNow ? new Date().toISOString() : null
       };
       const insertRes = await supabase.from("news_items").insert(createPayload).select().limit(1);
-      const inserted = Array.isArray(insertRes.data) ? (insertRes.data[0] as { id: string; slug?: string | null } | undefined) : undefined;
-      const error = insertRes.error;
+      let inserted = Array.isArray(insertRes.data) ? (insertRes.data[0] as { id: string; slug?: string | null } | undefined) : undefined;
+      let error = insertRes.error;
+
+      if (error && /video_url/i.test(String(error.message ?? ""))) {
+        const legacyPayload = { ...createPayload } as any;
+        delete legacyPayload.video_url;
+        const retry = await supabase.from("news_items").insert(legacyPayload).select().limit(1);
+        inserted = Array.isArray(retry.data) ? (retry.data[0] as { id: string; slug?: string | null } | undefined) : undefined;
+        error = retry.error;
+        if (!error && inserted?.id) {
+          setStatus(
+            "Noticia publicada, pero falta la columna video_url en news_items. Ejecuta `supabase/news_items_video_url.sql` para habilitar video en noticias."
+          );
+          toast.error("Falta migración video_url en news_items.");
+        }
+      }
       if (error || !inserted?.id) {
         const msg = humanizeNewsError(error?.message ?? "No se pudo publicar la noticia.");
         setStatus(msg);
@@ -271,6 +310,7 @@ export default function AdminNewsPage() {
     setAnalysis(item.analysis ?? "");
     setSourceUrl(item.source_url ?? "");
     setCoverUrl(item.cover_url ?? "");
+    setVideoUrl(item.video_url ?? "");
     setCategories(item.categories && item.categories.length > 0 ? item.categories : [newsCategories[0]]);
     setTags(item.tags?.join(", ") ?? "");
     setPublishNow((item.publication_state ?? "published") !== "draft");
@@ -402,6 +442,15 @@ export default function AdminNewsPage() {
           <input className="input" value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://..." />
         </label>
         <label>
+          Video (Google Drive / YouTube / Vimeo opcional)
+          <input
+            className="input"
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            placeholder="https://drive.google.com/... | https://youtube.com/... | https://vimeo.com/..."
+          />
+        </label>
+        <label>
           Subir portada
           <input
             className="input"
@@ -462,6 +511,11 @@ export default function AdminNewsPage() {
                   {(item.categories ?? []).join(" · ")} · {(item.publication_state ?? "published").toUpperCase()} ·{" "}
                   {item.published_at ? new Date(item.published_at).toLocaleDateString("es-PR") : "sin fecha"}
                 </span>
+                {item.video_url ? (
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    Video: configurado
+                  </span>
+                ) : null}
                 <span className="muted" style={{ fontSize: 12 }}>
                   IA: {(item.rewrite_status ?? "none").toUpperCase()}
                   {item.needs_review ? " · REVISIÓN" : ""}
