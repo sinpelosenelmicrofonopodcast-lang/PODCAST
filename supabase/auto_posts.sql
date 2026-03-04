@@ -102,4 +102,7 @@ begin
 end;
 $$;
 
+-- Ensure PostgREST sees new objects immediately after this migration.
+select pg_notify('pgrst', 'reload schema');
+
 commit;

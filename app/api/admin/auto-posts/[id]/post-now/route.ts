@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/adminAuth";
 import { publishScheduledPostToFacebook } from "@/lib/autoPosts";
 import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
+import { withScheduledPostsMigrationHint } from "@/lib/supabaseErrorHints";
 
 type ScheduledPostRow = {
   id: string;
@@ -31,7 +32,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       .select("id, message, status, scheduled_for")
       .maybeSingle();
 
-    if (claimResp.error) return NextResponse.json({ ok: false, error: claimResp.error.message }, { status: 400 });
+    if (claimResp.error) {
+      return NextResponse.json({ ok: false, error: withScheduledPostsMigrationHint(claimResp.error) }, { status: 400 });
+    }
 
     if (!claimResp.data) {
       const rowResp = await auth.service

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/adminAuth";
 import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
+import { withScheduledPostsMigrationHint } from "@/lib/supabaseErrorHints";
 
 const EDITABLE_STATUS = new Set(["queued", "cancelled"]);
 
@@ -52,7 +53,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       .select("id, platform, message, media_url, scheduled_for, status, posted_at, remote_id, error, created_by, created_at, updated_at")
       .maybeSingle();
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    if (error) return NextResponse.json({ ok: false, error: withScheduledPostsMigrationHint(error) }, { status: 400 });
     if (!data) return NextResponse.json({ ok: false, error: "No editable (ya publicado o en proceso)." }, { status: 409 });
 
     await logAdminAudit(auth.service, {
@@ -87,7 +88,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       .select("id")
       .maybeSingle();
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    if (error) return NextResponse.json({ ok: false, error: withScheduledPostsMigrationHint(error) }, { status: 400 });
     if (!data) return NextResponse.json({ ok: false, error: "No se pudo cancelar (ya publicado o en proceso)." }, { status: 409 });
 
     await logAdminAudit(auth.service, {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/adminAuth";
 import { chicagoDateInputFromNow, chicagoDayBoundsUtc } from "@/lib/autoPosts";
+import { withScheduledPostsMigrationHint } from "@/lib/supabaseErrorHints";
 
 const ALLOWED_STATUS = new Set(["queued", "publishing", "posted", "failed", "cancelled", "all"]);
 
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     if (status !== "all") query = query.eq("status", status);
 
     const { data, error } = await query;
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    if (error) return NextResponse.json({ ok: false, error: withScheduledPostsMigrationHint(error) }, { status: 400 });
 
     const items = data ?? [];
     const summary = items.reduce(

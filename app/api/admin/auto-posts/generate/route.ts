@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/adminAuth";
 import { chicagoDateInputFromNow, generateAutoPostDraftsSmart } from "@/lib/autoPosts";
 import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
+import { withScheduledPostsMigrationHint } from "@/lib/supabaseErrorHints";
 
 type GeneratePayload = {
   date?: string;
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
       .select("id, scheduled_for, message, status");
 
     if (upsert.error) {
-      return NextResponse.json({ ok: false, error: upsert.error.message }, { status: 400 });
+      return NextResponse.json({ ok: false, error: withScheduledPostsMigrationHint(upsert.error) }, { status: 400 });
     }
 
     await logAdminAudit(auth.service, {

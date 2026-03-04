@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { publishScheduledPostToFacebook } from "@/lib/autoPosts";
+import { withScheduledPostsMigrationHint } from "@/lib/supabaseErrorHints";
 
 type ScheduledPost = {
   id: string;
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const claim = await service.rpc("claim_due_scheduled_posts", { p_limit: limit });
-    if (claim.error) return NextResponse.json({ ok: false, error: claim.error.message }, { status: 400 });
+    if (claim.error) return NextResponse.json({ ok: false, error: withScheduledPostsMigrationHint(claim.error) }, { status: 400 });
 
     const rows = (claim.data ?? []) as ScheduledPost[];
     let posted = 0;
