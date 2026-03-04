@@ -14,11 +14,13 @@ function isEmail(value: string) {
 export function NewsletterForm({
   variant = "sidebar",
   title = "Suscribete",
-  subtitle = "Sin spam. Solo lo que vale."
+  subtitle = "Sin spam. Solo lo que vale.",
+  buttonLabel = "Suscribirme"
 }: {
   variant?: "sidebar" | "cta";
   title?: string;
   subtitle?: string;
+  buttonLabel?: string;
 }) {
   const pathname = usePathname() ?? "/";
   const [email, setEmail] = useState("");
@@ -64,7 +66,7 @@ export function NewsletterForm({
           autoComplete="email"
         />
         <button className="button" type="submit" disabled={loading}>
-          {loading ? "Enviando..." : "Suscribirme"}
+          {loading ? "Enviando..." : buttonLabel}
         </button>
       </form>
       <p className="muted" style={{ fontSize: 12, margin: 0 }}>
@@ -73,4 +75,3 @@ export function NewsletterForm({
     </div>
   );
 }
-
