@@ -17,6 +17,14 @@ export default function RegisterPage() {
   const [legalAck, setLegalAck] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
+  const normalizeNickname = (value: string) =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
   const computeAge = (dateValue: string) => {
     const birth = new Date(dateValue);
     const now = new Date();
@@ -42,14 +50,31 @@ export default function RegisterPage() {
       return;
     }
 
+    const safeNickname = normalizeNickname(nickname);
+
+    if (safeNickname.length < 3) {
+      setStatus("El nickname debe tener al menos 3 caracteres (letras, números o _).");
+      return;
+    }
+
+    const nicknameCheck = await supabase.from("users").select("id").ilike("nickname", safeNickname).limit(1);
+    if (nicknameCheck.error) {
+      setStatus(`No se pudo validar nickname: ${nicknameCheck.error.message}`);
+      return;
+    }
+    if ((nicknameCheck.data ?? []).length > 0) {
+      setStatus("Ese nickname ya está en uso. Elige otro.");
+      return;
+    }
+
     const { error } = await supabase.auth.signUp({
-      email,
+      email: email.trim().toLowerCase(),
       password,
       options: {
         data: {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
-          nickname,
+          nickname: safeNickname,
           birth_date: birthDate,
           is_21_confirmed: confirm21,
           legal_ack_at: new Date().toISOString(),
@@ -59,6 +84,12 @@ export default function RegisterPage() {
     });
 
     if (error) {
+      if (error.message.toLowerCase().includes("database error saving new user")) {
+        setStatus(
+          "Registro bloqueado por configuración de base de datos (trigger en auth.users). Ejecuta la migración `supabase/fix_auth_signup_triggers.sql` en Supabase SQL Editor y vuelve a intentar."
+        );
+        return;
+      }
       setStatus(error.message);
       return;
     }
