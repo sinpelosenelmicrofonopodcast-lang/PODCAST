@@ -6,7 +6,11 @@ import {
   type StaffPermission
 } from "./lib/staffPermissions";
 
-const SOCIAL_STAFF_APIS = new Set(["/api/social/youtube/sync", "/api/social/meta/facebook/post-news"]);
+const SOCIAL_STAFF_APIS = new Set([
+  "/api/social/youtube/sync",
+  "/api/social/meta/facebook/post-news",
+  "/api/social/meta/instagram/post-news"
+]);
 const SOCIAL_ADMIN_APIS = new Set(["/api/social/meta/facebook/diagnose"]);
 const ACCESS_TOKEN_COOKIE = "sp_access_token";
 
@@ -135,6 +139,7 @@ export async function middleware(request: NextRequest) {
     if (required && required !== "admin" && !hasAnyPermission(access, required)) return denyApi(403, "Sin permiso.");
     if (pathname === "/api/social/youtube/sync" && !hasAnyPermission(access, "manage_news_sources")) return denyApi(403, "Sin permiso.");
     if (pathname === "/api/social/meta/facebook/post-news" && !hasAnyPermission(access, "manage_news")) return denyApi(403, "Sin permiso.");
+    if (pathname === "/api/social/meta/instagram/post-news" && !hasAnyPermission(access, "manage_news")) return denyApi(403, "Sin permiso.");
     if (pathname === "/api/social/meta/facebook/diagnose" && !access.isAdmin) return denyApi(403, "Sin permiso.");
   }
 
@@ -142,5 +147,12 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*", "/api/social/youtube/sync", "/api/social/meta/facebook/post-news", "/api/social/meta/facebook/diagnose"]
+  matcher: [
+    "/admin/:path*",
+    "/api/admin/:path*",
+    "/api/social/youtube/sync",
+    "/api/social/meta/facebook/post-news",
+    "/api/social/meta/instagram/post-news",
+    "/api/social/meta/facebook/diagnose"
+  ]
 };

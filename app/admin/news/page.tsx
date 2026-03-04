@@ -58,6 +58,8 @@ export default function AdminNewsPage() {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [postToFacebook, setPostToFacebook] = useState(true);
   const [postingFacebookId, setPostingFacebookId] = useState<string | null>(null);
+  const [postToInstagram, setPostToInstagram] = useState(false);
+  const [postingInstagramId, setPostingInstagramId] = useState<string | null>(null);
   const [rewritingId, setRewritingId] = useState<string | null>(null);
   const router = useRouter();
 
@@ -101,6 +103,7 @@ export default function AdminNewsPage() {
     setEditingId(null);
     setEditingPublishedAt(null);
     setPostToFacebook(true);
+    setPostToInstagram(false);
   };
 
   const handleUpload = async (file: File) => {
@@ -264,34 +267,68 @@ export default function AdminNewsPage() {
       setStatus("Noticia publicada.");
       toast.success("Noticia publicada.");
 
-      if (postToFacebook && publishNow) {
+      if (publishNow && (postToFacebook || postToInstagram)) {
+        const done: string[] = [];
+        const failed: string[] = [];
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData.session?.access_token;
+
         if (!token) {
-          setStatus("Noticia publicada, pero no se pudo postear a Facebook (sesión inválida).");
-          toast.error("No se pudo postear a Facebook (sesión inválida).");
+          if (postToFacebook) failed.push("Facebook: sesión inválida");
+          if (postToInstagram) failed.push("Instagram: sesión inválida");
         } else {
-          const res = await fetch("/api/social/meta/facebook/post-news", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              newsId: inserted.id,
-              newsSlug: inserted.slug ?? null,
-              title,
-              summary
-            })
-          });
-          const json = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            setStatus(`Noticia publicada, pero Facebook falló: ${json?.error ?? "error"}`);
-            toast.error(`Facebook falló: ${json?.error ?? "error"}`);
-          } else {
-            setStatus("Noticia publicada y posteada en Facebook.");
-            toast.success("Posteada en Facebook.");
+          if (postToFacebook) {
+            const fbRes = await fetch("/api/social/meta/facebook/post-news", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                newsId: inserted.id,
+                newsSlug: inserted.slug ?? null,
+                title,
+                summary
+              })
+            });
+            const fbJson = await fbRes.json().catch(() => ({}));
+            if (!fbRes.ok) failed.push(`Facebook: ${fbJson?.error ?? "error"}`);
+            else done.push("Facebook");
           }
+
+          if (postToInstagram) {
+            const igRes = await fetch("/api/social/meta/instagram/post-news", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                newsId: inserted.id,
+                newsSlug: inserted.slug ?? null,
+                title,
+                summary,
+                coverUrl: coverUrl || null
+              })
+            });
+            const igJson = await igRes.json().catch(() => ({}));
+            if (!igRes.ok) failed.push(`Instagram: ${igJson?.error ?? "error"}`);
+            else done.push("Instagram");
+          }
+        }
+
+        if (done.length > 0 && failed.length === 0) {
+          const msg = `Noticia publicada y posteada en ${done.join(" + ")}.`;
+          setStatus(msg);
+          toast.success(msg);
+        } else if (done.length > 0 && failed.length > 0) {
+          const msg = `Noticia publicada. OK: ${done.join(" + ")}. Falló: ${failed.join(" | ")}.`;
+          setStatus(msg);
+          toast.error(msg);
+        } else if (failed.length > 0) {
+          const msg = `Noticia publicada, pero falló redes: ${failed.join(" | ")}.`;
+          setStatus(msg);
+          toast.error(msg);
         }
       }
     }
@@ -372,6 +409,59 @@ export default function AdminNewsPage() {
       return;
     }
     const msg = "Noticia publicada en Facebook.";
+    setStatus(msg);
+    toast.success(msg);
+  };
+
+  const handlePostToInstagramNow = async (item: NewsItem) => {
+    if ((item.publication_state ?? "published") === "draft") {
+      const msg = "Publica la noticia primero antes de enviarla a Instagram.";
+      setStatus(msg);
+      toast.error(msg);
+      return;
+    }
+    if (!item.cover_url) {
+      const msg = "Instagram requiere portada (URL pública) para publicar.";
+      setStatus(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setPostingInstagramId(item.id);
+    setStatus(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      const msg = "Sesión inválida. Inicia sesión de nuevo.";
+      setStatus(msg);
+      toast.error(msg);
+      setPostingInstagramId(null);
+      return;
+    }
+
+    const res = await fetch("/api/social/meta/instagram/post-news", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        newsId: item.id,
+        newsSlug: item.slug ?? null,
+        title: item.title,
+        summary: item.summary ?? "",
+        coverUrl: item.cover_url
+      })
+    });
+    const json = await res.json().catch(() => ({}));
+    setPostingInstagramId(null);
+    if (!res.ok) {
+      const msg = `Instagram falló: ${json?.error ?? "error"}`;
+      setStatus(msg);
+      toast.error(msg);
+      return;
+    }
+    const msg = "Noticia publicada en Instagram.";
     setStatus(msg);
     toast.success(msg);
   };
@@ -483,6 +573,12 @@ export default function AdminNewsPage() {
             Postear también en Facebook (con link a la noticia)
           </label>
         ) : null}
+        {!editingId ? (
+          <label className="check-row">
+            <input type="checkbox" checked={postToInstagram} onChange={(e) => setPostToInstagram(e.target.checked)} />
+            Postear también en Instagram (requiere portada)
+          </label>
+        ) : null}
         <label className="check-row">
           <input type="checkbox" checked={publishNow} onChange={(e) => setPublishNow(e.target.checked)} />
           Publicar ahora (si se desmarca, queda como borrador)
@@ -552,6 +648,14 @@ export default function AdminNewsPage() {
                     onClick={() => handlePostToFacebookNow(item)}
                   >
                     {postingFacebookId === item.id ? "Posteando..." : "Publicar en Facebook"}
+                  </button>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    disabled={postingInstagramId === item.id}
+                    onClick={() => handlePostToInstagramNow(item)}
+                  >
+                    {postingInstagramId === item.id ? "Posteando..." : "Publicar en Instagram"}
                   </button>
                   <AdminDeleteButton table="news_items" id={item.id} label="Eliminar" />
                 </div>

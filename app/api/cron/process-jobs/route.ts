@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createAutomationJob, logPipelineEvent, updateAutomationJob } from "@/lib/pipelineOps";
 import { postNewsToFacebook } from "@/lib/socialFacebook";
+import { postNewsToInstagram } from "@/lib/socialInstagram";
 import { rewriteNewsWithAI } from "@/lib/newsRewrite";
 
 type QueueJob = {
@@ -103,6 +104,75 @@ export async function POST(request: NextRequest) {
             status: "done",
             finishedAt: new Date().toISOString(),
             payload: { ...(job.payload ?? {}), postId: posted.postId, link: posted.link }
+          });
+          done += 1;
+          continue;
+        }
+
+        if (job.job_type === "instagram_post_news") {
+          const newsId = String(job.payload?.newsId ?? job.content_id ?? "").trim();
+          let newsSlug = String(job.payload?.newsSlug ?? "").trim();
+          let title = String(job.payload?.title ?? "").trim();
+          let summary = String(job.payload?.summary ?? "").trim();
+          let coverUrl = String(job.payload?.coverUrl ?? "").trim();
+          if (!newsId) throw new Error("Job inválido: falta newsId.");
+
+          if (!coverUrl || !title || !summary || !newsSlug) {
+            const newsRes = await service
+              .from("news_items")
+              .select("slug, title, summary, cover_url")
+              .eq("id", newsId)
+              .limit(1)
+              .maybeSingle();
+
+            if (newsRes.error) throw new Error(newsRes.error.message);
+            const row = newsRes.data as { slug?: string | null; title?: string | null; summary?: string | null; cover_url?: string | null } | null;
+            if (!row) throw new Error("No se encontró la noticia para Instagram.");
+            if (!newsSlug) newsSlug = String(row.slug ?? "").trim();
+            if (!title) title = String(row.title ?? "").trim();
+            if (!summary) summary = String(row.summary ?? "").trim();
+            if (!coverUrl) coverUrl = String(row.cover_url ?? "").trim();
+          }
+
+          const posted = await postNewsToInstagram({ newsId, newsSlug, title, summary, coverUrl });
+
+          await service.from("external_posts").upsert(
+            {
+              platform: "Instagram",
+              external_id: posted.mediaId || `news-${newsId}`,
+              title: title || null,
+              caption: summary || null,
+              media_url: coverUrl || null,
+              metrics: null,
+              posted_at: new Date().toISOString(),
+              source_url: posted.articleUrl
+            },
+            { onConflict: "platform,external_id", ignoreDuplicates: true }
+          );
+
+          await logPipelineEvent(service, {
+            jobId: job.id,
+            stage: "social",
+            status: "ok",
+            contentType: "news",
+            contentId: newsId,
+            platform: "Instagram",
+            message: "Post publicado por worker",
+            meta: { mediaId: posted.mediaId, link: posted.articleUrl }
+          });
+
+          await updateAutomationJob(service, job.id, {
+            status: "done",
+            finishedAt: new Date().toISOString(),
+            payload: {
+              ...(job.payload ?? {}),
+              newsSlug: newsSlug || null,
+              title,
+              summary,
+              coverUrl: coverUrl || null,
+              mediaId: posted.mediaId,
+              link: posted.articleUrl
+            }
           });
           done += 1;
           continue;
