@@ -96,8 +96,22 @@ export function summarizeDescription(text: string) {
 }
 
 const keywordCategories: Array<{ words: string[]; cat: string }> = [
+  { words: ["guerra", "ataque", "misil", "bombarde", "invasion", "frente", "ejercito", "militar"], cat: "Guerra" },
+  { words: ["geopolit", "diplomac", "otan", "onu", "relaciones internacionales", "cumbre"], cat: "Geopolítica" },
+  {
+    words: ["oriente", "oriente medio", "israel", "gaza", "palestina", "iran", "irak", "siria", "libano", "yemen", "hamas", "hezbola"],
+    cat: "Oriente"
+  },
+  { words: ["eleccion", "electoral", "voto", "urnas", "campana", "campaña"], cat: "Elecciones" },
+  { words: ["migracion", "inmigr", "migrante", "asilo", "deport", "frontera"], cat: "Migración" },
+  { words: ["seguridad", "defensa", "terror", "cartel", "narcotraf"], cat: "Seguridad" },
+  { words: ["justicia", "tribunal", "fiscal", "juez", "sentencia", "corte suprema"], cat: "Justicia" },
+  { words: ["crimen", "asesinato", "homicidio", "robo", "secuestro", "fbi"], cat: "Crimen" },
   { words: ["econom", "inflaci", "mercado", "negocio", "finanza"], cat: "Economía" },
+  { words: ["energia", "petroleo", "gas", "combustible", "electric", "renovable"], cat: "Energía" },
   { words: ["emprend", "pyme", "small business", "comercio local", "negocio pequeño", "startup"], cat: "Emprendimiento" },
+  { words: ["ciencia", "cientif", "investigacion", "nasa", "espacio", "descubr"], cat: "Ciencia" },
+  { words: ["clima", "climatico", "calentamiento", "huracan", "tormenta", "inundacion", "incendio forestal"], cat: "Clima" },
   { words: ["salud", "hospital", "medicina", "virus"], cat: "Salud" },
   { words: ["tecnolog", "startup", "ai", "inteligencia artificial"], cat: "Tecnología" },
   { words: ["deporte", "nba", "nfl", "mlb", "futbol", "béisbol"], cat: "Deporte" },
@@ -125,7 +139,7 @@ export function inferCategories(input: {
   }
 
   if (out.size === 0) out.add("Mundo");
-  return Array.from(out).slice(0, 4);
+  return Array.from(out).slice(0, 6);
 }
 
 export function inferTags(title: string, summary: string, categories: string[]) {
