@@ -61,7 +61,10 @@ pnpm dev
   - `PATCH /api/auto-posts/:id`
   - `POST /api/auto-posts/:id/post-now`
 - Scheduler:
-  - En Vercel se ejecuta cada 5 minutos por `vercel.json` (`/api/cron/auto-posts/publish`).
+  - GitHub Actions: `/.github/workflows/auto-posts-cron.yml` cada 5 minutos.
+  - Requiere secrets de repo:
+    - `CRON_BASE_URL` (ej. `https://tu-dominio.com`)
+    - `CRON_SECRET` (mismo valor que en el servidor)
 
 ## Reglas 21+
 - Registro con fecha de nacimiento
