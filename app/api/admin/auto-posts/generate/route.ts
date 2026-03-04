@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/adminAuth";
-import { chicagoDateInputFromNow, generateAutoPostDrafts } from "@/lib/autoPosts";
+import { chicagoDateInputFromNow, generateAutoPostDraftsSmart } from "@/lib/autoPosts";
 import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 
 type GeneratePayload = {
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json().catch(() => ({}))) as GeneratePayload;
     const date = String(body?.date ?? chicagoDateInputFromNow()).trim();
-    const drafts = generateAutoPostDrafts({
+    const drafts = await generateAutoPostDraftsSmart({
       date,
       startTime: body?.startTime,
       endTime: body?.endTime,

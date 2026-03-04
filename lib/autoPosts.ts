@@ -13,6 +13,11 @@ export type AutoPostDraft = {
   localTime: string;
 };
 
+type SlotMessage = {
+  localTime: string;
+  message: string;
+};
+
 export type GenerateAutoPostsInput = {
   date: string;
   startTime?: string;
@@ -299,6 +304,120 @@ export function generateAutoPostDrafts(input: GenerateAutoPostsInput): AutoPostD
   const slots = buildSlots(input);
   return slots.map((slot, index) => ({
     message: buildMessage(slot, index),
+    scheduledForUtc: chicagoLocalToUtcIso(slot.localDate, slot.localTime),
+    localDate: slot.localDate,
+    localTime: slot.localTime
+  }));
+}
+
+function enforceSlotRules(slot: Slot, messageRaw: string, fallbackIndex: number) {
+  const fallback = buildMessage(slot, fallbackIndex);
+  const message = normalizeMessage(String(messageRaw ?? "").trim());
+  if (!message) return fallback;
+
+  if (slot.minuteOfDay < 11 * 60 + 30) {
+    if (message.startsWith("Buenos días")) return message;
+    return normalizeMessage(`Buenos días, ${message}`);
+  }
+
+  if (slot.minuteOfDay >= 11 * 60 + 30 && slot.minuteOfDay <= 14 * 60) {
+    if (message.includes("Buen provecho")) return message;
+    return normalizeMessage(`Buen provecho. ${message}`);
+  }
+
+  if (slot.minuteOfDay >= 20 * 60) {
+    if (message.endsWith("Buenas noches")) return message;
+    return normalizeMessage(`${message} Buenas noches`);
+  }
+
+  return message;
+}
+
+async function generateSlotMessagesWithOpenAI(slots: Slot[]): Promise<SlotMessage[] | null> {
+  const apiKey = process.env.OPENAI_API_KEY ?? "";
+  if (!apiKey) return null;
+
+  const endpoint = process.env.OPENAI_API_BASE_URL ?? "https://api.openai.com/v1";
+  const model = process.env.OPENAI_NEWS_MODEL ?? "gpt-4o-mini";
+  const slotLines = slots.map((slot, idx) => {
+    const phase =
+      slot.minuteOfDay < 11 * 60 + 30 ? "morning" : slot.minuteOfDay <= 14 * 60 ? "midday" : slot.minuteOfDay >= 20 * 60 ? "night" : "afternoon";
+    return `${idx + 1}. ${slot.localDate} ${slot.localTime} (${phase})`;
+  });
+
+  const system = [
+    "Eres editor de redes de 'Sin Pelos en el Micrófono'.",
+    "Genera mensajes para Facebook en español boricua, cortos, directos, jocosos ligeros (no cursi).",
+    "No uses odio, violencia explícita, slurs, ni comedia negra.",
+    "Responde SOLO JSON válido con forma: {\"messages\":[{\"localTime\":\"HH:mm\",\"message\":\"...\"}]}.",
+    "Reglas duras:",
+    "- morning: el mensaje debe empezar con 'Buenos días'.",
+    "- midday (11:30-14:00): debe incluir 'Buen provecho'.",
+    "- night (>=20:00): debe terminar con 'Buenas noches'.",
+    "- Máximo 220 caracteres por mensaje."
+  ].join("\n");
+
+  const user = [
+    "Genera un mensaje por cada horario.",
+    "Horarios:",
+    ...slotLines
+  ].join("\n");
+
+  const payload = {
+    model,
+    temperature: 0.6,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ]
+  };
+
+  const res = await fetch(`${endpoint.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store"
+  });
+
+  if (!res.ok) return null;
+  const json = await res.json().catch(() => null);
+  const content = String(json?.choices?.[0]?.message?.content ?? "").trim();
+  if (!content) return null;
+
+  const parsed = JSON.parse(content);
+  const rows = Array.isArray(parsed?.messages) ? parsed.messages : [];
+  const out: SlotMessage[] = rows
+    .map((row: any) => ({
+      localTime: String(row?.localTime ?? "").trim(),
+      message: String(row?.message ?? "").trim()
+    }))
+    .filter((row: SlotMessage) => row.localTime && row.message);
+
+  return out.length > 0 ? out : null;
+}
+
+export async function generateAutoPostDraftsSmart(input: GenerateAutoPostsInput): Promise<AutoPostDraft[]> {
+  const slots = buildSlots(input);
+  if (slots.length === 0) return [];
+
+  let aiRows: SlotMessage[] | null = null;
+  try {
+    aiRows = await generateSlotMessagesWithOpenAI(slots);
+  } catch {
+    aiRows = null;
+  }
+
+  const byTime = new Map<string, string>();
+  for (const row of aiRows ?? []) {
+    if (!byTime.has(row.localTime)) byTime.set(row.localTime, row.message);
+  }
+
+  return slots.map((slot, index) => ({
+    message: enforceSlotRules(slot, byTime.get(slot.localTime) ?? "", index),
     scheduledForUtc: chicagoLocalToUtcIso(slot.localDate, slot.localTime),
     localDate: slot.localDate,
     localTime: slot.localTime
