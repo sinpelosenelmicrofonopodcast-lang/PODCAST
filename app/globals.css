@@ -6611,7 +6611,9 @@ body {
 .home-media-hero-image {
   display: block;
   position: relative;
-  min-height: 270px;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
   background: #180606;
 }
 
@@ -6628,12 +6630,14 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center center;
   display: block;
 }
 
 .home-media-image-fallback {
   width: 100%;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   background: linear-gradient(135deg, #390909 0%, #161616 55%, #4f1b08 100%);
 }
 
@@ -6681,6 +6685,9 @@ body {
 
 .home-media-trend-thumb {
   background: #1f0b0b;
+  min-height: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
 }
 
 .home-media-trend-body {
@@ -6797,11 +6804,15 @@ body {
 
 .home-region-card {
   display: grid;
-  min-height: 220px;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
 }
 
 .home-region-thumb {
-  min-height: 130px;
+  min-height: 0;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: #1f0b0b;
 }
 
 .home-region-body {
@@ -6818,7 +6829,10 @@ body {
 }
 
 .home-podcast-media {
-  min-height: 290px;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #1f0b0b;
 }
 
 .home-podcast-body {
@@ -6876,11 +6890,15 @@ body {
 
 .home-feed-card {
   display: grid;
-  min-height: 300px;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
 }
 
 .home-feed-thumb {
-  min-height: 160px;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #1f0b0b;
 }
 
 .home-feed-body {
@@ -6915,13 +6933,17 @@ body {
 .home-event-card,
 .home-viral-card {
   display: grid;
-  min-height: 300px;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
 }
 
 .home-editorial-thumb,
 .home-event-thumb,
 .home-viral-thumb {
-  min-height: 160px;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #1f0b0b;
   position: relative;
 }
 

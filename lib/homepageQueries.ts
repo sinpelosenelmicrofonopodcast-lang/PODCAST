@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { extractNewsPathSegmentFromUrl, newsHref } from "@/lib/newsRoute";
 import { getYouTubeVideoId } from "@/lib/youtube";
+import { normalizeImageUrl } from "@/lib/imageUrl";
 
 export type HomeNewsItem = {
   id: string;
@@ -246,7 +247,7 @@ function safeNum(value: unknown) {
 }
 
 function postThumb(row: ExternalPostRow) {
-  if (row.media_url) return row.media_url;
+  if (row.media_url) return normalizeImageUrl(row.media_url);
   if (!String(row.platform ?? "").toLowerCase().includes("youtube")) return null;
   const id = getYouTubeVideoId(row.source_url);
   return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
@@ -359,7 +360,7 @@ async function fetchNewsRows(supabase: ReturnType<typeof supabaseServer>, limit:
         slug: row.slug ?? null,
         title: cleanText(row.title, "Sin titular"),
         summary: row.summary ? String(row.summary) : null,
-        cover_url: row.cover_url ? String(row.cover_url) : null,
+        cover_url: normalizeImageUrl(row.cover_url),
         categories: toArray(row.categories),
         published_at: row.published_at ? String(row.published_at) : null
       }))
@@ -410,7 +411,7 @@ async function fetchBlogRows(supabase: ReturnType<typeof supabaseServer>, limit:
         slug: row.slug ?? null,
         title: cleanText(row.title, "Sin titular"),
         excerpt: row.excerpt ? String(row.excerpt) : null,
-        cover_url: row.cover_url ? String(row.cover_url) : null,
+        cover_url: normalizeImageUrl(row.cover_url),
         categories: toArray(row.categories),
         created_at: row.created_at ? String(row.created_at) : null
       }))
@@ -530,7 +531,7 @@ async function fetchUpcomingEvents(supabase: ReturnType<typeof supabaseServer>, 
         starts_at: row.starts_at ? String(row.starts_at) : null,
         venue_name: row.venue_name ? String(row.venue_name) : null,
         city: row.city ? String(row.city) : null,
-        flyer_url: row.flyer_url ? String(row.flyer_url) : null,
+        flyer_url: normalizeImageUrl(row.flyer_url),
         join_url: row.join_url ? String(row.join_url) : null,
         ticket_url: row.ticket_url ? String(row.ticket_url) : null,
         info_url: row.info_url ? String(row.info_url) : null
@@ -575,7 +576,7 @@ async function fetchPromotions(supabase: ReturnType<typeof supabaseServer>, limi
         id: cleanText(row.id),
         title: cleanText(row.title, "Sponsor"),
         description: row.description ? String(row.description) : null,
-        image_url: row.image_url ? String(row.image_url) : null,
+        image_url: normalizeImageUrl(row.image_url),
         cta_label: row.cta_label ? String(row.cta_label) : null,
         cta_url: row.cta_url ? String(row.cta_url) : null,
         placement: row.placement ? String(row.placement) : null,
@@ -725,7 +726,7 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
   };
 
   const podcastRows = podcastSourceRows;
-  const featuredEpisode = podcastRows.find((row) => isEpisodePost(row)) ?? null;
+  const featuredEpisode = podcastRows.find((row) => !isShortPost(row)) ?? podcastRows.find((row) => isEpisodePost(row)) ?? null;
 
   const editorialStories: HomeEditorialStory[] = [];
   for (const post of blogRows) {
