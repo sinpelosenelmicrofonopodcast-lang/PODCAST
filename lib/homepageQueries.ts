@@ -277,9 +277,11 @@ function isShortPost(row: ExternalPostRow) {
 function isEpisodePost(row: ExternalPostRow) {
   if (isShortPost(row)) return false;
   const duration = safeNum(row.metrics?.durationSeconds);
-  if (duration >= 8 * 60) return true;
+  if (duration >= 20 * 60) return true;
   const text = `${row.title ?? ""} ${row.caption ?? ""}`.toLowerCase();
-  return /(episodio|episode|podcast|entrevista|en vivo|live)/i.test(text);
+  const hasEpisodeSignal = /(episodio|episode|podcast|capitulo|capítulo|entrevista|full episode|sin pelos)/i.test(text);
+  if (!hasEpisodeSignal) return false;
+  return !/(clip|highlights?|resumen|noticia|breaking|reel|short|tiktok)/i.test(text);
 }
 
 function newsCategory(row: HomeNewsItem) {
@@ -425,6 +427,31 @@ async function fetchExternalRows(supabase: ReturnType<typeof supabaseServer>, li
   if (beforeIso) query = query.lt("posted_at", beforeIso);
 
   const { data, error } = await query;
+  if (error || !Array.isArray(data)) return [] as ExternalPostRow[];
+  return uniqById(
+    data
+      .map((row: any) => ({
+        id: cleanText(row.id),
+        title: row.title ? String(row.title) : null,
+        caption: row.caption ? String(row.caption) : null,
+        source_url: row.source_url ? String(row.source_url) : null,
+        media_url: row.media_url ? String(row.media_url) : null,
+        posted_at: row.posted_at ? String(row.posted_at) : null,
+        platform: row.platform ? String(row.platform) : null,
+        metrics: row.metrics ?? null
+      }))
+      .filter((row) => row.id)
+  );
+}
+
+async function fetchPodcastRows(supabase: ReturnType<typeof supabaseServer>, limit: number) {
+  const { data, error } = await supabase
+    .from("external_posts")
+    .select("id, title, caption, source_url, media_url, posted_at, platform, metrics")
+    .or("platform.ilike.%youtube%,source_url.ilike.%youtube.com%,source_url.ilike.%youtu.be%")
+    .order("posted_at", { ascending: false })
+    .limit(limit);
+
   if (error || !Array.isArray(data)) return [] as ExternalPostRow[];
   return uniqById(
     data
@@ -660,11 +687,11 @@ function sponsorCandidate(row: PromotionRow) {
 async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
   const supabase = supabaseServer();
 
-  const [settings, newsRows, blogRows, externalRows, threadRows, eventsRows, promoRows] = await Promise.all([
+  const [settings, newsRows, blogRows, podcastSourceRows, threadRows, eventsRows, promoRows] = await Promise.all([
     fetchHomeSettings(supabase),
     fetchNewsRows(supabase, 64),
     fetchBlogRows(supabase, 36),
-    fetchExternalRows(supabase, 24),
+    fetchPodcastRows(supabase, 80),
     fetchThreads(supabase, 14),
     fetchUpcomingEvents(supabase, 8),
     fetchPromotions(supabase, 10)
@@ -697,8 +724,8 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
     return selected;
   };
 
-  const podcastRows = externalRows.filter((row) => String(row.platform ?? "").toLowerCase().includes("youtube"));
-  const featuredEpisode = podcastRows.find((row) => isEpisodePost(row)) ?? podcastRows.find((row) => !isShortPost(row)) ?? null;
+  const podcastRows = podcastSourceRows;
+  const featuredEpisode = podcastRows.find((row) => isEpisodePost(row)) ?? null;
 
   const editorialStories: HomeEditorialStory[] = [];
   for (const post of blogRows) {

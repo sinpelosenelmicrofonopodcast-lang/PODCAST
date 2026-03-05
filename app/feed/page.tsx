@@ -95,6 +95,13 @@ function isShortPost(post: ExternalPost) {
   return false;
 }
 
+function isPodcastSource(post: ExternalPost) {
+  const platform = String(post.platform ?? "").toLowerCase();
+  if (platform.includes("youtube")) return true;
+  const url = String(post.source_url ?? "").toLowerCase();
+  return url.includes("youtube.com") || url.includes("youtu.be");
+}
+
 function mediaFor(post: ExternalPost) {
   if (post.media_url) return post.media_url;
   if (post.platform !== "YouTube") return null;
@@ -158,7 +165,9 @@ export default async function FeedPage({
     .order("posted_at", { ascending: false })
     .limit(FEED_LIMIT);
 
-  const allPosts = uniqueExternalPosts(((rows ?? []) as ExternalPost[]).filter((p) => p.source_url));
+  const allPosts = uniqueExternalPosts(
+    ((rows ?? []) as ExternalPost[]).filter((p) => p.source_url && isPodcastSource(p))
+  );
   const episodes = allPosts.filter((p) => !isShortPost(p)).slice(0, 12);
   const shorts = allPosts.filter((p) => isShortPost(p)).slice(0, 16);
   const shortsPreview = shorts.slice(0, PREVIEW_SHORTS);

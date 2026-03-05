@@ -7,7 +7,7 @@ function compact(value: unknown) {
 
 function sourceLink(item: HomePodcastItem | null | undefined) {
   const href = String(item?.source_url ?? "").trim();
-  return href || "/feed";
+  return href || "/podcast";
 }
 
 export function PodcastBlock({
@@ -40,7 +40,7 @@ export function PodcastBlock({
             <a className="button" href={sourceLink(featured)} target={featured?.source_url ? "_blank" : undefined} rel="noreferrer">
               VER EPISODIO
             </a>
-            <Link className="button secondary" href="/feed">
+            <Link className="button secondary" href="/podcast">
               IR AL PODCAST
             </Link>
           </div>
