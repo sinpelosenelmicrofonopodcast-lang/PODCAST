@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { newsHref } from "@/lib/newsRoute";
 import type { HomeNewsItem } from "@/lib/homepageQueries";
+import { SafeImage } from "@/components/home/SafeImage";
 
 function formatDate(value?: string | null) {
   if (!value) return "";
@@ -51,11 +52,7 @@ export function HeroNews({
           {lead ? (
             <>
               <Link href={newsHref(lead)} className="home-media-hero-image" aria-label={lead.title}>
-                {lead.cover_url ? (
-                  <img src={lead.cover_url} alt={lead.title} loading="eager" />
-                ) : (
-                  <div className="home-media-image-fallback" aria-hidden="true" />
-                )}
+                <SafeImage src={lead.cover_url} alt={lead.title} loading="eager" />
                 <span className="home-urgency-badge">{urgencyBadge(lead)}</span>
               </Link>
               <div className="home-media-hero-body">
@@ -83,11 +80,7 @@ export function HeroNews({
             trending.slice(0, 3).map((item) => (
               <Link key={item.id} href={newsHref(item)} className="card home-media-trend-card">
                 <div className="home-media-trend-thumb">
-                  {item.cover_url ? (
-                    <img src={item.cover_url} alt={item.title} loading="lazy" />
-                  ) : (
-                    <div className="home-media-image-fallback" aria-hidden="true" />
-                  )}
+                  <SafeImage src={item.cover_url} alt={item.title} loading="lazy" />
                 </div>
                 <div className="home-media-trend-body">
                   <span className="home-media-chip">{firstCategory(item)}</span>

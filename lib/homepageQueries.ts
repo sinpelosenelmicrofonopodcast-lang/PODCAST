@@ -446,12 +446,26 @@ async function fetchExternalRows(supabase: ReturnType<typeof supabaseServer>, li
 }
 
 async function fetchPodcastRows(supabase: ReturnType<typeof supabaseServer>, limit: number) {
-  const { data, error } = await supabase
+  const primary = await supabase
     .from("external_posts")
     .select("id, title, caption, source_url, media_url, posted_at, platform, metrics")
-    .or("platform.ilike.%youtube%,source_url.ilike.%youtube.com%,source_url.ilike.%youtu.be%")
+    .ilike("platform", "%youtube%")
     .order("posted_at", { ascending: false })
     .limit(limit);
+
+  let data: any[] | null = (primary.data as any[] | null) ?? null;
+  let error = primary.error;
+
+  if ((!Array.isArray(data) || data.length === 0) && !error) {
+    const fallback = await supabase
+      .from("external_posts")
+      .select("id, title, caption, source_url, media_url, posted_at, platform, metrics")
+      .or("source_url.ilike.%youtube.com%,source_url.ilike.%youtu.be%")
+      .order("posted_at", { ascending: false })
+      .limit(limit);
+    data = (fallback.data as any[] | null) ?? null;
+    error = fallback.error;
+  }
 
   if (error || !Array.isArray(data)) return [] as ExternalPostRow[];
   return uniqById(

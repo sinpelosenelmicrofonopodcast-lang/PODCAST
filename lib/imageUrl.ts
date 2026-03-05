@@ -11,8 +11,14 @@ function extractGoogleDriveFileId(url: URL) {
 }
 
 export function normalizeImageUrl(raw: unknown) {
-  const value = cleanText(raw);
+  let value = cleanText(raw);
   if (!value) return null;
+
+  // Fix malformed scheme like "https:/example.com"
+  value = value.replace(/^https?:\/(?!\/)/i, (m) => `${m}/`);
+  if (/^www\./i.test(value)) {
+    value = `https://${value}`;
+  }
 
   try {
     const url = new URL(value);

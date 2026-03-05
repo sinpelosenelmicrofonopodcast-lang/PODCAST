@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { newsHref } from "@/lib/newsRoute";
 import type { HomeNewsItem } from "@/lib/homepageQueries";
+import { SafeImage } from "@/components/home/SafeImage";
 
 function regionCard(item: HomeNewsItem) {
   const category = Array.isArray(item.categories) ? item.categories[0] : null;
   return (
     <Link key={item.id} href={newsHref(item)} className="card home-region-card">
       <div className="home-region-thumb">
-        {item.cover_url ? <img src={item.cover_url} alt={item.title} loading="lazy" /> : <div className="home-media-image-fallback" aria-hidden="true" />}
+        <SafeImage src={item.cover_url} alt={item.title} loading="lazy" />
       </div>
       <div className="home-region-body">
         <span className="home-media-chip">{category || "Noticias"}</span>

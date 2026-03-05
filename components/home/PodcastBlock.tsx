@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { HomePodcastItem } from "@/lib/homepageQueries";
+import { SafeImage } from "@/components/home/SafeImage";
 
 function compact(value: unknown) {
   return new Intl.NumberFormat("es-PR", { notation: "compact" }).format(Number(value ?? 0));
@@ -23,7 +24,7 @@ export function PodcastBlock({
 
       <article className="card home-podcast-featured">
         <div className="home-podcast-media">
-          {featured?.media_url ? <img src={featured.media_url} alt={featured.title} loading="lazy" /> : <div className="home-media-image-fallback" aria-hidden="true" />}
+          <SafeImage src={featured?.media_url} alt={featured?.title ?? "Podcast destacado"} loading="lazy" />
         </div>
         <div className="home-podcast-body">
           <span className="home-urgency-badge">EN VIVO</span>

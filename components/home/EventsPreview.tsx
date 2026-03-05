@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { HomeEvent } from "@/lib/homepageQueries";
+import { SafeImage } from "@/components/home/SafeImage";
 
 function formatDate(value?: string | null) {
   if (!value) return "Sin fecha";
@@ -35,7 +36,7 @@ export function EventsPreview({ events }: { events: HomeEvent[] }) {
           events.slice(0, 4).map((event) => (
             <a key={event.id} href={eventHref(event)} className="card home-event-card" target="_blank" rel="noreferrer">
               <div className="home-event-thumb">
-                {event.flyer_url ? <img src={event.flyer_url} alt={event.title} loading="lazy" /> : <div className="home-media-image-fallback" aria-hidden="true" />}
+                <SafeImage src={event.flyer_url} alt={event.title} loading="lazy" />
               </div>
               <div className="home-event-body">
                 <h3 className="clamp-2">{event.title}</h3>

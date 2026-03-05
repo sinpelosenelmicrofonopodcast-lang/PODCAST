@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HomeFeedItem } from "@/lib/homepageQueries";
+import { SafeImage } from "@/components/home/SafeImage";
 
 type FeedResponse = {
   ok: boolean;
@@ -131,7 +132,7 @@ export function FeedCentral({
             return (
               <article key={item.id} className="card home-feed-card">
                 <a href={item.href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className="home-feed-thumb">
-                  {item.thumbnailUrl ? <img src={item.thumbnailUrl} alt={item.title} loading="lazy" /> : <div className="home-media-image-fallback" aria-hidden="true" />}
+                  <SafeImage src={item.thumbnailUrl} alt={item.title} loading="lazy" />
                 </a>
                 <div className="home-feed-body">
                   <div className="home-feed-meta-row">
