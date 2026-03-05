@@ -4,6 +4,16 @@ export type InstagramPostNewsInput = {
   title?: string | null;
   summary?: string | null;
   coverUrl?: string | null;
+  publishAs?: "feed" | "story";
+};
+
+export type InstagramPostBlogInput = {
+  blogId: string;
+  blogSlug?: string | null;
+  title?: string | null;
+  excerpt?: string | null;
+  coverUrl?: string | null;
+  publishAs?: "feed" | "story";
 };
 
 function getConfig() {
@@ -24,6 +34,10 @@ function normalizeCaption(input: string) {
   const clean = String(input ?? "").trim();
   if (clean.length <= maxChars) return clean;
   return `${clean.slice(0, maxChars - 1).trimEnd()}…`;
+}
+
+function normalizePublishTarget(value?: string | null) {
+  return String(value ?? "").toLowerCase() === "story" ? "story" : "feed";
 }
 
 async function graphPostWithRetry(url: string, form: URLSearchParams, attempts = 3) {
@@ -70,13 +84,15 @@ export async function postNewsToInstagram(input: InstagramPostNewsInput) {
   const newsSlug = String(input.newsSlug ?? "").trim();
   const title = String(input.title ?? "").trim();
   const summary = String(input.summary ?? "").trim();
+  const publishAs = normalizePublishTarget(input.publishAs);
   const linkKey = newsSlug || newsId;
   const articleUrl = `${baseUrl.replace(/\/$/, "")}/noticias/${encodeURIComponent(linkKey)}`;
   const caption = normalizeCaption(summary ? `${title}\n\n${summary}\n\n${articleUrl}` : `${title}\n\n${articleUrl}`);
 
   const createForm = new URLSearchParams();
   createForm.set("image_url", coverUrl);
-  createForm.set("caption", caption);
+  if (publishAs === "story") createForm.set("media_type", "STORIES");
+  else createForm.set("caption", caption);
   createForm.set("access_token", igAccessToken);
 
   const createUrl = `https://graph.facebook.com/${graphVersion}/${igUserId}/media`;
@@ -96,6 +112,57 @@ export async function postNewsToInstagram(input: InstagramPostNewsInput) {
   return {
     ok: true as const,
     mediaId,
-    articleUrl
+    articleUrl,
+    publishAs
+  };
+}
+
+export async function postBlogToInstagram(input: InstagramPostBlogInput) {
+  const { igUserId, igAccessToken, graphVersion, baseUrl } = getConfig();
+  if (!igUserId || !igAccessToken) {
+    throw new Error("Faltan IG_USER_ID o IG_ACCESS_TOKEN/META_PAGE_ACCESS_TOKEN.");
+  }
+
+  const blogId = String(input.blogId ?? "").trim();
+  if (!blogId) throw new Error("blogId requerido.");
+
+  const coverUrl = String(input.coverUrl ?? "").trim();
+  if (!coverUrl) {
+    throw new Error("Instagram requiere portada (cover_url) pública.");
+  }
+
+  const blogSlug = String(input.blogSlug ?? "").trim();
+  const title = String(input.title ?? "").trim();
+  const excerpt = normalizeCaption(String(input.excerpt ?? "").replace(/\s+/g, " ").trim());
+  const publishAs = normalizePublishTarget(input.publishAs);
+  const linkKey = blogSlug || blogId;
+  const articleUrl = `${baseUrl.replace(/\/$/, "")}/blog/${encodeURIComponent(linkKey)}`;
+  const caption = normalizeCaption(excerpt ? `${title}\n\n${excerpt}\n\nLee completo: ${articleUrl}` : `${title}\n\nLee completo: ${articleUrl}`);
+
+  const createForm = new URLSearchParams();
+  createForm.set("image_url", coverUrl);
+  if (publishAs === "story") createForm.set("media_type", "STORIES");
+  else createForm.set("caption", caption);
+  createForm.set("access_token", igAccessToken);
+
+  const createUrl = `https://graph.facebook.com/${graphVersion}/${igUserId}/media`;
+  const createRes = await graphPostWithRetry(createUrl, createForm);
+  const creationId = String(createRes.data?.id ?? "").trim();
+  if (!creationId) throw new Error("Instagram no devolvió creation_id.");
+
+  const publishForm = new URLSearchParams();
+  publishForm.set("creation_id", creationId);
+  publishForm.set("access_token", igAccessToken);
+
+  const publishUrl = `https://graph.facebook.com/${graphVersion}/${igUserId}/media_publish`;
+  const publishRes = await graphPostWithRetry(publishUrl, publishForm);
+  const mediaId = String(publishRes.data?.id ?? "").trim();
+  if (!mediaId) throw new Error("Instagram no devolvió media id.");
+
+  return {
+    ok: true as const,
+    mediaId,
+    articleUrl,
+    publishAs
   };
 }

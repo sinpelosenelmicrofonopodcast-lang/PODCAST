@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     let title = String(body?.title ?? "").trim();
     let summary = String(body?.summary ?? "").trim();
     let coverUrl = String(body?.coverUrl ?? "").trim();
+    const publishAs = body?.story === true ? "story" : "feed";
 
     if (!newsId) return NextResponse.json({ ok: false, error: "newsId requerido." }, { status: 400 });
 
@@ -62,10 +63,10 @@ export async function POST(request: NextRequest) {
     jobId = await createAutomationJob(auth.service, {
       jobType: "instagram_post_news",
       source: "instagram",
-      title: title || "Publicar noticia en Instagram",
+      title: title || (publishAs === "story" ? "Publicar historia en Instagram" : "Publicar noticia en Instagram"),
       contentType: "news",
       contentId: newsId,
-      payload: { title, summary, newsSlug: newsSlug || null, coverUrl },
+      payload: { title, summary, newsSlug: newsSlug || null, coverUrl, publishAs },
       status: "running",
       createdBy: auth.userId
     });
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
       contentType: "news",
       contentId: newsId,
       platform: "Instagram",
-      message: "Inicio de publicación en Instagram",
+      message: publishAs === "story" ? "Inicio de publicación en historia de Instagram" : "Inicio de publicación en Instagram",
       actorId: auth.userId
     });
 
@@ -86,7 +87,8 @@ export async function POST(request: NextRequest) {
       newsSlug: newsSlug || null,
       title,
       summary,
-      coverUrl
+      coverUrl,
+      publishAs
     });
 
     await auth.service.from("external_posts").upsert(
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
         platform: "Instagram",
         external_id: String(posted.mediaId ?? `news-${newsId}`),
         title: title || null,
-        caption: summary || null,
+        caption: publishAs === "story" ? null : summary || null,
         media_url: coverUrl,
         metrics: null,
         posted_at: new Date().toISOString(),
@@ -110,8 +112,8 @@ export async function POST(request: NextRequest) {
       contentType: "news",
       contentId: newsId,
       platform: "Instagram",
-      message: "Noticia publicada en Instagram",
-      meta: { mediaId: posted.mediaId, link: posted.articleUrl },
+      message: publishAs === "story" ? "Historia publicada en Instagram" : "Noticia publicada en Instagram",
+      meta: { mediaId: posted.mediaId, link: posted.articleUrl, publishAs },
       actorId: auth.userId
     });
 
@@ -119,7 +121,7 @@ export async function POST(request: NextRequest) {
       status: "done",
       attempts: 1,
       finishedAt: new Date().toISOString(),
-      payload: { title, summary, coverUrl, link: posted.articleUrl, mediaId: posted.mediaId }
+      payload: { title, summary, coverUrl, link: posted.articleUrl, mediaId: posted.mediaId, publishAs }
     });
 
     await logAdminAudit(auth.service, {
@@ -127,7 +129,7 @@ export async function POST(request: NextRequest) {
       action: "admin.news.instagram_post",
       targetTable: "news_items",
       targetId: newsId,
-      meta: { media_id: posted.mediaId, link: posted.articleUrl },
+      meta: { media_id: posted.mediaId, link: posted.articleUrl, publish_as: publishAs },
       ...reqMeta
     });
 

@@ -59,7 +59,9 @@ export default function AdminNewsPage() {
   const [postToFacebook, setPostToFacebook] = useState(true);
   const [postingFacebookId, setPostingFacebookId] = useState<string | null>(null);
   const [postToInstagram, setPostToInstagram] = useState(false);
+  const [postToInstagramStory, setPostToInstagramStory] = useState(false);
   const [postingInstagramId, setPostingInstagramId] = useState<string | null>(null);
+  const [postingInstagramStoryId, setPostingInstagramStoryId] = useState<string | null>(null);
   const [rewritingId, setRewritingId] = useState<string | null>(null);
   const router = useRouter();
 
@@ -104,6 +106,7 @@ export default function AdminNewsPage() {
     setEditingPublishedAt(null);
     setPostToFacebook(true);
     setPostToInstagram(false);
+    setPostToInstagramStory(false);
   };
 
   const handleUpload = async (file: File) => {
@@ -267,7 +270,7 @@ export default function AdminNewsPage() {
       setStatus("Noticia publicada.");
       toast.success("Noticia publicada.");
 
-      if (publishNow && (postToFacebook || postToInstagram)) {
+      if (publishNow && (postToFacebook || postToInstagram || postToInstagramStory)) {
         const done: string[] = [];
         const failed: string[] = [];
         const { data: sessionData } = await supabase.auth.getSession();
@@ -275,7 +278,8 @@ export default function AdminNewsPage() {
 
         if (!token) {
           if (postToFacebook) failed.push("Facebook: sesión inválida");
-          if (postToInstagram) failed.push("Instagram: sesión inválida");
+          if (postToInstagram) failed.push("Instagram feed: sesión inválida");
+          if (postToInstagramStory) failed.push("Instagram story: sesión inválida");
         } else {
           if (postToFacebook) {
             const fbRes = await fetch("/api/social/meta/facebook/post-news", {
@@ -312,8 +316,29 @@ export default function AdminNewsPage() {
               })
             });
             const igJson = await igRes.json().catch(() => ({}));
-            if (!igRes.ok) failed.push(`Instagram: ${igJson?.error ?? "error"}`);
-            else done.push("Instagram");
+            if (!igRes.ok) failed.push(`Instagram feed: ${igJson?.error ?? "error"}`);
+            else done.push("Instagram feed");
+          }
+
+          if (postToInstagramStory) {
+            const igStoryRes = await fetch("/api/social/meta/instagram/post-news", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                newsId: inserted.id,
+                newsSlug: inserted.slug ?? null,
+                title,
+                summary,
+                coverUrl: coverUrl || null,
+                story: true
+              })
+            });
+            const igStoryJson = await igStoryRes.json().catch(() => ({}));
+            if (!igStoryRes.ok) failed.push(`Instagram story: ${igStoryJson?.error ?? "error"}`);
+            else done.push("Instagram story");
           }
         }
 
@@ -413,7 +438,7 @@ export default function AdminNewsPage() {
     toast.success(msg);
   };
 
-  const handlePostToInstagramNow = async (item: NewsItem) => {
+  const handlePostToInstagramNow = async (item: NewsItem, story = false) => {
     if ((item.publication_state ?? "published") === "draft") {
       const msg = "Publica la noticia primero antes de enviarla a Instagram.";
       setStatus(msg);
@@ -427,7 +452,8 @@ export default function AdminNewsPage() {
       return;
     }
 
-    setPostingInstagramId(item.id);
+    if (story) setPostingInstagramStoryId(item.id);
+    else setPostingInstagramId(item.id);
     setStatus(null);
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
@@ -435,7 +461,8 @@ export default function AdminNewsPage() {
       const msg = "Sesión inválida. Inicia sesión de nuevo.";
       setStatus(msg);
       toast.error(msg);
-      setPostingInstagramId(null);
+      if (story) setPostingInstagramStoryId(null);
+      else setPostingInstagramId(null);
       return;
     }
 
@@ -450,18 +477,20 @@ export default function AdminNewsPage() {
         newsSlug: item.slug ?? null,
         title: item.title,
         summary: item.summary ?? "",
-        coverUrl: item.cover_url
+        coverUrl: item.cover_url,
+        story
       })
     });
     const json = await res.json().catch(() => ({}));
-    setPostingInstagramId(null);
+    if (story) setPostingInstagramStoryId(null);
+    else setPostingInstagramId(null);
     if (!res.ok) {
-      const msg = `Instagram falló: ${json?.error ?? "error"}`;
+      const msg = `Instagram ${story ? "story" : "feed"} falló: ${json?.error ?? "error"}`;
       setStatus(msg);
       toast.error(msg);
       return;
     }
-    const msg = "Noticia publicada en Instagram.";
+    const msg = story ? "Noticia publicada en historia de Instagram." : "Noticia publicada en Instagram.";
     setStatus(msg);
     toast.success(msg);
   };
@@ -579,6 +608,12 @@ export default function AdminNewsPage() {
             Postear también en Instagram (requiere portada)
           </label>
         ) : null}
+        {!editingId ? (
+          <label className="check-row">
+            <input type="checkbox" checked={postToInstagramStory} onChange={(e) => setPostToInstagramStory(e.target.checked)} />
+            Postear también en Instagram Story (requiere portada)
+          </label>
+        ) : null}
         <label className="check-row">
           <input type="checkbox" checked={publishNow} onChange={(e) => setPublishNow(e.target.checked)} />
           Publicar ahora (si se desmarca, queda como borrador)
@@ -656,6 +691,14 @@ export default function AdminNewsPage() {
                     onClick={() => handlePostToInstagramNow(item)}
                   >
                     {postingInstagramId === item.id ? "Posteando..." : "Publicar en Instagram"}
+                  </button>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    disabled={postingInstagramStoryId === item.id}
+                    onClick={() => handlePostToInstagramNow(item, true)}
+                  >
+                    {postingInstagramStoryId === item.id ? "Posteando..." : "Publicar Story IG"}
                   </button>
                   <AdminDeleteButton table="news_items" id={item.id} label="Eliminar" />
                 </div>
