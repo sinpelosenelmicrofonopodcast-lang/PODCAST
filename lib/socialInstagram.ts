@@ -19,6 +19,7 @@ export type InstagramPostBlogInput = {
 function getConfig() {
   return {
     igUserId: process.env.IG_USER_ID ?? "",
+    pageId: process.env.META_PAGE_ID ?? "",
     igAccessToken: process.env.IG_ACCESS_TOKEN ?? process.env.META_PAGE_ACCESS_TOKEN ?? "",
     graphVersion: process.env.META_GRAPH_VERSION ?? "v24.0",
     baseUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
@@ -67,11 +68,40 @@ async function graphPostWithRetry(url: string, form: URLSearchParams, attempts =
   throw new Error(lastError);
 }
 
-export async function postNewsToInstagram(input: InstagramPostNewsInput) {
-  const { igUserId, igAccessToken, graphVersion, baseUrl } = getConfig();
-  if (!igUserId || !igAccessToken) {
-    throw new Error("Faltan IG_USER_ID o IG_ACCESS_TOKEN/META_PAGE_ACCESS_TOKEN.");
+async function resolveIgUserId(config: ReturnType<typeof getConfig>) {
+  const direct = String(config.igUserId ?? "").trim();
+  if (direct) return direct;
+
+  const pageId = String(config.pageId ?? "").trim();
+  const token = String(config.igAccessToken ?? "").trim();
+  if (!pageId || !token) {
+    throw new Error("Faltan IG_USER_ID y/o META_PAGE_ID junto con token de acceso para Instagram.");
   }
+
+  const url = new URL(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(pageId)}`);
+  url.searchParams.set("fields", "connected_instagram_account{id}");
+  url.searchParams.set("access_token", token);
+
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  const json = await res.json().catch(() => ({} as any));
+  if (!res.ok) {
+    throw new Error(String(json?.error?.message ?? `Meta API HTTP ${res.status}`));
+  }
+
+  const connectedId = String(json?.connected_instagram_account?.id ?? "").trim();
+  if (!connectedId) {
+    throw new Error("La página de Facebook no tiene cuenta de Instagram conectada.");
+  }
+  return connectedId;
+}
+
+export async function postNewsToInstagram(input: InstagramPostNewsInput) {
+  const config = getConfig();
+  const { igAccessToken, graphVersion, baseUrl } = config;
+  if (!igAccessToken) {
+    throw new Error("Falta IG_ACCESS_TOKEN/META_PAGE_ACCESS_TOKEN.");
+  }
+  const igUserId = await resolveIgUserId(config);
 
   const newsId = String(input.newsId ?? "").trim();
   if (!newsId) throw new Error("newsId requerido.");
@@ -118,10 +148,12 @@ export async function postNewsToInstagram(input: InstagramPostNewsInput) {
 }
 
 export async function postBlogToInstagram(input: InstagramPostBlogInput) {
-  const { igUserId, igAccessToken, graphVersion, baseUrl } = getConfig();
-  if (!igUserId || !igAccessToken) {
-    throw new Error("Faltan IG_USER_ID o IG_ACCESS_TOKEN/META_PAGE_ACCESS_TOKEN.");
+  const config = getConfig();
+  const { igAccessToken, graphVersion, baseUrl } = config;
+  if (!igAccessToken) {
+    throw new Error("Falta IG_ACCESS_TOKEN/META_PAGE_ACCESS_TOKEN.");
   }
+  const igUserId = await resolveIgUserId(config);
 
   const blogId = String(input.blogId ?? "").trim();
   if (!blogId) throw new Error("blogId requerido.");
