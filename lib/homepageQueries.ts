@@ -194,7 +194,7 @@ const DEFAULT_HERO_KICKER = "Noticias en caliente";
 const DEFAULT_HERO_TITLE = "Sin Pelos en el Micrófono";
 const DEFAULT_HERO_SUBTITLE = "Cobertura diaria estilo redacción digital: rápido, directo y sin filtros.";
 
-const FEED_DEFAULT_LIMIT = 12;
+const FEED_DEFAULT_LIMIT = 8;
 const MAX_FEED_LIMIT = 24;
 
 function serviceClient() {
@@ -212,6 +212,15 @@ function toArray(input: unknown): string[] {
 function cleanText(input: unknown, fallback = "") {
   const value = String(input ?? "").trim();
   return value || fallback;
+}
+
+function normalizeHeadline(input: unknown) {
+  return String(input ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function toIsoHoursAgo(hours: number) {
@@ -666,16 +675,30 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
 
   const usedHero = new Set<string>([heroLead?.id ?? "", ...heroTrending.map((row) => row.id)].filter(Boolean));
   const regionPool = newsRows.filter((row) => !usedHero.has(row.id));
+  const regionRemaining = new Set(regionPool.map((row) => row.id));
 
   const pickRegion = (keys: string[]) => {
-    const primary = regionPool.filter((row) => hasCategory(row, keys));
-    const fallback = newsRows.filter((row) => hasCategory(row, keys));
-    const items = primary.length > 0 ? primary : fallback;
-    return items.slice(0, 4);
+    const selected: HomeNewsItem[] = [];
+    for (const row of regionPool) {
+      if (selected.length >= 4) break;
+      if (!regionRemaining.has(row.id)) continue;
+      if (!hasCategory(row, keys)) continue;
+      selected.push(row);
+      regionRemaining.delete(row.id);
+    }
+
+    for (const row of regionPool) {
+      if (selected.length >= 4) break;
+      if (!regionRemaining.has(row.id)) continue;
+      selected.push(row);
+      regionRemaining.delete(row.id);
+    }
+
+    return selected;
   };
 
   const podcastRows = externalRows.filter((row) => String(row.platform ?? "").toLowerCase().includes("youtube"));
-  const featuredEpisode = podcastRows.find((row) => isEpisodePost(row)) ?? podcastRows.find((row) => !isShortPost(row)) ?? podcastRows[0] ?? null;
+  const featuredEpisode = podcastRows.find((row) => isEpisodePost(row)) ?? podcastRows.find((row) => !isShortPost(row)) ?? null;
 
   const editorialStories: HomeEditorialStory[] = [];
   for (const post of blogRows) {
@@ -805,21 +828,21 @@ async function queryHomepageTrendingInternal(): Promise<HomepageTrendingData> {
       if (Math.abs(byScore) > 0.0001) return byScore;
       return new Date(b.published_at ?? 0).getTime() - new Date(a.published_at ?? 0).getTime();
     })
-    .slice(0, 6);
+    .slice(0, 4);
 
   const enTendenciaIds = new Set(enTendenciaRows.map((row) => row.id));
 
   const subiendoRows = [...newsRows]
     .filter((row) => !enTendenciaIds.has(row.id))
     .sort((a, b) => risingScore(b) - risingScore(a))
-    .slice(0, 6);
+    .slice(0, 4);
 
   const skipIds = new Set([...enTendenciaRows, ...subiendoRows].map((row) => row.id));
 
   const viralRows = [...newsRows]
     .filter((row) => !skipIds.has(row.id))
     .sort((a, b) => viralScore(b.id) - viralScore(a.id))
-    .slice(0, 6);
+    .slice(0, 4);
 
   return {
     enTendencia: enTendenciaRows.map(mapItem),
@@ -841,11 +864,10 @@ async function queryHomepageFeedPageInternal(
   const beforeIso = parsedCursor && Number.isFinite(parsedCursor.getTime()) ? parsedCursor.toISOString() : null;
   const sourceLimit = Math.max(16, limit * 2);
 
-  const [newsRows, blogRows, externalRows, threads] = await Promise.all([
+  const [newsRows, blogRows, externalRows] = await Promise.all([
     fetchNewsRows(supabase, sourceLimit, beforeIso),
     fetchBlogRows(supabase, sourceLimit, beforeIso),
-    fetchExternalRows(supabase, sourceLimit, beforeIso),
-    fetchThreads(supabase, sourceLimit, beforeIso)
+    fetchExternalRows(supabase, sourceLimit, beforeIso)
   ]);
 
   const newsCommentCounts = new Map<string, number>();
@@ -863,26 +885,6 @@ async function queryHomepageFeedPageInternal(
         const key = cleanText(row.content_id);
         if (!key) return;
         newsCommentCounts.set(key, (newsCommentCounts.get(key) ?? 0) + 1);
-      });
-    }
-  }
-
-  const threadReplyCounts = new Map<string, number>();
-  if (threads.length > 0) {
-    const repliesResp = await supabase
-      .from("replies")
-      .select("thread_id")
-      .in(
-        "thread_id",
-        threads.map((row) => row.id)
-      )
-      .limit(4000);
-
-    if (!repliesResp.error) {
-      (repliesResp.data ?? []).forEach((row: any) => {
-        const key = cleanText(row.thread_id);
-        if (!key) return;
-        threadReplyCounts.set(key, (threadReplyCounts.get(key) ?? 0) + 1);
       });
     }
   }
@@ -984,30 +986,16 @@ async function queryHomepageFeedPageInternal(
     });
   });
 
-  threads.forEach((row) => {
-    const createdAt = row.created_at;
-    if (!createdAt) return;
-    const isForum = row.space === "foro";
-    feedItems.push({
-      id: `community:${row.id}`,
-      sourceType: "community",
-      createdAt,
-      title: row.title,
-      excerpt: cleanText(row.body, "Nueva conversacion abierta en la comunidad."),
-      href: isForum ? `/foro/${encodeURIComponent(row.id)}` : "/community",
-      isExternal: false,
-      thumbnailUrl: null,
-      badge: isForum ? "Foro" : "Comunidad",
-      counters: {
-        views: 0,
-        likes: 0,
-        comments: threadReplyCounts.get(row.id) ?? 0,
-        shares: 0
-      }
+  const seenHeadlines = new Set<string>();
+  const deduped = uniqById(feedItems)
+    .filter((item) => !exclude.has(item.id))
+    .filter((item) => {
+      const key = normalizeHeadline(item.title);
+      if (!key) return true;
+      if (seenHeadlines.has(key)) return false;
+      seenHeadlines.add(key);
+      return true;
     });
-  });
-
-  const deduped = uniqById(feedItems).filter((item) => !exclude.has(item.id));
 
   const sorted = deduped.sort((a, b) => {
     const byDate = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();

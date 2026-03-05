@@ -15,6 +15,15 @@ function compact(value: unknown) {
   return new Intl.NumberFormat("es-PR", { notation: "compact" }).format(Number(value ?? 0));
 }
 
+function normalizeTitle(value: string) {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("es-PR", {
     day: "2-digit",
@@ -57,7 +66,7 @@ export function FeedCentral({
     setError(null);
 
     const qs = new URLSearchParams();
-    qs.set("limit", "12");
+    qs.set("limit", "8");
     if (cursor) qs.set("cursor", cursor);
     const mergedExclude = Array.from(new Set([...staticExclude, ...Array.from(itemIds)])).slice(0, 400);
     if (mergedExclude.length > 0) {
@@ -76,9 +85,13 @@ export function FeedCentral({
     setItems((prev) => {
       const next = [...prev];
       const seen = new Set(prev.map((item) => item.id));
+      const seenTitles = new Set(prev.map((item) => normalizeTitle(item.title)).filter(Boolean));
       (json.items ?? []).forEach((item) => {
         if (seen.has(item.id)) return;
+        const titleKey = normalizeTitle(item.title);
+        if (titleKey && seenTitles.has(titleKey)) return;
         seen.add(item.id);
+        if (titleKey) seenTitles.add(titleKey);
         next.push(item);
       });
       return next;

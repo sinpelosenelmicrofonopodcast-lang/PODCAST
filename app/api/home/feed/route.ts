@@ -4,8 +4,8 @@ import { queryHomepageFeedPage } from "@/lib/homepageQueries";
 export async function GET(request: NextRequest) {
   try {
     const cursor = String(request.nextUrl.searchParams.get("cursor") ?? "").trim() || null;
-    const limitRaw = Number(request.nextUrl.searchParams.get("limit") ?? "12");
-    const limit = Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 12;
+    const limitRaw = Number(request.nextUrl.searchParams.get("limit") ?? "8");
+    const limit = Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 8;
     const excludeRaw = String(request.nextUrl.searchParams.get("exclude") ?? "").trim();
     const exclude = excludeRaw
       ? excludeRaw

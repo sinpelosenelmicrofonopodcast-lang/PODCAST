@@ -52,7 +52,7 @@ export default async function HomePage() {
     ...Array.from(communityExcludeIds).map((id) => `community:${id}`)
   ];
 
-  const feed = await queryHomepageFeedPage(null, 12, feedExcludeIds);
+  const feed = await queryHomepageFeedPage(null, 8, feedExcludeIds);
 
   return (
     <main className="app-enter home-media-v6">
