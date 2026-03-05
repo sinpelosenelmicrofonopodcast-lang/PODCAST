@@ -48,7 +48,7 @@ export function RegionNews({
   return (
     <section className="home-media-section" aria-label="Noticias por region">
       <div className="home-media-section-head">
-        <h2>NOTICIAS POR REGION</h2>
+        <h2>NOTICIAS POR REGIÓN</h2>
       </div>
       <div className="home-region-layout">
         <RegionBlock title="Puerto Rico" items={regions.puertoRico} />

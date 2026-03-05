@@ -125,7 +125,7 @@ export default async function HomePage() {
           <div className="home-media-newsletter-wrap">
             <NewsletterForm
               variant="cta"
-              title="Recibe lo mas polemico antes que nadie"
+              title="Recibe lo más polémico antes que nadie"
               subtitle="Alertas de portada y picks editoriales sin ruido."
               buttonLabel="SUSCRIBIRME"
             />

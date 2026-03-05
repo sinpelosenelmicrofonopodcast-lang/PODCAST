@@ -34,6 +34,8 @@ body {
     var(--bg);
   color: var(--text);
   font-family: var(--font-body);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   padding-bottom: var(--promo-bottom-h, 0px);
   overflow-x: hidden;
 }
@@ -6657,6 +6659,26 @@ body {
 .home-feed-body h3 {
   margin: 0;
   color: #fff;
+}
+
+.home-media-hero-body h2 {
+  font-size: clamp(1.32rem, 3vw, 1.95rem);
+  line-height: 1.08;
+}
+
+.home-media-trend-body h3 {
+  font-size: clamp(1.02rem, 2.3vw, 1.2rem);
+  line-height: 1.14;
+}
+
+.home-region-body h4,
+.home-podcast-body h3,
+.home-editorial-body h3,
+.home-event-body h3,
+.home-viral-body h3,
+.home-feed-body h3 {
+  font-size: clamp(0.98rem, 2vw, 1.12rem);
+  line-height: 1.16;
 }
 
 .home-media-hero-body p,

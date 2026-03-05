@@ -7,21 +7,24 @@ import { PromoPopup } from "@/components/promotions/PromoPopup";
 import { TermsConsentPopup } from "@/components/TermsConsentPopup";
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.sinpelosenelmicrofono.com").replace(/\/+$/, "");
-const ogImage = `${siteUrl}/logo.png`;
+const iconImage = `${siteUrl}/logo.png`;
+const socialImage = `${siteUrl}/og-share.png`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "Sin Pelos en el Micrófono",
-  description: "Plataforma adulta independiente para contenido, comunidad y debate sin censura ideológica.",
+  description: "Noticias, podcast y comunidad en un solo lugar. Sin filtros, sin libreto y con conversación real.",
   openGraph: {
     title: "Sin Pelos en el Micrófono",
-    description: "Plataforma adulta independiente para contenido, comunidad y debate sin censura ideológica.",
+    description: "Noticias, podcast y comunidad en un solo lugar. Sin filtros, sin libreto y con conversación real.",
     url: siteUrl,
     siteName: "Sin Pelos en el Micrófono",
     type: "website",
     images: [
       {
-        url: ogImage,
+        url: socialImage,
+        width: 1200,
+        height: 630,
         alt: "Sin Pelos en el Micrófono"
       }
     ]
@@ -29,12 +32,12 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Sin Pelos en el Micrófono",
-    description: "Plataforma adulta independiente para contenido, comunidad y debate sin censura ideológica.",
-    images: [ogImage]
+    description: "Noticias, podcast y comunidad en un solo lugar. Sin filtros, sin libreto y con conversación real.",
+    images: [socialImage]
   },
   icons: {
-    icon: [{ url: ogImage }],
-    apple: [{ url: ogImage }]
+    icon: [{ url: iconImage }],
+    apple: [{ url: iconImage }]
   },
   manifest: "/manifest.webmanifest"
 };

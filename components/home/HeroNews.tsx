@@ -61,9 +61,9 @@ export function HeroNews({
                   <span className="home-media-date">{formatDate(lead.published_at)}</span>
                 </div>
                 <h2 className="clamp-2">{lead.title}</h2>
-                <p className="clamp-2">{lead.summary ?? "Contexto, analisis y señal editorial en tiempo real."}</p>
+                <p className="clamp-2">{lead.summary ?? "Contexto, análisis y señal editorial en tiempo real."}</p>
                 <Link className="button" href={newsHref(lead)}>
-                  LEER ANALISIS
+                  LEER ANÁLISIS
                 </Link>
               </div>
             </>

@@ -9,12 +9,8 @@ import { PODCAST_RSS_URL } from "@/lib/podcastRss";
 import { getYouTubeVideoId } from "@/lib/youtube";
 
 export const revalidate = 120;
-
-export const metadata: Metadata = {
-  title: "Feed – Últimos episodios y shorts | Sin Pelos en el Micrófono",
-  description: "Últimos capítulos, shorts y audio podcast de Sin Pelos en el Micrófono.",
-  alternates: { canonical: "/feed" }
-};
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.sinpelosenelmicrofono.com").replace(/\/+$/, "");
+const feedSocialImage = `${siteUrl}/og-share.png`;
 
 type View = "all" | "episodes" | "shorts" | "audio";
 
@@ -60,6 +56,66 @@ function uniqueExternalPosts(items: ExternalPost[]): ExternalPost[] {
 function normalizeView(input?: string): View {
   if (input === "episodes" || input === "shorts" || input === "audio" || input === "all") return input;
   return "all";
+}
+
+function metadataForView(view: View): Metadata {
+  const isEpisodes = view === "episodes";
+  const isShorts = view === "shorts";
+  const isAudio = view === "audio";
+
+  const title = isEpisodes
+    ? "Episodios del podcast | Sin Pelos en el Micrófono"
+    : isShorts
+      ? "Shorts y clips virales | Sin Pelos en el Micrófono"
+      : isAudio
+        ? "Podcast en audio | Sin Pelos en el Micrófono"
+        : "Feed | Episodios y clips de Sin Pelos en el Micrófono";
+
+  const description = isEpisodes
+    ? "Mira todos los episodios completos y entra a la conversación de Sin Pelos en el Micrófono."
+    : isShorts
+      ? "Clips cortos, momentos virales y highlights del podcast Sin Pelos en el Micrófono."
+      : isAudio
+        ? "Escucha el podcast en audio y mantente al día con los episodios más recientes."
+        : "Últimos capítulos, clips y contenido en audio de Sin Pelos en el Micrófono.";
+
+  const path = view === "all" ? "/feed" : `/feed?view=${view}`;
+  const url = `${siteUrl}${path}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: "/feed" },
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: "Sin Pelos en el Micrófono",
+      type: "website",
+      images: [
+        {
+          url: feedSocialImage,
+          width: 1200,
+          height: 630,
+          alt: "Sin Pelos en el Micrófono"
+        }
+      ]
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [feedSocialImage]
+    }
+  };
+}
+
+export function generateMetadata({
+  searchParams
+}: {
+  searchParams?: { view?: string };
+}): Metadata {
+  return metadataForView(normalizeView(searchParams?.view));
 }
 
 function formatNumber(value?: number) {
