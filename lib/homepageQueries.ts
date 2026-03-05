@@ -83,7 +83,7 @@ export type HomeSponsor = {
 
 export type HomeFeedItem = {
   id: string;
-  sourceType: "news" | "blog" | "clip" | "community";
+  sourceType: "news" | "blog" | "community";
   createdAt: string;
   title: string;
   excerpt: string;
@@ -122,7 +122,6 @@ export type HomepageOverviewData = {
   };
   podcast: {
     featured: HomePodcastItem | null;
-    clips: HomePodcastItem[];
   };
   editorialStories: HomeEditorialStory[];
   community: {
@@ -130,7 +129,6 @@ export type HomepageOverviewData = {
     fallbackTopics: string[];
   };
   events: HomeEvent[];
-  viral: HomePodcastItem[];
   sponsors: {
     mid: HomeSponsor | null;
     footer: HomeSponsor | null;
@@ -657,7 +655,7 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
     fetchHomeSettings(supabase),
     fetchNewsRows(supabase, 64),
     fetchBlogRows(supabase, 36),
-    fetchExternalRows(supabase, 80),
+    fetchExternalRows(supabase, 24),
     fetchThreads(supabase, 14),
     fetchUpcomingEvents(supabase, 8),
     fetchPromotions(supabase, 10)
@@ -678,7 +676,6 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
 
   const podcastRows = externalRows.filter((row) => String(row.platform ?? "").toLowerCase().includes("youtube"));
   const featuredEpisode = podcastRows.find((row) => isEpisodePost(row)) ?? podcastRows.find((row) => !isShortPost(row)) ?? podcastRows[0] ?? null;
-  const clips = podcastRows.filter((row) => isShortPost(row)).slice(0, 10).map(mapPodcastRow);
 
   const editorialStories: HomeEditorialStory[] = [];
   for (const post of blogRows) {
@@ -709,16 +706,6 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
 
   const communityThreads = threadRows.filter((row) => row.space === "community").slice(0, 6);
   const fallbackTopics = newsRows.slice(0, 6).map((row) => row.title);
-
-  const viral = externalRows
-    .filter((row) => row.source_url)
-    .sort((a, b) => {
-      const aScore = safeNum(a.metrics?.views) + safeNum(a.metrics?.likes) * 2 + safeNum(a.metrics?.comments) * 3 + safeNum(a.metrics?.shares) * 4;
-      const bScore = safeNum(b.metrics?.views) + safeNum(b.metrics?.likes) * 2 + safeNum(b.metrics?.comments) * 3 + safeNum(b.metrics?.shares) * 4;
-      return bScore - aScore;
-    })
-    .slice(0, 3)
-    .map(mapPodcastRow);
 
   const sponsors = promoRows.filter(sponsorCandidate).slice(0, 3).map((row) => ({
     id: row.id,
@@ -756,8 +743,7 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
       mundo: pickRegion(["mundo", "internacional", "global"])
     },
     podcast: {
-      featured: featuredEpisode ? mapPodcastRow(featuredEpisode) : null,
-      clips
+      featured: featuredEpisode ? mapPodcastRow(featuredEpisode) : null
     },
     editorialStories: editorialStories.slice(0, 3),
     community: {
@@ -765,7 +751,6 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
       fallbackTopics
     },
     events: eventsRows.slice(0, 4),
-    viral,
     sponsors: {
       mid: sponsors[0] ?? null,
       footer: sponsors[1] ?? sponsors[0] ?? null
@@ -843,9 +828,14 @@ async function queryHomepageTrendingInternal(): Promise<HomepageTrendingData> {
   };
 }
 
-async function queryHomepageFeedPageInternal(cursor?: string | null, limitRaw?: number): Promise<HomepageFeedPage> {
+async function queryHomepageFeedPageInternal(
+  cursor?: string | null,
+  limitRaw?: number,
+  excludeFeedIds?: string[]
+): Promise<HomepageFeedPage> {
   const supabase = supabaseServer();
   const limit = Math.max(6, Math.min(MAX_FEED_LIMIT, Math.floor(Number(limitRaw ?? FEED_DEFAULT_LIMIT) || FEED_DEFAULT_LIMIT)));
+  const exclude = new Set((excludeFeedIds ?? []).map((id) => cleanText(id)).filter(Boolean));
 
   const parsedCursor = cursor ? new Date(cursor) : null;
   const beforeIso = parsedCursor && Number.isFinite(parsedCursor.getTime()) ? parsedCursor.toISOString() : null;
@@ -994,29 +984,6 @@ async function queryHomepageFeedPageInternal(cursor?: string | null, limitRaw?: 
     });
   });
 
-  externalRows.forEach((row) => {
-    const createdAt = row.posted_at;
-    if (!createdAt) return;
-    const short = isShortPost(row);
-    feedItems.push({
-      id: `clip:${row.id}`,
-      sourceType: "clip",
-      createdAt,
-      title: cleanText(row.title, "Clip social"),
-      excerpt: cleanText(row.caption, "Resumen de video viral"),
-      href: cleanText(row.source_url, "/feed"),
-      isExternal: /^https?:\/\//i.test(cleanText(row.source_url)),
-      thumbnailUrl: postThumb(row),
-      badge: short ? "Podcast Clip" : "Podcast",
-      counters: {
-        views: safeNum(row.metrics?.views),
-        likes: safeNum(row.metrics?.likes),
-        comments: safeNum(row.metrics?.comments),
-        shares: safeNum(row.metrics?.shares)
-      }
-    });
-  });
-
   threads.forEach((row) => {
     const createdAt = row.created_at;
     if (!createdAt) return;
@@ -1040,7 +1007,7 @@ async function queryHomepageFeedPageInternal(cursor?: string | null, limitRaw?: 
     });
   });
 
-  const deduped = uniqById(feedItems);
+  const deduped = uniqById(feedItems).filter((item) => !exclude.has(item.id));
 
   const sorted = deduped.sort((a, b) => {
     const byDate = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -1085,10 +1052,11 @@ export async function queryHomepageTrending() {
   return cachedTrending();
 }
 
-export async function queryHomepageFeedPage(cursor?: string | null, limit?: number) {
+export async function queryHomepageFeedPage(cursor?: string | null, limit?: number, excludeFeedIds?: string[]) {
   const safeCursor = cleanText(cursor);
-  if (!safeCursor && (limit === undefined || limit === FEED_DEFAULT_LIMIT)) {
+  const exclude = (excludeFeedIds ?? []).map((id) => cleanText(id)).filter(Boolean);
+  if (!safeCursor && (limit === undefined || limit === FEED_DEFAULT_LIMIT) && exclude.length === 0) {
     return cachedFeedFirstPage();
   }
-  return queryHomepageFeedPageInternal(safeCursor || null, limit);
+  return queryHomepageFeedPageInternal(safeCursor || null, limit, exclude);
 }

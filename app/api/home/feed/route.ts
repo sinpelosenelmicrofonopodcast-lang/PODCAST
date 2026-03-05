@@ -6,8 +6,15 @@ export async function GET(request: NextRequest) {
     const cursor = String(request.nextUrl.searchParams.get("cursor") ?? "").trim() || null;
     const limitRaw = Number(request.nextUrl.searchParams.get("limit") ?? "12");
     const limit = Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 12;
+    const excludeRaw = String(request.nextUrl.searchParams.get("exclude") ?? "").trim();
+    const exclude = excludeRaw
+      ? excludeRaw
+          .split(",")
+          .map((v) => decodeURIComponent(String(v ?? "").trim()))
+          .filter(Boolean)
+      : [];
 
-    const data = await queryHomepageFeedPage(cursor, limit);
+    const data = await queryHomepageFeedPage(cursor, limit, exclude);
 
     return NextResponse.json(
       { ok: true, ...data },

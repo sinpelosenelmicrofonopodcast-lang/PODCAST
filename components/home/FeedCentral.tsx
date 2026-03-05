@@ -26,11 +26,13 @@ function formatDate(value: string) {
 export function FeedCentral({
   initialItems,
   initialCursor,
-  initialHasMore
+  initialHasMore,
+  excludeIds = []
 }: {
   initialItems: HomeFeedItem[];
   initialCursor: string | null;
   initialHasMore: boolean;
+  excludeIds?: string[];
 }) {
   const [items, setItems] = useState<HomeFeedItem[]>(initialItems);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
@@ -40,6 +42,13 @@ export function FeedCentral({
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const itemIds = useMemo(() => new Set(items.map((item) => item.id)), [items]);
+  const staticExclude = useMemo(
+    () =>
+      (excludeIds ?? [])
+        .map((id) => String(id ?? "").trim())
+        .filter(Boolean),
+    [excludeIds]
+  );
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
@@ -50,6 +59,10 @@ export function FeedCentral({
     const qs = new URLSearchParams();
     qs.set("limit", "12");
     if (cursor) qs.set("cursor", cursor);
+    const mergedExclude = Array.from(new Set([...staticExclude, ...Array.from(itemIds)])).slice(0, 400);
+    if (mergedExclude.length > 0) {
+      qs.set("exclude", mergedExclude.join(","));
+    }
 
     const res = await fetch(`/api/home/feed?${qs.toString()}`, { cache: "no-store" }).catch(() => null);
     const json = (await res?.json().catch(() => null)) as FeedResponse | null;
@@ -73,7 +86,7 @@ export function FeedCentral({
     setCursor(json.nextCursor ?? null);
     setHasMore(Boolean(json.hasMore));
     setLoading(false);
-  }, [cursor, hasMore, loading]);
+  }, [cursor, hasMore, itemIds, loading, staticExclude]);
 
   useEffect(() => {
     if (!sentinelRef.current || !hasMore) return;
@@ -134,7 +147,7 @@ export function FeedCentral({
 
       <div className="home-feed-actions">
         {hasMore ? (
-          <button type="button" className="button secondary" onClick={loadMore} disabled={loading || !hasMore || itemIds.size === 0}>
+          <button type="button" className="button secondary" onClick={loadMore} disabled={loading || !hasMore}>
             {loading ? "Cargando..." : "Cargar mas"}
           </button>
         ) : (

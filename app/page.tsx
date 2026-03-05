@@ -8,28 +8,51 @@ import { TrendingBlock } from "@/components/home/TrendingBlock";
 import { RegionNews } from "@/components/home/RegionNews";
 import { PodcastBlock } from "@/components/home/PodcastBlock";
 import { FeedCentral } from "@/components/home/FeedCentral";
-import { EditorialStories } from "@/components/home/EditorialStories";
 import { CommunityPreview } from "@/components/home/CommunityPreview";
 import { EventsPreview } from "@/components/home/EventsPreview";
-import { ViralSection } from "@/components/home/ViralSection";
 import { SponsorBlock } from "@/components/home/SponsorBlock";
 import { queryHomepageFeedPage, queryHomepageOverview, queryHomepageTrending } from "@/lib/homepageQueries";
 
 export const revalidate = 120;
 
 export const metadata: Metadata = {
-  title: "Sin Pelos en el Micrófono | Noticias, podcast, comunidad y viral",
+  title: "Sin Pelos en el Micrófono | Noticias, podcast y comunidad",
   description:
-    "Portada editorial de alto impacto para descubrir noticias, clips virales, podcast, comunidad y eventos en tiempo real.",
+    "Portada editorial para descubrir noticias, podcast, comunidad y eventos con jerarquía clara y sin contenido repetido.",
   alternates: { canonical: "/" }
 };
 
 export default async function HomePage() {
-  const [overview, trending, feed] = await Promise.all([
-    queryHomepageOverview(),
-    queryHomepageTrending(),
-    queryHomepageFeedPage(null, 12)
-  ]);
+  const [overview, trending] = await Promise.all([queryHomepageOverview(), queryHomepageTrending()]);
+
+  const newsExcludeIds = new Set<string>();
+  if (overview.hero.lead?.id) newsExcludeIds.add(overview.hero.lead.id);
+  overview.hero.trending.forEach((item) => {
+    if (item?.id) newsExcludeIds.add(item.id);
+  });
+  [
+    ...overview.regions.puertoRico,
+    ...overview.regions.texas,
+    ...overview.regions.usa,
+    ...overview.regions.mundo,
+    ...trending.enTendencia.map((item) => ({ id: item.id })),
+    ...trending.subiendo.map((item) => ({ id: item.id })),
+    ...trending.viral.map((item) => ({ id: item.id }))
+  ].forEach((item) => {
+    if (item?.id) newsExcludeIds.add(item.id);
+  });
+
+  const communityExcludeIds = new Set<string>();
+  overview.community.threads.forEach((thread) => {
+    if (thread?.id) communityExcludeIds.add(thread.id);
+  });
+
+  const feedExcludeIds = [
+    ...Array.from(newsExcludeIds).map((id) => `news:${id}`),
+    ...Array.from(communityExcludeIds).map((id) => `community:${id}`)
+  ];
+
+  const feed = await queryHomepageFeedPage(null, 12, feedExcludeIds);
 
   return (
     <main className="app-enter home-media-v6">
@@ -66,31 +89,20 @@ export default async function HomePage() {
 
       <section className="section">
         <div className="container">
-          <PodcastBlock featured={overview.podcast.featured} clips={overview.podcast.clips} />
+          <PodcastBlock featured={overview.podcast.featured} />
         </div>
       </section>
 
       <section className="section">
         <div className="container">
-          <FeedCentral initialItems={feed.items} initialCursor={feed.nextCursor} initialHasMore={feed.hasMore} />
+          <FeedCentral
+            initialItems={feed.items}
+            initialCursor={feed.nextCursor}
+            initialHasMore={feed.hasMore}
+            excludeIds={feedExcludeIds}
+          />
         </div>
       </section>
-
-      {overview.flags.showPromotions ? (
-        <section className="section">
-          <div className="container">
-            <SponsorBlock title="SPONSOR DESTACADO" sponsor={overview.sponsors.mid} slot="mid" />
-          </div>
-        </section>
-      ) : null}
-
-      {overview.flags.showLatestBlog ? (
-        <section className="section">
-          <div className="container">
-            <EditorialStories stories={overview.editorialStories} />
-          </div>
-        </section>
-      ) : null}
 
       {overview.flags.showCommunity ? (
         <section className="section">
@@ -110,17 +122,11 @@ export default async function HomePage() {
 
       <section className="section">
         <div className="container">
-          <ViralSection items={overview.viral} />
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container">
           <div className="home-media-newsletter-wrap">
             <NewsletterForm
               variant="cta"
               title="Recibe lo mas polemico antes que nadie"
-              subtitle="Alertas de portada, contenido viral y picks editoriales sin ruido."
+              subtitle="Alertas de portada y picks editoriales sin ruido."
               buttonLabel="SUSCRIBIRME"
             />
           </div>
