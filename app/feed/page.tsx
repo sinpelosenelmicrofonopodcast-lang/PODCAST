@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { EpisodesInfinite } from "@/components/feed/EpisodesInfinite";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { queryPodcastEpisodesPage } from "@/lib/feedEpisodes";
 import { PODCAST_RSS_URL } from "@/lib/podcastRss";
 import { getYouTubeVideoId } from "@/lib/youtube";
 
@@ -158,6 +160,7 @@ export default async function FeedPage({
 }) {
   const view = normalizeView(searchParams?.view);
   const supabase = supabaseServer();
+  const episodesPage = view === "episodes" ? await queryPodcastEpisodesPage(supabase, null, 12) : null;
 
   const { data: rows } = await supabase
     .from("external_posts")
@@ -210,7 +213,7 @@ export default async function FeedPage({
             </Link>
           </nav>
 
-          {allPosts.length === 0 ? (
+          {((view === "episodes" ? episodesPage?.items.length ?? 0 : allPosts.length) === 0) ? (
             <div className="card" style={{ marginTop: 16 }}>
               <p className="muted" style={{ margin: 0 }}>
                 Aún no hay contenido sincronizado. Verifica YouTube Sync en admin.
@@ -286,13 +289,12 @@ export default async function FeedPage({
           ) : null}
 
           {view === "episodes" ? (
-            <section className="feed-v4-blocks" style={{ marginTop: 14 }}>
-              <div className="feed-v4-grid episodes">
-                {episodes.map((post) => (
-                  <FeedCard key={post.id} post={post} label="Capítulo" />
-                ))}
-              </div>
-            </section>
+            <EpisodesInfinite
+              initialItems={episodesPage?.items ?? []}
+              initialCursor={episodesPage?.nextCursor ?? null}
+              initialHasMore={Boolean(episodesPage?.hasMore)}
+              pageSize={12}
+            />
           ) : null}
 
           {view === "shorts" ? (
