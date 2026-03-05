@@ -6700,23 +6700,24 @@ body {
 
 .home-media-trend-card {
   display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
+  grid-template-columns: 180px minmax(0, 1fr);
   gap: 10px;
-  min-height: 106px;
+  min-height: 140px;
 }
 
 .home-media-trend-thumb {
   background: #1f0b0b;
   min-height: 100%;
-  aspect-ratio: 1 / 1;
+  height: 100%;
   overflow: hidden;
 }
 
 .home-media-trend-body {
   padding: 10px 10px 10px 0;
   display: grid;
-  gap: 8px;
-  align-content: center;
+  gap: 10px;
+  align-content: start;
+  justify-items: start;
 }
 
 .home-media-chip-row {
@@ -6724,6 +6725,10 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.home-media-trend-body .home-media-chip-row {
+  width: 100%;
 }
 
 .home-media-chip,
@@ -7112,7 +7117,8 @@ body {
   }
 
   .home-media-trend-card {
-    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-columns: 108px minmax(0, 1fr);
+    min-height: 118px;
   }
 
   .home-sponsor-card {

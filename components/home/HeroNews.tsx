@@ -83,9 +83,11 @@ export function HeroNews({
                   <SafeImage src={item.cover_url} alt={item.title} loading="lazy" />
                 </div>
                 <div className="home-media-trend-body">
-                  <span className="home-media-chip">{firstCategory(item)}</span>
+                  <div className="home-media-chip-row">
+                    <span className="home-media-chip">{firstCategory(item)}</span>
+                    <span className="home-media-date">{formatDate(item.published_at)}</span>
+                  </div>
                   <h3 className="clamp-2">{item.title}</h3>
-                  <span className="home-media-date">{formatDate(item.published_at)}</span>
                 </div>
               </Link>
             ))
