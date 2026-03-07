@@ -12,6 +12,7 @@ type StatsPayload = {
     skippedFresh: number;
     skippedInvalid: number;
     errors: Array<{ id: string; platform: string; error: string }>;
+    permissionErrors?: Array<{ platform: string; code: string; hint: string }>;
   };
   website: {
     day: { visits: number; unique: number };
@@ -318,6 +319,11 @@ export default function AdminStatsPage() {
           {data.metaSync.errors.length > 0 ? (
             <p className="muted" style={{ margin: "6px 0 0" }}>
               Errores: {data.metaSync.errors.slice(0, 2).map((x) => `${x.platform}: ${x.error}`).join(" | ")}
+            </p>
+          ) : null}
+          {(data.metaSync.permissionErrors?.length ?? 0) > 0 ? (
+            <p className="muted" style={{ margin: "6px 0 0" }}>
+              Permisos faltantes: {data.metaSync.permissionErrors?.map((x) => `${x.platform}: ${x.hint}`).join(" | ")}
             </p>
           ) : null}
         </div>

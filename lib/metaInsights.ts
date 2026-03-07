@@ -18,6 +18,7 @@ type SyncSummary = {
   skippedFresh: number;
   skippedInvalid: number;
   errors: Array<{ id: string; platform: string; error: string }>;
+  permissionErrors: Array<{ platform: string; code: string; hint: string }>;
 };
 
 type MetricPayload = {
@@ -34,6 +35,26 @@ function toPlatform(raw?: string | null) {
   const value = String(raw ?? "").toLowerCase().trim();
   if (value.includes("instagram")) return "instagram" as const;
   if (value.includes("facebook")) return "facebook" as const;
+  return null;
+}
+
+function classifyPermissionError(platform: "facebook" | "instagram", error: string) {
+  const msg = String(error ?? "");
+  const lower = msg.toLowerCase();
+  if (platform === "facebook" && (lower.includes("pages_read_engagement") || lower.includes("page public content access"))) {
+    return {
+      platform,
+      code: "missing_pages_read_engagement",
+      hint: "Tu token de página no tiene pages_read_engagement. Regenera el token con ese permiso."
+    };
+  }
+  if (platform === "instagram" && lower.includes("instagram_manage_insights")) {
+    return {
+      platform,
+      code: "missing_instagram_manage_insights",
+      hint: "Tu token no tiene instagram_manage_insights para leer métricas de Instagram."
+    };
+  }
   return null;
 }
 
@@ -166,7 +187,8 @@ export async function syncMetaInsights(service: any, options: SyncOptions = {}):
     updated: 0,
     skippedFresh: 0,
     skippedInvalid: 0,
-    errors: []
+    errors: [],
+    permissionErrors: []
   };
 
   const { data, error } = await service
@@ -238,6 +260,13 @@ export async function syncMetaInsights(service: any, options: SyncOptions = {}):
       summary.attempted += 1;
       if (result.kind === "updated") {
         summary.updated += 1;
+        continue;
+      }
+      const perm = classifyPermissionError(result.platform as "facebook" | "instagram", result.error);
+      if (perm) {
+        if (!summary.permissionErrors.some((row) => row.code === perm.code)) {
+          summary.permissionErrors.push(perm);
+        }
         continue;
       }
       summary.errors.push({ id: result.id, platform: result.platform, error: result.error });
