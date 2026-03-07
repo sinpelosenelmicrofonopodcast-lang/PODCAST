@@ -65,6 +65,15 @@ async function graphGet(path: string, params: Record<string, string> = {}) {
   return json as any;
 }
 
+async function graphGetSafe(path: string, params: Record<string, string> = {}) {
+  try {
+    const data = await graphGet(path, params);
+    return { ok: true as const, data };
+  } catch (e: any) {
+    return { ok: false as const, error: String(e?.message ?? "Meta API error") };
+  }
+}
+
 function parseInsightMetric(insights: any, key: string) {
   const rows = Array.isArray(insights?.data) ? insights.data : [];
   const found = rows.find((row: any) => String(row?.name ?? "") === key);
@@ -75,14 +84,32 @@ function parseInsightMetric(insights: any, key: string) {
 
 async function fetchFacebookMetrics(postId: string): Promise<MetricPayload> {
   const json = await graphGet(`/${encodeURIComponent(postId)}`, {
-    fields:
-      "id,shares,comments.summary(true),reactions.summary(true),insights.metric(post_impressions,post_impressions_unique,post_engaged_users)"
+    fields: "id,shares,comments.summary(true),reactions.summary(true)"
   });
 
+  const metricSets = [
+    "post_impressions,post_impressions_unique,post_engaged_users",
+    "post_impressions,post_engaged_users",
+    "post_impressions"
+  ];
+  let insightsData: any = null;
+  for (const metric of metricSets) {
+    const res = await graphGetSafe(`/${encodeURIComponent(postId)}/insights`, { metric });
+    if (res.ok) {
+      insightsData = res.data;
+      break;
+    }
+    const msg = String(res.error ?? "").toLowerCase();
+    if (!msg.includes("valid insights metric")) {
+      // Unknown hard failure (token/permission/etc): bubble up immediately.
+      throw new Error(res.error);
+    }
+  }
+
   return {
-    views: parseInsightMetric(json?.insights, "post_impressions"),
-    reach: parseInsightMetric(json?.insights, "post_impressions_unique"),
-    engaged: parseInsightMetric(json?.insights, "post_engaged_users"),
+    views: parseInsightMetric(insightsData, "post_impressions"),
+    reach: parseInsightMetric(insightsData, "post_impressions_unique"),
+    engaged: parseInsightMetric(insightsData, "post_engaged_users"),
     likes: asNumber(json?.reactions?.summary?.total_count),
     comments: asNumber(json?.comments?.summary?.total_count),
     shares: asNumber(json?.shares?.count)
