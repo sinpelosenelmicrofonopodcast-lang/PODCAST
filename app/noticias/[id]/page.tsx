@@ -11,6 +11,9 @@ import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { getServerLang } from "@/lib/i18nServer";
 import type { AppLang } from "@/lib/language";
 import { isUuid, newsHref, normalizeNewsKey } from "@/lib/newsRoute";
+import { buildSeoMetadata, newsSeoTemplate } from "@/lib/seo/meta";
+import { buildNewsArticleJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
+import { DEFAULT_OG_IMAGE } from "@/lib/seo/constants";
 
 export const revalidate = 180;
 
@@ -303,31 +306,15 @@ async function loadItem(supabase: ReturnType<typeof supabaseServer>, id: string)
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const supabase = supabaseServer();
   const item = await loadItem(supabase, params.id);
-  const title = item?.title ?? "Noticia";
-  const description = item?.summary ?? "Noticias Sin Pelos";
-  const image = item?.cover_url ?? "/logo.png";
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const canonical = item ? newsHref(item) : `/noticias/${encodeURIComponent(params.id)}`;
-
-  return {
-    title,
-    description,
-    alternates: { canonical },
-    metadataBase: new URL(baseUrl),
-    openGraph: {
-      title,
-      description,
-      type: "article",
-      url: canonical,
-      images: [{ url: image }]
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [image]
-    }
-  };
+  const seo = newsSeoTemplate(item?.title ?? "Noticia", item?.summary ?? "Noticias Sin Pelos");
+  return buildSeoMetadata({
+    title: seo.title,
+    description: seo.description,
+    path: canonical,
+    image: item?.cover_url ?? DEFAULT_OG_IMAGE,
+    type: "article"
+  });
 }
 
 export default async function NoticiaDetailPage({ params }: { params: { id: string } }) {
@@ -486,6 +473,20 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
   const readTime = estimateReadMinutes(`${item?.title ?? ""}\n${item?.summary ?? ""}\n${item?.analysis ?? ""}`);
   const editorialTags = item ? buildEditorialTags(item, lang) : [];
   const videoEmbedUrl = getSupportedVideoEmbedUrl(item?.video_url);
+  const articleSchema = item
+    ? buildNewsArticleJsonLd({
+        canonicalPath: newsHref(item),
+        title: item.title,
+        description: item.summary,
+        image: item.cover_url || undefined,
+        datePublished: item.published_at,
+        dateModified: item.updated_at || item.published_at,
+        authorName: "SPM News",
+        tags: [],
+        category: item.categories?.[0] ?? null,
+        isNews: true
+      })
+    : null;
 
   return (
     <main>
@@ -752,6 +753,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
         </div>
       </section>
       <Footer />
+      {articleSchema ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(articleSchema) }} /> : null}
     </main>
   );
 }

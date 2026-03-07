@@ -128,6 +128,15 @@ export default function AdminDashboard() {
             </div>
           </div>
         ) : null}
+        {can("manage_news") ? (
+          <div className="card">
+            <h3>Episodios a Facebook</h3>
+            <p className="muted">Publica episodios nuevos o viejos con texto propio o extracto automático.</p>
+            <a className="button secondary" href="/admin/episodes">
+              Gestionar Episodios
+            </a>
+          </div>
+        ) : null}
         {can("manage_guest_requests") ? (
           <div className="card">
             <h3>Invitados al programa</h3>
@@ -156,6 +165,15 @@ export default function AdminDashboard() {
           </div>
         ) : null}
         {can("manage_news_sources") ? <AdminSyncYouTube /> : null}
+        {can("view_stats") ? (
+          <div className="card">
+            <h3>SEO Autopilot</h3>
+            <p className="muted">Sitemaps, auditoría técnica y rendimiento en Search Console.</p>
+            <a className="button secondary" href="/admin/seo">
+              Abrir SEO Dashboard
+            </a>
+          </div>
+        ) : null}
         {access.isAdmin ? (
           <div className="card">
             <h3>SPM Arcade / Mic Brawl</h3>

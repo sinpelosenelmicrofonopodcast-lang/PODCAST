@@ -7,9 +7,11 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { queryPodcastEpisodesPage } from "@/lib/feedEpisodes";
 import { PODCAST_RSS_URL } from "@/lib/podcastRss";
 import { getYouTubeVideoId } from "@/lib/youtube";
+import { buildPodcastSeriesJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
+import { CANONICAL_SITE_URL } from "@/lib/seo/constants";
 
 export const revalidate = 120;
-const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.sinpelosenelmicrofono.com").replace(/\/+$/, "");
+const siteUrl = CANONICAL_SITE_URL;
 const feedSocialImage = `${siteUrl}/og-share.png`;
 
 type View = "all" | "episodes" | "shorts" | "audio";
@@ -235,6 +237,12 @@ export default async function FeedPage({
     .filter((p) => !shortsPreviewIds.has(p.id))
     .sort((a, b) => Number(b.metrics?.views ?? 0) - Number(a.metrics?.views ?? 0))
     .slice(0, 6);
+  const schema = buildPodcastSeriesJsonLd({
+    canonicalPath: "/feed",
+    name: "Sin Pelos en el Micrófono",
+    description: "Feed de episodios, clips y contenido de podcast.",
+    image: allPosts[0]?.media_url ?? null
+  });
 
   return (
     <main>
@@ -403,6 +411,7 @@ export default async function FeedPage({
         </div>
       </section>
       <Footer />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(schema) }} />
     </main>
   );
 }

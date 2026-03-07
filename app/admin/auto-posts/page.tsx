@@ -46,6 +46,9 @@ export default function AdminAutoPostsPage() {
   const [intervalMinutes, setIntervalMinutes] = useState(30);
   const [countOverride, setCountOverride] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [manualMessage, setManualMessage] = useState("");
+  const [manualScheduleFor, setManualScheduleFor] = useState(`${chicagoDateInputFromNow()}T09:00`);
+  const [creatingManual, setCreatingManual] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState("");
@@ -129,6 +132,51 @@ export default function AdminAutoPostsPage() {
 
     toast.success(`Generados ${json?.inserted ?? 0} posts (de ${json?.requested ?? 0} slots).`);
     setGenerating(false);
+    await load();
+  };
+
+  const handleCreateManual = async () => {
+    const message = manualMessage.trim();
+    const scheduledFor = manualScheduleFor.trim();
+    if (!message) {
+      setStatus("Escribe el mensaje del estado.");
+      return;
+    }
+    if (!scheduledFor) {
+      setStatus("Selecciona fecha y hora para programar.");
+      return;
+    }
+
+    setCreatingManual(true);
+    setStatus(null);
+    const token = await getToken();
+    if (!token) {
+      setStatus("Sesión inválida. Inicia sesión otra vez.");
+      setCreatingManual(false);
+      return;
+    }
+
+    const res = await fetch("/api/admin/auto-posts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        message,
+        scheduledFor
+      })
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.ok) {
+      setStatus(json?.error ?? "No se pudo crear el estado programado.");
+      setCreatingManual(false);
+      return;
+    }
+
+    toast.success("Estado programado.");
+    setManualMessage("");
+    setCreatingManual(false);
     await load();
   };
 
@@ -281,6 +329,34 @@ export default function AdminAutoPostsPage() {
           </button>
           <button className="button secondary" type="button" onClick={load} disabled={loading}>
             {loading ? "Cargando..." : "Actualizar lista"}
+          </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 14, display: "grid", gap: 12 }}>
+        <strong>Programar estado manual</strong>
+        <label>
+          Mensaje
+          <textarea
+            className="textarea"
+            rows={3}
+            value={manualMessage}
+            onChange={(e) => setManualMessage(e.target.value)}
+            placeholder="Escribe el estado que quieres publicar en Facebook..."
+          />
+        </label>
+        <label>
+          Programar para (America/Chicago)
+          <input
+            className="input"
+            type="datetime-local"
+            value={manualScheduleFor}
+            onChange={(e) => setManualScheduleFor(e.target.value)}
+          />
+        </label>
+        <div className="form-submit-bar">
+          <button className="button" type="button" onClick={handleCreateManual} disabled={creatingManual}>
+            {creatingManual ? "Programando..." : "Programar estado"}
           </button>
         </div>
       </div>

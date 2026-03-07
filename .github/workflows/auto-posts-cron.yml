@@ -19,7 +19,23 @@ jobs:
             exit 1
           fi
 
-          curl -sS -f \
+          BASE_URL="${CRON_BASE_URL%/}"
+          SECRET="$(printf '%s' "$CRON_SECRET" | tr -d '\r\n')"
+          URL="$BASE_URL/api/cron/auto-posts/publish?limit=5"
+
+          HTTP_CODE=$(curl -sS \
+            -o /tmp/auto-posts-cron-response.json \
+            -w "%{http_code}" \
             -X POST \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            "$CRON_BASE_URL/api/cron/auto-posts/publish?limit=5"
+            -H "Authorization: Bearer $SECRET" \
+            -H "x-cron-secret: $SECRET" \
+            "$URL")
+
+          cat /tmp/auto-posts-cron-response.json
+          echo
+          echo "HTTP_STATUS=$HTTP_CODE"
+
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Cron endpoint failed."
+            exit 1
+          fi

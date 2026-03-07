@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
+import { toast } from "@/lib/toast";
 import { clampMetaDescription, estimateReadingTimeMinutes, slugify } from "@/lib/blogSeo";
 import { newsCategories } from "@/lib/newsCategories";
 
@@ -74,6 +75,14 @@ export default function AdminBlogPage() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [items, setItems] = useState<BlogPost[]>([]);
+  const [postToFacebook, setPostToFacebook] = useState(true);
+  const [pushOnPublish, setPushOnPublish] = useState(true);
+  const [postToInstagram, setPostToInstagram] = useState(false);
+  const [postingFacebookId, setPostingFacebookId] = useState<string | null>(null);
+  const [postingInstagramId, setPostingInstagramId] = useState<string | null>(null);
+  const [scheduleFacebookAt, setScheduleFacebookAt] = useState("");
+  const [scheduleItemFacebookAt, setScheduleItemFacebookAt] = useState<Record<string, string>>({});
+  const [schedulingFacebookId, setSchedulingFacebookId] = useState<string | null>(null);
   const [schema, setSchema] = useState<BlogSchemaCheck | null>(null);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState<string | null>(null);
@@ -143,6 +152,35 @@ export default function AdminBlogPage() {
     setInlineLinkText("");
     setInlineLinkUrl("");
     setEditingId(null);
+    setPostToFacebook(true);
+    setPushOnPublish(true);
+    setPostToInstagram(false);
+    setScheduleFacebookAt("");
+  };
+
+  const pushBlogNotification = async (
+    token: string,
+    post: { id: string; slug?: string | null; title?: string | null; excerpt?: string | null; cover_url?: string | null }
+  ) => {
+    const url = postHref({ id: post.id, slug: post.slug ?? null });
+    const res = await fetch("/api/admin/notifications/onesignal", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        title: post.title ?? "Nuevo blog",
+        message: post.excerpt ?? "Nuevo artículo del blog en Sin Pelos en el Micrófono.",
+        url,
+        imageUrl: post.cover_url ?? null,
+        category: "blog"
+      })
+    }).catch(() => null);
+    const json = (res ? await res.json().catch(() => ({})) : {}) as { ok?: boolean; error?: string };
+    if (!res || !res.ok || !json?.ok) {
+      throw new Error(json?.error ?? "No se pudo enviar push.");
+    }
   };
 
   const insertAtCursor = (snippet: string) => {
@@ -261,20 +299,42 @@ export default function AdminBlogPage() {
 
     const minimalPayload = { title, excerpt: excerpt || null, body: body || null, cover_url: coverUrl || null, author_id: userId };
     const mode = editingId ? "update" : "insert";
-    const primary = editingId
-      ? await supabase.from("blog_posts").update(payloadBase).eq("id", editingId)
-      : await supabase.from("blog_posts").insert(payloadBase);
-    let error = primary.error;
+    let error: { message?: string | null } | null = null;
     let usedFallback = false;
     let fallbackReason = "";
+    let createdPost: { id: string; slug?: string | null; title?: string | null; excerpt?: string | null; cover_url?: string | null } | null = null;
 
-    if (error && isBlogCompatibilityColumnError(error.message)) {
-      usedFallback = true;
-      fallbackReason = error.message;
-      const fallback = editingId
-        ? await supabase.from("blog_posts").update(minimalPayload).eq("id", editingId)
-        : await supabase.from("blog_posts").insert(minimalPayload);
-      error = fallback.error;
+    if (editingId) {
+      const updateRes = await supabase.from("blog_posts").update(payloadBase).eq("id", editingId);
+      error = updateRes.error;
+      if (error && isBlogCompatibilityColumnError(error.message)) {
+        usedFallback = true;
+        fallbackReason = String(error.message ?? "");
+        const fallback = await supabase.from("blog_posts").update(minimalPayload).eq("id", editingId);
+        error = fallback.error;
+      }
+    } else {
+      const insertRes = await supabase
+        .from("blog_posts")
+        .insert(payloadBase)
+        .select("id, slug, title, excerpt, cover_url")
+        .limit(1)
+        .maybeSingle();
+      error = insertRes.error;
+      createdPost = (insertRes.data as any) ?? null;
+
+      if (error && isBlogCompatibilityColumnError(error.message)) {
+        usedFallback = true;
+        fallbackReason = String(error.message ?? "");
+        const fallback = await supabase
+          .from("blog_posts")
+          .insert(minimalPayload)
+          .select("id, title, excerpt, cover_url")
+          .limit(1)
+          .maybeSingle();
+        error = fallback.error;
+        createdPost = (fallback.data as any) ?? null;
+      }
     }
 
     if (error) return setStatus(humanizeBlogError(error.message)), void setLoading(false);
@@ -284,6 +344,102 @@ export default function AdminBlogPage() {
       );
     } else {
       setStatus(mode === "update" ? "Artículo actualizado." : "Artículo publicado.");
+    }
+
+    if (!editingId && createdPost?.id) {
+      if (pushOnPublish) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (token) {
+          await pushBlogNotification(token, {
+            id: createdPost.id,
+            slug: createdPost.slug ?? safeSlug,
+            title: createdPost.title ?? title,
+            excerpt: createdPost.excerpt ?? excerpt,
+            cover_url: createdPost.cover_url ?? coverUrl
+          }).catch((e: any) => {
+            setStatus((prev) =>
+              `${prev ? `${prev} ` : ""}Push falló: ${e?.message ?? "error"}`.trim()
+            );
+            toast.error(`Push falló: ${e?.message ?? "error"}`);
+          });
+        }
+      }
+    }
+
+    if (!editingId && createdPost?.id && (postToFacebook || postToInstagram)) {
+      const done: string[] = [];
+      const failed: string[] = [];
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        if (postToFacebook) failed.push("Facebook: sesión inválida");
+        if (postToInstagram) failed.push("Instagram: sesión inválida");
+      } else {
+        if (postToFacebook) {
+          let scheduleIso: string | null = null;
+          const scheduleRaw = scheduleFacebookAt.trim();
+          let scheduleInvalid = false;
+          if (scheduleRaw) {
+            const parsed = new Date(scheduleRaw);
+            if (!Number.isFinite(parsed.getTime())) {
+              failed.push("Facebook: fecha de programación inválida");
+              scheduleInvalid = true;
+            } else {
+              scheduleIso = parsed.toISOString();
+            }
+          }
+
+          if (!scheduleInvalid) {
+            const fbRes = await fetch("/api/social/meta/facebook/post-blog", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                blogId: createdPost.id,
+                blogSlug: (createdPost.slug ?? safeSlug) || null,
+                title: createdPost.title ?? title,
+                excerpt: createdPost.excerpt ?? excerpt,
+                scheduleFor: scheduleIso
+              })
+            });
+            const fbJson = await fbRes.json().catch(() => ({}));
+            if (!fbRes.ok) failed.push(`Facebook: ${fbJson?.error ?? "error"}`);
+            else done.push(fbJson?.queued ? "Facebook (programado)" : "Facebook");
+          }
+        }
+
+        if (postToInstagram) {
+          const igRes = await fetch("/api/social/meta/instagram/post-blog", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              blogId: createdPost.id,
+              blogSlug: (createdPost.slug ?? safeSlug) || null,
+              title: createdPost.title ?? title,
+              excerpt: createdPost.excerpt ?? excerpt,
+              coverUrl: (createdPost.cover_url ?? coverUrl) || null
+            })
+          });
+          const igJson = await igRes.json().catch(() => ({}));
+          if (!igRes.ok) failed.push(`Instagram: ${igJson?.error ?? "error"}`);
+          else done.push("Instagram");
+        }
+      }
+
+      if (done.length > 0 && failed.length === 0) {
+        setStatus(`Artículo publicado y compartido en ${done.join(" + ")}.`);
+      } else if (done.length > 0 && failed.length > 0) {
+        setStatus(`Artículo publicado. OK: ${done.join(" + ")}. Falló: ${failed.join(" | ")}.`);
+      } else if (failed.length > 0) {
+        setStatus(`Artículo publicado, pero falló redes: ${failed.join(" | ")}.`);
+      }
     }
 
     setLoading(false);
@@ -305,6 +461,129 @@ export default function AdminBlogPage() {
     setEpisodeTitle(String((item as any).episode_title ?? ""));
     setCategories((item as any).categories ?? []);
     setTags(((item as any).tags ?? []).join(", "));
+  };
+
+  const handlePostToFacebookNow = async (item: BlogPost) => {
+    setPostingFacebookId(item.id);
+    setStatus(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      const msg = "Sesión inválida. Inicia sesión de nuevo.";
+      setStatus(msg);
+      setPostingFacebookId(null);
+      return;
+    }
+
+    const res = await fetch("/api/social/meta/facebook/post-blog", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        blogId: item.id,
+        blogSlug: item.slug ?? null,
+        title: item.title,
+        excerpt: item.excerpt ?? ""
+      })
+    });
+    const json = await res.json().catch(() => ({}));
+    setPostingFacebookId(null);
+    if (!res.ok) {
+      setStatus(`Facebook falló: ${json?.error ?? "error"}`);
+      return;
+    }
+    setStatus("Artículo publicado en Facebook.");
+  };
+
+  const handleScheduleToFacebook = async (item: BlogPost) => {
+    const localValue = String(scheduleItemFacebookAt[item.id] ?? "").trim();
+    if (!localValue) {
+      setStatus("Selecciona fecha y hora para programar.");
+      return;
+    }
+
+    const parsed = new Date(localValue);
+    if (!Number.isFinite(parsed.getTime())) {
+      setStatus("Fecha/hora inválida para programar.");
+      return;
+    }
+
+    setSchedulingFacebookId(item.id);
+    setStatus(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      const msg = "Sesión inválida. Inicia sesión de nuevo.";
+      setStatus(msg);
+      setSchedulingFacebookId(null);
+      return;
+    }
+
+    const res = await fetch("/api/social/meta/facebook/post-blog", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        blogId: item.id,
+        blogSlug: item.slug ?? null,
+        title: item.title,
+        excerpt: item.excerpt ?? "",
+        scheduleFor: parsed.toISOString()
+      })
+    });
+    const json = await res.json().catch(() => ({}));
+    setSchedulingFacebookId(null);
+    if (!res.ok || !json?.ok) {
+      setStatus(`Schedule Facebook falló: ${json?.error ?? "error"}`);
+      return;
+    }
+
+    const scheduled = json?.scheduledFor ? new Date(json.scheduledFor).toLocaleString("es-PR") : localValue;
+    setStatus(`Artículo programado en Facebook para ${scheduled}.`);
+  };
+
+  const handlePostToInstagramNow = async (item: BlogPost) => {
+    if (!item.cover_url) {
+      setStatus("Instagram requiere portada (cover_url) para publicar.");
+      return;
+    }
+
+    setPostingInstagramId(item.id);
+    setStatus(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      const msg = "Sesión inválida. Inicia sesión de nuevo.";
+      setStatus(msg);
+      setPostingInstagramId(null);
+      return;
+    }
+
+    const res = await fetch("/api/social/meta/instagram/post-blog", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        blogId: item.id,
+        blogSlug: item.slug ?? null,
+        title: item.title,
+        excerpt: item.excerpt ?? "",
+        coverUrl: item.cover_url
+      })
+    });
+    const json = await res.json().catch(() => ({}));
+    setPostingInstagramId(null);
+    if (!res.ok) {
+      setStatus(`Instagram falló: ${json?.error ?? "error"}`);
+      return;
+    }
+    setStatus("Artículo publicado en Instagram.");
   };
 
   return (
@@ -500,6 +779,35 @@ Párrafo normal.
             }}
           />
         </label>
+        {!editingId ? (
+          <label className="check-row">
+            <input type="checkbox" checked={postToFacebook} onChange={(e) => setPostToFacebook(e.target.checked)} />
+            Compartir también en Facebook (resumen + link)
+          </label>
+        ) : null}
+        {!editingId && postToFacebook ? (
+          <label>
+            Programar Facebook (opcional)
+            <input
+              className="input"
+              type="datetime-local"
+              value={scheduleFacebookAt}
+              onChange={(e) => setScheduleFacebookAt(e.target.value)}
+            />
+          </label>
+        ) : null}
+        {!editingId ? (
+          <label className="check-row">
+            <input type="checkbox" checked={pushOnPublish} onChange={(e) => setPushOnPublish(e.target.checked)} />
+            Enviar push de blog al publicar
+          </label>
+        ) : null}
+        {!editingId ? (
+          <label className="check-row">
+            <input type="checkbox" checked={postToInstagram} onChange={(e) => setPostToInstagram(e.target.checked)} />
+            Compartir también en Instagram (requiere portada)
+          </label>
+        ) : null}
         <div className="form-submit-bar">
           <button className="button" type="submit" disabled={loading || uploading}>
             {loading ? "Guardando..." : uploading ? "Subiendo portada..." : editingId ? "Actualizar" : "Publicar"}
@@ -523,6 +831,15 @@ Párrafo normal.
                 <span className="muted" style={{ fontSize: 12 }}>
                   {item.created_at ? new Date(item.created_at).toLocaleDateString("es-PR") : ""}
                 </span>
+                <label>
+                  Programar Facebook (opcional)
+                  <input
+                    className="input"
+                    type="datetime-local"
+                    value={scheduleItemFacebookAt[item.id] ?? ""}
+                    onChange={(e) => setScheduleItemFacebookAt((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                  />
+                </label>
                 <div className="admin-item-actions">
                   <button className="button secondary" type="button" onClick={() => handleEdit(item)}>
                     Editar
@@ -530,6 +847,30 @@ Párrafo normal.
                   <a className="button secondary" href={postHref(item)} target="_blank" rel="noreferrer">
                     Ver publico
                   </a>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    disabled={postingFacebookId === item.id}
+                    onClick={() => handlePostToFacebookNow(item)}
+                  >
+                    {postingFacebookId === item.id ? "Posteando..." : "Publicar en Facebook"}
+                  </button>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    disabled={schedulingFacebookId === item.id}
+                    onClick={() => handleScheduleToFacebook(item)}
+                  >
+                    {schedulingFacebookId === item.id ? "Programando..." : "Programar Facebook"}
+                  </button>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    disabled={postingInstagramId === item.id}
+                    onClick={() => handlePostToInstagramNow(item)}
+                  >
+                    {postingInstagramId === item.id ? "Posteando..." : "Publicar en Instagram"}
+                  </button>
                   <AdminDeleteButton table="blog_posts" id={item.id} label="Eliminar" />
                 </div>
               </div>

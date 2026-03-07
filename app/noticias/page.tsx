@@ -10,14 +10,17 @@ import { getServerLang } from "@/lib/i18nServer";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { DesktopSideAdSlot } from "@/components/promotions/DesktopSideAdSlot";
 import { extractNewsPathSegment, extractNewsPathSegmentFromUrl, newsHref } from "@/lib/newsRoute";
+import { buildSeoMetadata } from "@/lib/seo/meta";
+import { jsonLdScript } from "@/lib/seo/jsonld";
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildSeoMetadata({
   title: "Noticias Sin Pelos | Puerto Rico, Texas, USA y Mundo",
-  description: "Noticias analizadas sin filtro. Cobertura en Puerto Rico, Texas, USA y Mundo con enfoque editorial de Sin Pelos.",
-  alternates: { canonical: "/noticias" }
-};
+  description:
+    "Noticias analizadas sin filtro. Cobertura en Puerto Rico, Texas, USA y Mundo con enfoque editorial de Sin Pelos.",
+  path: "/noticias"
+});
 
 type NewsItem = {
   id: string;
@@ -299,6 +302,17 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
   const railFromTrending = trendingUnique.filter((item) => !usedInMain.has(item.id));
   const railItems = (railFromTrending.length > 0 ? railFromTrending : sideItems).slice(0, 5);
   const breakingUnique = uniqueById(breakingItems);
+  const newsCollectionSchema = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Noticias Sin Pelos",
+    url: "https://www.sinpelosenelmicrofono.com/noticias",
+    hasPart: pageItems.slice(0, 20).map((item, idx) => ({
+      "@type": "ListItem",
+      position: idx + 1,
+      url: `https://www.sinpelosenelmicrofono.com${newsHref(item)}`
+    }))
+  };
 
   return (
     <main>
@@ -493,6 +507,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
         </div>
       </section>
       <Footer />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(newsCollectionSchema) }} />
     </main>
   );
 }

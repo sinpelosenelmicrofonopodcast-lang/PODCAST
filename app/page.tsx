@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { GuestInvitePopup } from "@/components/GuestInvitePopup";
 import { NewsletterForm } from "@/components/newsletter/NewsletterForm";
 import { HeroNews } from "@/components/home/HeroNews";
 import { TrendingBlock } from "@/components/home/TrendingBlock";
@@ -56,7 +55,6 @@ export default async function HomePage() {
 
   return (
     <main className="app-enter home-media-v6">
-      <GuestInvitePopup />
       <Navbar />
 
       {overview.flags.showLatestNews ? (

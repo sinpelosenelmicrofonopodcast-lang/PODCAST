@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
+import { CANONICAL_SITE_URL } from "@/lib/seo/constants";
 
-const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.sinpelosenelmicrofono.com").replace(/\/+$/, "");
+const siteUrl = CANONICAL_SITE_URL;
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -8,11 +9,10 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin", "/api", "/login", "/register", "/reset", "/perfil"]
+        disallow: ["/entrar", "/unirme", "/community", "/comunidad", "/zona-cruda", "/dashboard", "/admin", "/api"]
       }
     ],
     sitemap: [`${siteUrl}/sitemap.xml`],
     host: siteUrl
   };
 }
-

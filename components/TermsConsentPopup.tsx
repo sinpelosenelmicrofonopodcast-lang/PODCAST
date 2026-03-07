@@ -76,17 +76,9 @@ export function TermsConsentPopup() {
     setOpen(stored !== TERMS_GATE_VERSION);
   }, [isBlockedPath]);
 
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [open]);
-
   const onAccept = () => {
     if (!confirmAge || !confirmTerms) return;
+
     window.localStorage.setItem(TERMS_GATE_STORAGE_KEY, TERMS_GATE_VERSION);
     document.cookie = `spm_terms_gate=${TERMS_GATE_VERSION};path=/;max-age=31536000;samesite=lax`;
     setOpen(false);
@@ -97,7 +89,7 @@ export function TermsConsentPopup() {
   const t = texts[lang];
 
   return (
-    <div className="terms-gate-backdrop" role="dialog" aria-modal="true" aria-label={t.title}>
+    <div className="terms-gate-backdrop" role="region" aria-label={t.title}>
       <div className="terms-gate-card">
         <span className="badge">{t.title}</span>
         <h2>{t.title}</h2>

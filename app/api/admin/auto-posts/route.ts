@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/adminAuth";
-import { chicagoDateInputFromNow, chicagoDayBoundsUtc } from "@/lib/autoPosts";
+import { chicagoDateInputFromNow, chicagoDayBoundsUtc, chicagoLocalToUtcIso } from "@/lib/autoPosts";
+import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 import { withScheduledPostsMigrationHint } from "@/lib/supabaseErrorHints";
 
 const ALLOWED_STATUS = new Set(["queued", "publishing", "posted", "failed", "cancelled", "all"]);
+const CHICAGO_LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+type CreatePayload = {
+  message?: string;
+  mediaUrl?: string | null;
+  scheduledFor?: string;
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -50,6 +58,74 @@ export async function GET(request: NextRequest) {
       summary,
       items
     });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const auth = await requireAdminApi(request);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+    const reqMeta = getRequestAuditMeta(request);
+
+    const body = (await request.json().catch(() => ({}))) as CreatePayload;
+    const message = String(body?.message ?? "").trim();
+    const mediaUrl = String(body?.mediaUrl ?? "").trim();
+    const scheduledForRaw = String(body?.scheduledFor ?? "").trim();
+
+    if (!message) return NextResponse.json({ ok: false, error: "Mensaje requerido." }, { status: 400 });
+    if (!scheduledForRaw) {
+      return NextResponse.json({ ok: false, error: "scheduledFor requerido." }, { status: 400 });
+    }
+
+    let scheduledForUtc = "";
+    if (CHICAGO_LOCAL_DATE_TIME.test(scheduledForRaw)) {
+      const [datePart, timePart] = scheduledForRaw.split("T");
+      scheduledForUtc = chicagoLocalToUtcIso(datePart, timePart);
+    } else {
+      const parsed = new Date(scheduledForRaw);
+      if (!Number.isFinite(parsed.getTime())) {
+        return NextResponse.json({ ok: false, error: "Fecha inválida para schedule." }, { status: 400 });
+      }
+      scheduledForUtc = parsed.toISOString();
+    }
+
+    if (new Date(scheduledForUtc).getTime() <= Date.now() + 30_000) {
+      return NextResponse.json({ ok: false, error: "La fecha programada debe ser futura (mínimo 30 segundos)." }, { status: 400 });
+    }
+
+    const insert = await auth.service
+      .from("scheduled_posts")
+      .insert({
+        platform: "facebook_page",
+        message,
+        media_url: mediaUrl || null,
+        scheduled_for: scheduledForUtc,
+        status: "queued",
+        created_by: auth.userId
+      })
+      .select("id, platform, message, media_url, scheduled_for, status, posted_at, remote_id, error, created_by, created_at, updated_at")
+      .limit(1)
+      .maybeSingle();
+
+    if (insert.error) {
+      return NextResponse.json({ ok: false, error: withScheduledPostsMigrationHint(insert.error) }, { status: 400 });
+    }
+    if (!insert.data) {
+      return NextResponse.json({ ok: false, error: "No se pudo crear el post programado." }, { status: 400 });
+    }
+
+    await logAdminAudit(auth.service, {
+      actorId: auth.userId,
+      action: "admin.auto_posts.create",
+      targetTable: "scheduled_posts",
+      targetId: insert.data.id,
+      meta: { scheduled_for: scheduledForUtc },
+      ...reqMeta
+    });
+
+    return NextResponse.json({ ok: true, item: insert.data });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });
   }

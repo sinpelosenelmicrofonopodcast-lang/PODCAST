@@ -4,6 +4,13 @@ import { createAutomationJob, logPipelineEvent, updateAutomationJob } from "@/li
 import { postNewsToFacebook } from "@/lib/socialFacebook";
 import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 
+type NewsRow = {
+  id: string;
+  slug: string | null;
+  title: string | null;
+  summary: string | null;
+};
+
 export async function POST(request: NextRequest) {
   let jobId = "";
   try {
@@ -13,11 +20,81 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const newsId = String(body?.newsId ?? "").trim();
-    const newsSlug = String(body?.newsSlug ?? "").trim();
-    const title = String(body?.title ?? "").trim();
-    const summary = String(body?.summary ?? "").trim();
+    let newsSlug = String(body?.newsSlug ?? "").trim();
+    let title = String(body?.title ?? "").trim();
+    let summary = String(body?.summary ?? "").trim();
+    const scheduleForRaw = String(body?.scheduleFor ?? "").trim();
 
     if (!newsId) return NextResponse.json({ ok: false, error: "newsId requerido." }, { status: 400 });
+
+    if (!title || !summary || !newsSlug) {
+      const newsRes = await auth.service
+        .from("news_items")
+        .select("id, slug, title, summary")
+        .eq("id", newsId)
+        .limit(1)
+        .maybeSingle();
+
+      if (newsRes.error) {
+        return NextResponse.json({ ok: false, error: newsRes.error.message }, { status: 400 });
+      }
+
+      const row = (newsRes.data ?? null) as NewsRow | null;
+      if (!row) return NextResponse.json({ ok: false, error: "Noticia no encontrada." }, { status: 404 });
+
+      if (!newsSlug) newsSlug = String(row.slug ?? "").trim();
+      if (!title) title = String(row.title ?? "").trim();
+      if (!summary) summary = String(row.summary ?? "").trim();
+    }
+
+    let scheduleForIso: string | null = null;
+    if (scheduleForRaw) {
+      const parsed = new Date(scheduleForRaw);
+      if (!Number.isFinite(parsed.getTime())) {
+        return NextResponse.json({ ok: false, error: "scheduleFor inválido." }, { status: 400 });
+      }
+      scheduleForIso = parsed.toISOString();
+      if (parsed.getTime() <= Date.now() + 30_000) {
+        return NextResponse.json({ ok: false, error: "La fecha programada debe ser futura (mínimo 30 segundos)." }, { status: 400 });
+      }
+    }
+
+    if (scheduleForIso) {
+      jobId = await createAutomationJob(auth.service, {
+        jobType: "facebook_post_news",
+        source: "facebook",
+        title: title || "Programar noticia en Facebook",
+        contentType: "news",
+        contentId: newsId,
+        payload: { newsId, title, summary, newsSlug: newsSlug || null },
+        status: "queued",
+        priority: 40,
+        scheduledFor: scheduleForIso,
+        createdBy: auth.userId
+      });
+      await logPipelineEvent(auth.service, {
+        jobId,
+        stage: "social",
+        status: "info",
+        contentType: "news",
+        contentId: newsId,
+        platform: "Facebook",
+        message: "Post de noticia programado para Facebook",
+        meta: { scheduled_for: scheduleForIso },
+        actorId: auth.userId
+      });
+
+      await logAdminAudit(auth.service, {
+        actorId: auth.userId,
+        action: "admin.news.facebook_schedule",
+        targetTable: "news_items",
+        targetId: newsId,
+        meta: { scheduled_for: scheduleForIso },
+        ...reqMeta
+      });
+
+      return NextResponse.json({ ok: true, queued: true, jobId, scheduledFor: scheduleForIso });
+    }
 
     jobId = await createAutomationJob(auth.service, {
       jobType: "facebook_post_news",

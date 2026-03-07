@@ -5,11 +5,16 @@ import {
   requiredPermissionForAdminPage,
   type StaffPermission
 } from "./lib/staffPermissions";
+import { canonicalHost } from "@/lib/seo/constants";
+import { isPrivateSeoPath } from "@/lib/seo/privateRoutes";
 
 const SOCIAL_STAFF_APIS = new Set([
   "/api/social/youtube/sync",
   "/api/social/meta/facebook/post-news",
-  "/api/social/meta/instagram/post-news"
+  "/api/social/meta/facebook/post-episode",
+  "/api/social/meta/instagram/post-news",
+  "/api/social/meta/facebook/post-blog",
+  "/api/social/meta/instagram/post-blog"
 ]);
 const SOCIAL_ADMIN_APIS = new Set(["/api/social/meta/facebook/diagnose"]);
 const ACCESS_TOKEN_COOKIE = "sp_access_token";
@@ -93,25 +98,74 @@ async function getAccessByToken(token: string): Promise<AccessInfo | null> {
 }
 
 function denyPage(request: NextRequest, target: "/admin" | "/") {
-  return NextResponse.redirect(new URL(target, request.url));
+  return withNoindex(NextResponse.redirect(new URL(target, request.url)));
 }
 
 function denyApi(status: number, error: string) {
-  return NextResponse.json({ ok: false, error }, { status });
+  return withNoindex(NextResponse.json({ ok: false, error }, { status }));
+}
+
+function withNoindex(response: NextResponse) {
+  response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  return response;
+}
+
+function isAssetPath(pathname: string) {
+  if (pathname.startsWith("/_next")) return true;
+  if (pathname.startsWith("/favicon")) return true;
+  if (pathname.startsWith("/images/")) return true;
+  if (pathname.startsWith("/icons/")) return true;
+  if (pathname.startsWith("/logo")) return true;
+  if (pathname.startsWith("/manifest")) return true;
+  return /\.[a-zA-Z0-9]+$/.test(pathname);
+}
+
+function shouldCanonicalRedirect(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  const hostHeader = (request.headers.get("host") ?? "").toLowerCase();
+  const host = hostHeader || url.host.toLowerCase();
+  const protocol = (request.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "")).toLowerCase();
+  const localHost = host.includes("localhost") || host.startsWith("127.0.0.1");
+  const targetHost = canonicalHost();
+
+  let changed = false;
+  if (!localHost && protocol === "http") {
+    url.protocol = "https:";
+    changed = true;
+  }
+  if (!localHost && host !== targetHost) {
+    url.host = targetHost;
+    changed = true;
+  }
+  if (url.pathname !== "/" && url.pathname.endsWith("/")) {
+    url.pathname = url.pathname.replace(/\/+$/, "");
+    changed = true;
+  }
+  return changed ? url : null;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (isAssetPath(pathname)) return NextResponse.next();
+
+  const redirectTo = shouldCanonicalRedirect(request);
+  if (redirectTo) return NextResponse.redirect(redirectTo, 308);
+
   const needsStaffPage = pathname.startsWith("/admin");
   const needsStaffApi = pathname.startsWith("/api/admin") || SOCIAL_STAFF_APIS.has(pathname) || SOCIAL_ADMIN_APIS.has(pathname);
-  if (!needsStaffPage && !needsStaffApi) return NextResponse.next();
+  const privateSeoPath = isPrivateSeoPath(pathname);
+  if (!needsStaffPage && !needsStaffApi) {
+    const response = NextResponse.next();
+    if (privateSeoPath) withNoindex(response);
+    return response;
+  }
 
   const token = readBearer(request) || request.cookies.get(ACCESS_TOKEN_COOKIE)?.value || "";
   if (!token) {
     if (needsStaffPage) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);
-      return NextResponse.redirect(loginUrl);
+      return withNoindex(NextResponse.redirect(loginUrl));
     }
     return denyApi(401, "Unauthorized");
   }
@@ -139,20 +193,18 @@ export async function middleware(request: NextRequest) {
     if (required && required !== "admin" && !hasAnyPermission(access, required)) return denyApi(403, "Sin permiso.");
     if (pathname === "/api/social/youtube/sync" && !hasAnyPermission(access, "manage_news_sources")) return denyApi(403, "Sin permiso.");
     if (pathname === "/api/social/meta/facebook/post-news" && !hasAnyPermission(access, "manage_news")) return denyApi(403, "Sin permiso.");
+    if (pathname === "/api/social/meta/facebook/post-episode" && !hasAnyPermission(access, "manage_news")) return denyApi(403, "Sin permiso.");
     if (pathname === "/api/social/meta/instagram/post-news" && !hasAnyPermission(access, "manage_news")) return denyApi(403, "Sin permiso.");
+    if (pathname === "/api/social/meta/facebook/post-blog" && !hasAnyPermission(access, "manage_blog")) return denyApi(403, "Sin permiso.");
+    if (pathname === "/api/social/meta/instagram/post-blog" && !hasAnyPermission(access, "manage_blog")) return denyApi(403, "Sin permiso.");
     if (pathname === "/api/social/meta/facebook/diagnose" && !access.isAdmin) return denyApi(403, "Sin permiso.");
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  if (privateSeoPath) withNoindex(response);
+  return response;
 }
 
 export const config = {
-  matcher: [
-    "/admin/:path*",
-    "/api/admin/:path*",
-    "/api/social/youtube/sync",
-    "/api/social/meta/facebook/post-news",
-    "/api/social/meta/instagram/post-news",
-    "/api/social/meta/facebook/diagnose"
-  ]
+  matcher: ["/:path*"]
 };

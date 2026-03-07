@@ -27,6 +27,8 @@ type VisitRow = {
 
 const VISITS_SELECT_GEO = "visitor_id, visited_at, country_code, country, city";
 const VISITS_SELECT_FALLBACK = "visitor_id, visited_at";
+const VISITS_BATCH = 1000;
+const VISITS_MAX_ROWS = 250000;
 
 function normalizePlatform(value?: string | null) {
   const raw = String(value ?? "").toLowerCase().trim();
@@ -60,24 +62,33 @@ function isMissingGeoColumnsError(message?: string | null) {
 }
 
 async function loadVisits(service: any, monthStartIso: string) {
-  const primaryResp = await service
-    .from("page_visits")
-    .select(VISITS_SELECT_GEO)
-    .gte("visited_at", monthStartIso)
-    .order("visited_at", { ascending: false })
-    .limit(50000);
+  const fetchAll = async (selectCols: string) => {
+    const rows: VisitRow[] = [];
+    let offset = 0;
 
-  if (!primaryResp.error) return { error: null as string | null, rows: (primaryResp.data ?? []) as VisitRow[] };
-  if (!isMissingGeoColumnsError(primaryResp.error.message)) return { error: primaryResp.error.message, rows: [] as VisitRow[] };
+    while (rows.length < VISITS_MAX_ROWS) {
+      const chunkResp = await service
+        .from("page_visits")
+        .select(selectCols)
+        .gte("visited_at", monthStartIso)
+        .order("visited_at", { ascending: false })
+        .range(offset, offset + VISITS_BATCH - 1);
 
-  const fallbackResp = await service
-    .from("page_visits")
-    .select(VISITS_SELECT_FALLBACK)
-    .gte("visited_at", monthStartIso)
-    .order("visited_at", { ascending: false })
-    .limit(50000);
-  if (fallbackResp.error) return { error: fallbackResp.error.message, rows: [] as VisitRow[] };
-  return { error: null as string | null, rows: (fallbackResp.data ?? []) as VisitRow[] };
+      if (chunkResp.error) return { error: chunkResp.error.message as string, rows: [] as VisitRow[] };
+
+      const chunk = (chunkResp.data ?? []) as VisitRow[];
+      rows.push(...chunk);
+      if (chunk.length < VISITS_BATCH) break;
+      offset += VISITS_BATCH;
+    }
+
+    return { error: null as string | null, rows };
+  };
+
+  const primaryResp = await fetchAll(VISITS_SELECT_GEO);
+  if (!primaryResp.error) return primaryResp;
+  if (!isMissingGeoColumnsError(primaryResp.error)) return primaryResp;
+  return fetchAll(VISITS_SELECT_FALLBACK);
 }
 
 export async function GET(request: NextRequest) {

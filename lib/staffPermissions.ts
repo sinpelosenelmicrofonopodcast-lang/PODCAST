@@ -72,12 +72,14 @@ export function requiredPermissionForAdminPage(pathname: string): StaffPermissio
   if (pathname.startsWith("/admin/home")) return "manage_home";
   if (pathname.startsWith("/admin/news-sources")) return "manage_news_sources";
   if (pathname.startsWith("/admin/news")) return "manage_news";
+  if (pathname.startsWith("/admin/episodes")) return "manage_news";
   if (pathname.startsWith("/admin/blog")) return "manage_blog";
   if (pathname.startsWith("/admin/events")) return "manage_events";
   if (pathname.startsWith("/admin/promotions")) return "manage_promotions";
   if (pathname.startsWith("/admin/newsletter")) return "manage_newsletter";
   if (pathname.startsWith("/admin/guest-requests")) return "manage_guest_requests";
   if (pathname.startsWith("/admin/stats")) return "view_stats";
+  if (pathname.startsWith("/admin/seo")) return "view_stats";
   if (pathname.startsWith("/admin/reports")) return "view_reports";
   if (pathname.startsWith("/admin/schedule")) return "view_schedule";
   if (pathname.startsWith("/admin/content")) return "manage_home";
@@ -96,6 +98,7 @@ export function requiredPermissionForAdminApi(pathname: string): StaffPermission
   if (pathname.startsWith("/api/admin/news-sources")) return "manage_news_sources";
   if (pathname.startsWith("/api/admin/news-automation")) return "manage_news_sources";
   if (pathname.startsWith("/api/admin/news/rewrite")) return "manage_news";
+  if (pathname.startsWith("/api/admin/notifications/onesignal")) return "manage_news";
   if (pathname.startsWith("/api/admin/promotions")) return "manage_promotions";
   if (pathname.startsWith("/api/admin/delete")) return null;
   return null;

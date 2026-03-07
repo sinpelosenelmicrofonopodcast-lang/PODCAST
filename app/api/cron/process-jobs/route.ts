@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createAutomationJob, logPipelineEvent, updateAutomationJob } from "@/lib/pipelineOps";
-import { postNewsToFacebook } from "@/lib/socialFacebook";
+import { postBlogToFacebook, postEpisodeToFacebook, postNewsToFacebook } from "@/lib/socialFacebook";
 import { postNewsToInstagram } from "@/lib/socialInstagram";
 import { rewriteNewsWithAI } from "@/lib/newsRewrite";
+import { getYouTubeVideoId } from "@/lib/youtube";
 
 type QueueJob = {
   id: string;
@@ -28,6 +29,7 @@ function isCronAuthorized(request: NextRequest) {
   const secret = process.env.CRON_SECRET ?? "";
   if (!secret) return false;
   const auth = request.headers.get("authorization") ?? "";
+  if (auth === secret) return true;
   if (auth === `Bearer ${secret}`) return true;
   if ((request.headers.get("x-cron-secret") ?? "") === secret) return true;
   if ((request.nextUrl.searchParams.get("secret") ?? "") === secret) return true;
@@ -109,6 +111,64 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        if (job.job_type === "facebook_post_blog") {
+          const blogId = String(job.payload?.blogId ?? job.content_id ?? "").trim();
+          let blogSlug = String(job.payload?.blogSlug ?? "").trim();
+          let title = String(job.payload?.title ?? "").trim();
+          let excerpt = String(job.payload?.excerpt ?? "").trim();
+          if (!blogId) throw new Error("Job inválido: falta blogId.");
+
+          if (!title || !excerpt || !blogSlug) {
+            const blogRes = await service
+              .from("blog_posts")
+              .select("slug, title, excerpt")
+              .eq("id", blogId)
+              .limit(1)
+              .maybeSingle();
+
+            if (blogRes.error) throw new Error(blogRes.error.message);
+            const row = blogRes.data as { slug?: string | null; title?: string | null; excerpt?: string | null } | null;
+            if (!row) throw new Error("No se encontró el artículo del blog para publicar.");
+            if (!blogSlug) blogSlug = String(row.slug ?? "").trim();
+            if (!title) title = String(row.title ?? "").trim();
+            if (!excerpt) excerpt = String(row.excerpt ?? "").trim();
+          }
+
+          const posted = await postBlogToFacebook({ blogId, blogSlug: blogSlug || null, title, excerpt });
+
+          await service.from("external_posts").upsert(
+            {
+              platform: "Facebook",
+              external_id: posted.postId || `blog-${blogId}`,
+              title: title || null,
+              caption: excerpt || null,
+              media_url: null,
+              metrics: null,
+              posted_at: new Date().toISOString(),
+              source_url: posted.link
+            },
+            { onConflict: "platform,external_id", ignoreDuplicates: true }
+          );
+
+          await logPipelineEvent(service, {
+            jobId: job.id,
+            stage: "social",
+            status: "ok",
+            contentType: "blog",
+            contentId: blogId,
+            platform: "Facebook",
+            message: "Blog publicado por worker",
+            meta: { postId: posted.postId, link: posted.link }
+          });
+          await updateAutomationJob(service, job.id, {
+            status: "done",
+            finishedAt: new Date().toISOString(),
+            payload: { ...(job.payload ?? {}), blogSlug: blogSlug || null, title, excerpt, postId: posted.postId, link: posted.link }
+          });
+          done += 1;
+          continue;
+        }
+
         if (job.job_type === "instagram_post_news") {
           const newsId = String(job.payload?.newsId ?? job.content_id ?? "").trim();
           let newsSlug = String(job.payload?.newsSlug ?? "").trim();
@@ -172,6 +232,85 @@ export async function POST(request: NextRequest) {
               coverUrl: coverUrl || null,
               mediaId: posted.mediaId,
               link: posted.articleUrl
+            }
+          });
+          done += 1;
+          continue;
+        }
+
+        if (job.job_type === "facebook_post_episode") {
+          const episodeId = String(job.payload?.episodeId ?? job.content_id ?? "").trim();
+          let episodeSlug = String(job.payload?.episodeSlug ?? "").trim();
+          let title = String(job.payload?.title ?? "").trim();
+          let description = String(job.payload?.description ?? "").trim();
+          let sourceUrl = String(job.payload?.sourceUrl ?? "").trim();
+          const customText = String(job.payload?.customText ?? "").trim();
+          if (!episodeId) throw new Error("Job inválido: falta episodeId.");
+
+          if (!title || !description || !episodeSlug || !sourceUrl) {
+            const externalRes = await service
+              .from("external_posts")
+              .select("id, title, caption, source_url")
+              .eq("id", episodeId)
+              .limit(1)
+              .maybeSingle();
+            if (externalRes.error) throw new Error(externalRes.error.message);
+            const row = (externalRes.data ?? null) as { id?: string | null; title?: string | null; caption?: string | null; source_url?: string | null } | null;
+            if (row) {
+              if (!title) title = String(row.title ?? "").trim();
+              if (!description) description = String(row.caption ?? "").trim();
+              if (!sourceUrl) sourceUrl = String(row.source_url ?? "").trim();
+              if (!episodeSlug) episodeSlug = getYouTubeVideoId(row.source_url) || String(row.id ?? "").trim();
+            }
+          }
+
+          if (!title) title = "Nuevo episodio";
+          if (!episodeSlug) episodeSlug = getYouTubeVideoId(sourceUrl) || episodeId;
+
+          const posted = await postEpisodeToFacebook({
+            episodeId,
+            episodeSlug,
+            title,
+            description,
+            sourceUrl: sourceUrl || null,
+            customText: customText || null
+          });
+
+          await service.from("external_posts").upsert(
+            {
+              platform: "Facebook",
+              external_id: posted.postId || `episode-${episodeId}`,
+              title: title || null,
+              caption: customText || description || null,
+              media_url: null,
+              metrics: null,
+              posted_at: new Date().toISOString(),
+              source_url: posted.link
+            },
+            { onConflict: "platform,external_id", ignoreDuplicates: true }
+          );
+
+          await logPipelineEvent(service, {
+            jobId: job.id,
+            stage: "social",
+            status: "ok",
+            contentType: "episode",
+            contentId: episodeId,
+            platform: "Facebook",
+            message: "Episodio publicado por worker",
+            meta: { postId: posted.postId, link: posted.link }
+          });
+
+          await updateAutomationJob(service, job.id, {
+            status: "done",
+            finishedAt: new Date().toISOString(),
+            payload: {
+              ...(job.payload ?? {}),
+              title,
+              description,
+              sourceUrl: sourceUrl || null,
+              postId: posted.postId,
+              link: posted.link
             }
           });
           done += 1;

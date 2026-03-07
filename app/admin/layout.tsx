@@ -1,6 +1,15 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { AdminShell } from "@/components/AdminShell";
 import { requireStaffPageOrRedirect } from "@/lib/adminAuth";
+import { buildSeoMetadata } from "@/lib/seo/meta";
+
+export const metadata: Metadata = buildSeoMetadata({
+  title: "Admin | Sin Pelos en el Micrófono",
+  description: "Panel administrativo.",
+  path: "/admin",
+  noindex: true
+});
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await requireStaffPageOrRedirect("/admin");

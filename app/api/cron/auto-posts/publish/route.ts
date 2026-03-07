@@ -18,12 +18,15 @@ function getServiceClient() {
 }
 
 function isCronAuthorized(request: NextRequest) {
-  const secret = process.env.CRON_SECRET ?? "";
+  const secret = (process.env.CRON_SECRET ?? "").trim();
   if (!secret) return false;
-  const auth = request.headers.get("authorization") ?? "";
-  if (auth === `Bearer ${secret}`) return true;
-  if ((request.headers.get("x-cron-secret") ?? "") === secret) return true;
-  if ((request.nextUrl.searchParams.get("secret") ?? "") === secret) return true;
+  const auth = (request.headers.get("authorization") ?? "").trim();
+  if (auth && auth === secret) return true;
+  const bearerMatch = auth.match(/^bearer\s+(.+)$/i);
+  const bearer = (bearerMatch?.[1] ?? "").trim();
+  if (bearer && bearer === secret) return true;
+  if ((request.headers.get("x-cron-secret") ?? "").trim() === secret) return true;
+  if ((request.nextUrl.searchParams.get("secret") ?? "").trim() === secret) return true;
   return false;
 }
 

@@ -2,6 +2,8 @@
   "crons": [
     { "path": "/api/cron/youtube-sync", "schedule": "0 8 * * *" },
     { "path": "/api/cron/news-ingest", "schedule": "15 9 * * *" },
-    { "path": "/api/cron/process-jobs", "schedule": "30 9 * * *" }
+    { "path": "/api/cron/process-jobs", "schedule": "30 9 * * *" },
+    { "path": "/api/cron/seo", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/seo-daily", "schedule": "20 7 * * *" }
   ]
 }
