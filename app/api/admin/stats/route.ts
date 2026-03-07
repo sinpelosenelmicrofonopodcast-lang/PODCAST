@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireStaffApi } from "@/lib/adminAuth";
+import { syncMetaInsights } from "@/lib/metaInsights";
 
 function getClients() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -97,6 +98,19 @@ export async function GET(request: NextRequest) {
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const { service } = getClients();
+    const refreshMeta = String(request.nextUrl.searchParams.get("refreshMeta") ?? "").trim() === "1";
+    const syncSummary = await syncMetaInsights(service, {
+      force: refreshMeta,
+      maxPerPlatform: refreshMeta ? 30 : 12,
+      minSyncMinutes: refreshMeta ? 1 : 180
+    }).catch((e: any) => ({
+      attempted: 0,
+      updated: 0,
+      skippedFresh: 0,
+      skippedInvalid: 0,
+      errors: [{ id: "sync", platform: "meta", error: String(e?.message ?? "Meta sync error") }]
+    }));
+
     const now = new Date();
     const dayStart = new Date(now);
     dayStart.setHours(0, 0, 0, 0);
@@ -213,6 +227,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      metaSync: syncSummary,
       website: {
         day: { visits: dayVisits, unique: dayVisitors.size },
         week: { visits: weekVisits, unique: weekVisitors.size },

@@ -6,6 +6,13 @@ import { StatCard } from "@/components/StatCard";
 import { toast } from "@/lib/toast";
 
 type StatsPayload = {
+  metaSync?: {
+    attempted: number;
+    updated: number;
+    skippedFresh: number;
+    skippedInvalid: number;
+    errors: Array<{ id: string; platform: string; error: string }>;
+  };
   website: {
     day: { visits: number; unique: number };
     week: { visits: number; unique: number };
@@ -44,10 +51,12 @@ const formatDateTime = (value?: string | null) => {
 
 export default function AdminStatsPage() {
   const [loading, setLoading] = useState(true);
+  const [syncingMeta, setSyncingMeta] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<StatsPayload | null>(null);
 
-  const load = async () => {
+  const load = async (options?: { refreshMeta?: boolean }) => {
+    const refreshMeta = options?.refreshMeta === true;
     setLoading(true);
     setError(null);
 
@@ -56,19 +65,22 @@ export default function AdminStatsPage() {
     if (!token) {
       setError("Sesión inválida. Vuelve a iniciar sesión.");
       setLoading(false);
-      return;
+      return null;
     }
 
-    const res = await fetch("/api/admin/stats", { headers: { Authorization: `Bearer ${token}` } });
+    const url = refreshMeta ? "/api/admin/stats?refreshMeta=1" : "/api/admin/stats";
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
       setError(json?.error ?? `No se pudo cargar stats (HTTP ${res.status}).`);
       setLoading(false);
-      return;
+      return null;
     }
 
-    setData(json as StatsPayload);
+    const payload = json as StatsPayload;
+    setData(payload);
     setLoading(false);
+    return payload;
   };
 
   useEffect(() => {
@@ -122,17 +134,34 @@ export default function AdminStatsPage() {
     }
   };
 
+  const handleSyncMeta = async () => {
+    setSyncingMeta(true);
+    const refreshed = await load({ refreshMeta: true });
+    setSyncingMeta(false);
+    const summary = refreshed?.metaSync;
+    if (summary) {
+      if (summary.errors.length > 0) {
+        toast.error(`Meta sync con errores. Actualizados: ${summary.updated}`);
+      } else {
+        toast.success(`Meta sync listo. Actualizados: ${summary.updated}`);
+      }
+    }
+  };
+
   return (
     <main>
       <h1 className="section-title">Estadísticas</h1>
       <p className="muted">Visitas del sitio + métricas del feed sincronizado.</p>
 
       <div className="form-submit-bar" style={{ marginTop: 14 }}>
-        <button className="button secondary" type="button" onClick={load} disabled={loading}>
+        <button className="button secondary" type="button" onClick={() => void load()} disabled={loading}>
           {loading ? "Cargando..." : "Actualizar"}
         </button>
         <button className="button" type="button" onClick={handleSyncYT}>
           Sincronizar YouTube ahora
+        </button>
+        <button className="button secondary" type="button" onClick={handleSyncMeta} disabled={syncingMeta || loading}>
+          {syncingMeta ? "Sincronizando..." : "Sincronizar Facebook/Instagram"}
         </button>
       </div>
 
@@ -274,11 +303,25 @@ export default function AdminStatsPage() {
             <span className="badge">Sin datos</span>
             <h3 style={{ marginTop: 0 }}>No hay métricas aún</h3>
             <p className="muted" style={{ marginBottom: 0 }}>
-              YouTube se llena con “Sincronizar YouTube”. Instagram/Facebook/TikTok requiere integración API (fase siguiente).
+              Usa “Sincronizar Facebook/Instagram” para jalar insights reales de Meta.
             </p>
           </article>
         ) : null}
       </div>
+      {data?.metaSync ? (
+        <div className="card" style={{ marginTop: 14 }}>
+          <strong>Sync Meta</strong>
+          <p className="muted" style={{ margin: "8px 0 0" }}>
+            Intentados: {formatNumber(data.metaSync.attempted)} · Actualizados: {formatNumber(data.metaSync.updated)} · Fresh skip:{" "}
+            {formatNumber(data.metaSync.skippedFresh)} · Inválidos: {formatNumber(data.metaSync.skippedInvalid)}
+          </p>
+          {data.metaSync.errors.length > 0 ? (
+            <p className="muted" style={{ margin: "6px 0 0" }}>
+              Errores: {data.metaSync.errors.slice(0, 2).map((x) => `${x.platform}: ${x.error}`).join(" | ")}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </main>
   );
 }
