@@ -20,6 +20,9 @@ jobs:
           fi
 
           BASE_URL="${CRON_BASE_URL%/}"
+          if [[ ! "$BASE_URL" =~ ^https?:// ]]; then
+            BASE_URL="https://$BASE_URL"
+          fi
           SECRET="$(printf '%s' "$CRON_SECRET" | tr -d '\r\n')"
           URL="$BASE_URL/api/cron/auto-posts/publish?limit=5"
 

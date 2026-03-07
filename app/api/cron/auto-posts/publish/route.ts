@@ -10,6 +10,50 @@ type ScheduledPost = {
   status: string;
 };
 
+async function recoverStalePublishing(service: any, staleMinutes = 20) {
+  const staleBefore = new Date(Date.now() - staleMinutes * 60 * 1000).toISOString();
+  const { data, error } = await service
+    .from("scheduled_posts")
+    .update({
+      status: "queued",
+      error: `Recovered stale publishing lock (${new Date().toISOString()})`
+    })
+    .eq("status", "publishing")
+    .lt("updated_at", staleBefore)
+    .select("id");
+  if (error) return { recovered: 0, error: error.message };
+  return { recovered: Array.isArray(data) ? data.length : 0, error: null as string | null };
+}
+
+async function claimDueScheduledPostsFallback(service: any, limit: number) {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await service
+    .from("scheduled_posts")
+    .select("id, message, scheduled_for, status")
+    .eq("status", "queued")
+    .lte("scheduled_for", nowIso)
+    .order("scheduled_for", { ascending: true })
+    .limit(limit);
+
+  if (error) return { rows: [] as ScheduledPost[], error: error.message };
+  const due = (data ?? []) as ScheduledPost[];
+  const claimed: ScheduledPost[] = [];
+
+  for (const row of due) {
+    const lock = await service
+      .from("scheduled_posts")
+      .update({ status: "publishing", error: null })
+      .eq("id", row.id)
+      .eq("status", "queued")
+      .select("id, message, scheduled_for, status")
+      .maybeSingle();
+    if (lock.error) continue;
+    if (lock.data) claimed.push(lock.data as ScheduledPost);
+  }
+
+  return { rows: claimed, error: null as string | null };
+}
+
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -40,10 +84,28 @@ export async function POST(request: NextRequest) {
   const limit = Number.isFinite(limitRaw) ? Math.min(20, Math.max(1, Math.floor(limitRaw))) : 5;
 
   try {
-    const claim = await service.rpc("claim_due_scheduled_posts", { p_limit: limit });
-    if (claim.error) return NextResponse.json({ ok: false, error: withScheduledPostsMigrationHint(claim.error) }, { status: 400 });
+    const stale = await recoverStalePublishing(service, 20);
+    let usedFallbackClaim = false;
+    let rows: ScheduledPost[] = [];
 
-    const rows = (claim.data ?? []) as ScheduledPost[];
+    const claim = await service.rpc("claim_due_scheduled_posts", { p_limit: limit });
+    if (claim.error) {
+      usedFallbackClaim = true;
+      const fallback = await claimDueScheduledPostsFallback(service, limit);
+      if (fallback.error) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: withScheduledPostsMigrationHint(claim.error),
+            fallbackError: fallback.error
+          },
+          { status: 400 }
+        );
+      }
+      rows = fallback.rows;
+    } else {
+      rows = (claim.data ?? []) as ScheduledPost[];
+    }
     let posted = 0;
     let failed = 0;
     const results: Array<{ id: string; status: "posted" | "failed"; remoteId?: string | null; error?: string }> = [];
@@ -97,6 +159,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      usedFallbackClaim,
+      recoveredStalePublishing: stale.recovered,
+      staleRecoveryError: stale.error,
       claimed: rows.length,
       posted,
       failed,

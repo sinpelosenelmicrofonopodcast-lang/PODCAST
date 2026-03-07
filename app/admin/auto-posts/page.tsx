@@ -233,6 +233,55 @@ export default function AdminAutoPostsPage() {
     await load();
   };
 
+  const requeuePost = async (id: string) => {
+    const token = await getToken();
+    if (!token) {
+      setStatus("Sesión inválida. Inicia sesión otra vez.");
+      return;
+    }
+
+    const res = await fetch(`/api/admin/auto-posts/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ status: "queued" })
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.ok) {
+      setStatus(json?.error ?? "No se pudo reencolar el estado.");
+      return;
+    }
+
+    toast.success("Estado reencolado.");
+    await load();
+  };
+
+  const deletePost = async (id: string) => {
+    const token = await getToken();
+    if (!token) {
+      setStatus("Sesión inválida. Inicia sesión otra vez.");
+      return;
+    }
+
+    const confirmed = window.confirm("¿Eliminar este estado de forma permanente?");
+    if (!confirmed) return;
+
+    const res = await fetch(`/api/admin/auto-posts/${id}/purge`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.ok) {
+      setStatus(json?.error ?? "No se pudo eliminar el estado.");
+      return;
+    }
+
+    toast.success("Estado eliminado.");
+    await load();
+  };
+
   const postNow = async (id: string) => {
     const token = await getToken();
     if (!token) {
@@ -438,10 +487,26 @@ export default function AdminAutoPostsPage() {
                       <button
                         className="button secondary"
                         type="button"
+                        onClick={() => requeuePost(item.id)}
+                        disabled={item.status === "queued" || item.status === "publishing" || item.status === "posted"}
+                      >
+                        Reintentar
+                      </button>
+                      <button
+                        className="button secondary"
+                        type="button"
                         onClick={() => cancelPost(item.id)}
                         disabled={item.status === "posted" || item.status === "cancelled" || item.status === "publishing"}
                       >
                         Cancelar
+                      </button>
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => deletePost(item.id)}
+                        disabled={item.status === "publishing" || item.status === "posted"}
+                      >
+                        Eliminar
                       </button>
                     </div>
                   </td>
