@@ -8,10 +8,6 @@ const OneSignalInit = dynamic(() => import("@/components/OneSignalInit").then((m
 const OneSignalAutoPrompt = dynamic(() => import("@/components/OneSignalAutoPrompt").then((m) => m.OneSignalAutoPrompt), {
   ssr: false
 });
-const OneSignalFloatingBell = dynamic(
-  () => import("@/components/OneSignalFloatingBell").then((m) => m.OneSignalFloatingBell),
-  { ssr: false }
-);
 const Toaster = dynamic(() => import("@/components/Toaster").then((m) => m.Toaster), { ssr: false });
 const BottomStickyPromo = dynamic(
   () => import("@/components/promotions/BottomStickyPromo").then((m) => m.BottomStickyPromo),
@@ -107,7 +103,6 @@ OneSignalDeferred.push(async function(OneSignal) {
         <PageViewTracker />
         <OneSignalInit appId={oneSignalAppId} safariWebId={oneSignalSafariWebId} />
         <OneSignalAutoPrompt appId={oneSignalAppId} safariWebId={oneSignalSafariWebId} />
-        <OneSignalFloatingBell appId={oneSignalAppId} safariWebId={oneSignalSafariWebId} />
         <TermsConsentPopup />
         <BottomStickyPromo />
         <PromoPopup />
