@@ -70,12 +70,33 @@ async function graphPostWithRetry(url: string, form: URLSearchParams, attempts =
 
 async function resolveIgUserId(config: ReturnType<typeof getConfig>) {
   const direct = String(config.igUserId ?? "").trim();
-  if (direct) return direct;
-
   const pageId = String(config.pageId ?? "").trim();
   const token = String(config.igAccessToken ?? "").trim();
-  if (!pageId || !token) {
-    throw new Error("Faltan IG_USER_ID y/o META_PAGE_ID junto con token de acceso para Instagram.");
+  if (!token) {
+    throw new Error("Falta IG_ACCESS_TOKEN/META_PAGE_ACCESS_TOKEN.");
+  }
+
+  let directError = "";
+  if (direct) {
+    const directUrl = new URL(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(direct)}`);
+    directUrl.searchParams.set("fields", "id,username,account_type");
+    directUrl.searchParams.set("access_token", token);
+
+    const directRes = await fetch(directUrl.toString(), { cache: "no-store" });
+    const directJson = await directRes.json().catch(() => ({} as any));
+    if (directRes.ok) {
+      const directId = String(directJson?.id ?? "").trim();
+      if (directId) return directId;
+    } else {
+      directError = String(directJson?.error?.message ?? `Meta API HTTP ${directRes.status}`);
+    }
+  }
+
+  if (!pageId) {
+    if (directError) {
+      throw new Error(`IG_USER_ID inválido o sin permisos: ${directError}`);
+    }
+    throw new Error("Faltan IG_USER_ID o META_PAGE_ID para resolver la cuenta de Instagram.");
   }
 
   const url = new URL(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(pageId)}`);
@@ -90,6 +111,11 @@ async function resolveIgUserId(config: ReturnType<typeof getConfig>) {
 
   const connectedId = String(json?.connected_instagram_account?.id ?? "").trim();
   if (!connectedId) {
+    if (directError) {
+      throw new Error(
+        `No se pudo usar IG_USER_ID y la página no tiene Instagram conectada. IG_USER_ID error: ${directError}`
+      );
+    }
     throw new Error("La página de Facebook no tiene cuenta de Instagram conectada.");
   }
   return connectedId;
