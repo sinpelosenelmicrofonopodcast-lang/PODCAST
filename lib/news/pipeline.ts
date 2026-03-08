@@ -6,6 +6,7 @@ import { dedupeFeedItems } from "@/lib/news/dedupe";
 import { normalizeFeedItemToCandidate } from "@/lib/news/normalize";
 import { computeControversyScore, computeInitialDiscoverScore } from "@/lib/news/score";
 import { slugify } from "@/lib/validations/common";
+import { normalizeImageUrl } from "@/lib/imageUrl";
 
 type IngestOptions = {
   sourceLimit?: number;
@@ -62,6 +63,7 @@ async function ensureUniqueSlug(service: SupabaseClient, baseSlug: string) {
 }
 
 async function mirrorToLegacyNewsItems(service: SupabaseClient, candidate: IngestedCandidate, status: "draft" | "published") {
+  const coverUrl = normalizeImageUrl(candidate.featuredImageUrl);
   const payload = {
     title: candidate.title,
     summary: candidate.summary || null,
@@ -69,7 +71,7 @@ async function mirrorToLegacyNewsItems(service: SupabaseClient, candidate: Inges
     source_url: candidate.sourceUrl,
     categories: [candidate.category ?? "Mundo", ...(candidate.region ? [candidate.region] : [])],
     tags: candidate.tags,
-    cover_url: candidate.featuredImageUrl,
+    cover_url: coverUrl,
     publication_state: status,
     published_at: status === "published" ? candidate.publishedAt ?? new Date().toISOString() : null,
     ingest_source: candidate.sourceName,
@@ -92,7 +94,7 @@ async function mirrorToLegacyNewsItems(service: SupabaseClient, candidate: Inges
           source_url: payload.source_url,
           categories: payload.categories,
           tags: payload.tags,
-          cover_url: payload.cover_url,
+          cover_url: coverUrl,
           publication_state: payload.publication_state,
           published_at: payload.published_at,
           ingest_source: payload.ingest_source
@@ -116,6 +118,8 @@ async function insertArticle(service: SupabaseClient, candidate: IngestedCandida
   const discoverScore = computeInitialDiscoverScore(candidate);
   const controversyScore = computeControversyScore(`${candidate.title} ${candidate.summary}`);
 
+  const coverUrl = normalizeImageUrl(candidate.featuredImageUrl);
+
   const payload = {
     source_id: source.id,
     title: candidate.title,
@@ -130,8 +134,8 @@ async function insertArticle(service: SupabaseClient, candidate: IngestedCandida
     category: candidate.category,
     region: candidate.region,
     tags: candidate.tags,
-    featured_image_url: candidate.featuredImageUrl,
-    cover_image_url: candidate.featuredImageUrl,
+    featured_image_url: coverUrl,
+    cover_image_url: coverUrl,
     status,
     publish_at: status === "published" ? candidate.publishedAt ?? new Date().toISOString() : null,
     published_at: status === "published" ? candidate.publishedAt ?? new Date().toISOString() : null,

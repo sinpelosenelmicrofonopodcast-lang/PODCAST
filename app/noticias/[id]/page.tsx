@@ -14,6 +14,7 @@ import { isUuid, newsHref, normalizeNewsKey } from "@/lib/newsRoute";
 import { buildSeoMetadata, newsSeoTemplate } from "@/lib/seo/meta";
 import { buildNewsArticleJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
 import { DEFAULT_OG_IMAGE } from "@/lib/seo/constants";
+import { normalizeImageUrl } from "@/lib/imageUrl";
 
 export const revalidate = 180;
 
@@ -52,6 +53,13 @@ type ContentBlock =
   | { type: "subheading"; text: string }
   | { type: "list"; items: string[] }
   | { type: "quote"; text: string };
+
+function normalizeItemCover<T extends { cover_url: string | null }>(item: T): T {
+  return {
+    ...item,
+    cover_url: normalizeImageUrl(item.cover_url)
+  };
+}
 
 const t: Record<
   AppLang,
@@ -286,7 +294,7 @@ async function loadItem(supabase: ReturnType<typeof supabaseServer>, id: string)
 
         const result = await query;
         const rows = (result.data as unknown as NewsItem[] | null) ?? [];
-        if (!result.error && rows.length > 0) return rows[0];
+        if (!result.error && rows.length > 0) return normalizeItemCover(rows[0]);
         if (result.error && !/(slug|video_url|updated_at|publication_state)/i.test(result.error.message)) break;
       }
     }
@@ -298,7 +306,7 @@ async function loadItem(supabase: ReturnType<typeof supabaseServer>, id: string)
       .select("id, title, summary, analysis, source_url, cover_url, categories, published_at")
       .eq("id", key)
       .maybeSingle();
-    return (fallback.data as NewsItem | null) ?? null;
+    return fallback.data ? normalizeItemCover(fallback.data as NewsItem) : null;
   }
   return null;
 }
@@ -312,7 +320,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     title: seo.title,
     description: seo.description,
     path: canonical,
-    image: item?.cover_url ?? DEFAULT_OG_IMAGE,
+    image: normalizeImageUrl(item?.cover_url) ?? DEFAULT_OG_IMAGE,
     type: "article"
   });
 }
@@ -366,7 +374,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
       relatedErr = retry.error;
     }
     if (relatedErr) relatedRows = [];
-    related = ((relatedRows ?? []) as RelatedNewsItem[]).slice(0, 4);
+    related = ((relatedRows ?? []) as RelatedNewsItem[]).map(normalizeItemCover).slice(0, 4);
 
     let trendingQuery = supabase
       .from("news_items")
@@ -388,7 +396,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
     }
     if (trendingErr) trendingRows = [];
 
-    const trendRows = (trendingRows ?? []) as RelatedNewsItem[];
+    const trendRows = ((trendingRows ?? []) as RelatedNewsItem[]).map(normalizeItemCover);
     if (trendRows.length > 0) {
       const ids = trendRows.map((row) => row.id);
       const { data: trendComments } = await supabase
@@ -432,7 +440,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
           .limit(1)
           .maybeSingle();
       }
-      prevItem = (prevRes.data as RelatedNewsItem | null) ?? null;
+      prevItem = prevRes.data ? normalizeItemCover(prevRes.data as RelatedNewsItem) : null;
 
       let nextQuery = supabase
         .from("news_items")
@@ -452,7 +460,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
           .limit(1)
           .maybeSingle();
       }
-      nextItem = (nextRes.data as RelatedNewsItem | null) ?? null;
+      nextItem = nextRes.data ? normalizeItemCover(nextRes.data as RelatedNewsItem) : null;
     }
   }
 
@@ -478,7 +486,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
         canonicalPath: newsHref(item),
         title: item.title,
         description: item.summary,
-        image: item.cover_url || undefined,
+        image: normalizeImageUrl(item.cover_url) || undefined,
         datePublished: item.published_at,
         dateModified: item.updated_at || item.published_at,
         authorName: "SPM News",

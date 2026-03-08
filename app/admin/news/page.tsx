@@ -7,6 +7,7 @@ import { AdminDeleteButton } from "@/components/AdminDeleteButton";
 import { newsCategories } from "@/lib/newsCategories";
 import { toast } from "@/lib/toast";
 import { newsHref } from "@/lib/newsRoute";
+import { normalizeImageUrl } from "@/lib/imageUrl";
 
 type NewsItem = {
   id: string;
@@ -165,7 +166,7 @@ export default function AdminNewsPage() {
 
     const { data } = supabase.storage.from("news-covers").getPublicUrl(filePath);
     if (data?.publicUrl) {
-      setCoverUrl(data.publicUrl);
+      setCoverUrl(normalizeImageUrl(data.publicUrl) ?? data.publicUrl);
       setStatus("Portada subida.");
       toast.success("Portada subida.");
     }
@@ -199,13 +200,14 @@ export default function AdminNewsPage() {
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
+    const normalizedCoverUrl = normalizeImageUrl(coverUrl);
 
     const payload = {
       title,
       summary: summary ? summary : null,
       analysis: analysis ? analysis : null,
       source_url: sourceUrl ? sourceUrl : null,
-      cover_url: coverUrl ? coverUrl : null,
+      cover_url: normalizedCoverUrl ?? null,
       video_url: videoUrl ? videoUrl : null,
       categories: categories && categories.length > 0 ? categories : [newsCategories[0]],
       tags: tagList,
@@ -317,7 +319,7 @@ export default function AdminNewsPage() {
               slug: inserted.slug ?? null,
               title,
               summary,
-              cover_url: coverUrl || null
+              cover_url: normalizedCoverUrl ?? null
             }).catch((e: any) => {
               toast.error(`Push falló: ${e?.message ?? "error"}`);
             });
@@ -378,13 +380,13 @@ export default function AdminNewsPage() {
                 Authorization: `Bearer ${token}`
               },
               body: JSON.stringify({
-                newsId: inserted.id,
-                newsSlug: inserted.slug ?? null,
-                title,
-                summary,
-                coverUrl: coverUrl || null
-              })
-            });
+                  newsId: inserted.id,
+                  newsSlug: inserted.slug ?? null,
+                  title,
+                  summary,
+                  coverUrl: normalizedCoverUrl ?? null
+                })
+              });
             const igJson = await igRes.json().catch(() => ({}));
             if (!igRes.ok) failed.push(`Instagram feed: ${igJson?.error ?? "error"}`);
             else done.push("Instagram feed");
@@ -402,7 +404,7 @@ export default function AdminNewsPage() {
                 newsSlug: inserted.slug ?? null,
                 title,
                 summary,
-                coverUrl: coverUrl || null,
+                coverUrl: normalizedCoverUrl ?? null,
                 story: true
               })
             });
@@ -441,7 +443,7 @@ export default function AdminNewsPage() {
     setSummary(item.summary ?? "");
     setAnalysis(item.analysis ?? "");
     setSourceUrl(item.source_url ?? "");
-    setCoverUrl(item.cover_url ?? "");
+    setCoverUrl(normalizeImageUrl(item.cover_url) ?? item.cover_url ?? "");
     setVideoUrl(item.video_url ?? "");
     setCategories(item.categories && item.categories.length > 0 ? item.categories : [newsCategories[0]]);
     setTags(item.tags?.join(", ") ?? "");
@@ -478,7 +480,7 @@ export default function AdminNewsPage() {
             slug: item.slug ?? null,
             title: item.title,
             summary: item.summary ?? null,
-            cover_url: item.cover_url ?? null
+            cover_url: normalizeImageUrl(item.cover_url) ?? null
           }).catch((e: any) => {
             toast.error(`Push falló: ${e?.message ?? "error"}`);
           });
@@ -606,7 +608,8 @@ export default function AdminNewsPage() {
       toast.error(msg);
       return;
     }
-    if (!item.cover_url) {
+    const normalizedCover = normalizeImageUrl(item.cover_url);
+    if (!normalizedCover) {
       const msg = "Instagram requiere portada (URL pública) para publicar.";
       setStatus(msg);
       toast.error(msg);
@@ -638,7 +641,7 @@ export default function AdminNewsPage() {
         newsSlug: item.slug ?? null,
         title: item.title,
         summary: item.summary ?? "",
-        coverUrl: item.cover_url,
+        coverUrl: normalizedCover,
         story
       })
     });
@@ -719,7 +722,13 @@ export default function AdminNewsPage() {
         </label>
         <label>
           Portada (URL)
-          <input className="input" value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://..." />
+          <input
+            className="input"
+            value={coverUrl}
+            onChange={(e) => setCoverUrl(e.target.value)}
+            onBlur={(e) => setCoverUrl(normalizeImageUrl(e.target.value) ?? e.target.value.trim())}
+            placeholder="https://..."
+          />
         </label>
         <label>
           Video (Google Drive / YouTube / Vimeo opcional)

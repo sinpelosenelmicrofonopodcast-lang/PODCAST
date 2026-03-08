@@ -12,6 +12,7 @@ import { DesktopSideAdSlot } from "@/components/promotions/DesktopSideAdSlot";
 import { extractNewsPathSegment, extractNewsPathSegmentFromUrl, newsHref } from "@/lib/newsRoute";
 import { buildSeoMetadata } from "@/lib/seo/meta";
 import { jsonLdScript } from "@/lib/seo/jsonld";
+import { normalizeImageUrl } from "@/lib/imageUrl";
 
 export const revalidate = 300;
 
@@ -31,6 +32,13 @@ type NewsItem = {
   cover_url: string | null;
   categories: string[] | null;
 };
+
+function normalizeCoverRows<T extends { cover_url: string | null }>(rows: T[]): T[] {
+  return rows.map((row) => ({
+    ...row,
+    cover_url: normalizeImageUrl(row.cover_url)
+  }));
+}
 
 function uniqueById<T extends { id: string }>(items: T[]): T[] {
   const seen = new Set<string>();
@@ -98,7 +106,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     total = sorted.length;
     totalPages = Math.max(1, Math.ceil(total / perPage));
     const start = (pageNum - 1) * perPage;
-    items = sorted.slice(start, start + perPage);
+    items = normalizeCoverRows(sorted.slice(start, start + perPage));
   } else {
     let countQuery = supabase.from("news_items").select("id", { count: "exact", head: true }).eq("publication_state", "published");
     if (category) countQuery = countQuery.contains("categories", [category]);
@@ -136,7 +144,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
       error = r.error;
     }
     if (error) data = [];
-    items = data ?? [];
+    items = normalizeCoverRows((data ?? []) as NewsItem[]);
   }
 
   let trendingItems: any[] = [];
@@ -242,6 +250,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
       .slice(0, 6)
       .map((item) => ({
         ...item,
+        cover_url: normalizeImageUrl(item.cover_url),
         comments_count: counts.get(item.id) ?? 0,
         views_count: viewCounts.get(item.id) ?? 0,
         shares_count: shareCounts.get(item.id) ?? 0,

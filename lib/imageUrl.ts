@@ -4,10 +4,20 @@ function cleanText(value: unknown) {
 
 function extractGoogleDriveFileId(url: URL) {
   const path = cleanText(url.pathname);
-  const fromFile = path.match(/\/file\/d\/([^/]+)/i)?.[1];
-  const fromDirect = path.match(/\/d\/([^/]+)/i)?.[1];
-  const fromQuery = url.searchParams.get("id");
-  return cleanText(fromFile || fromDirect || fromQuery || "") || null;
+  const fromFile = path.match(/\/file\/d\/([a-zA-Z0-9_-]+)/i)?.[1];
+  const fromDirect = path.match(/\/d\/([a-zA-Z0-9_-]+)/i)?.[1];
+  const fromUcPath = path.match(/\/uc\/([a-zA-Z0-9_-]+)/i)?.[1];
+  const fromQuery = url.searchParams.get("id") || url.searchParams.get("file_id");
+  return cleanText(fromFile || fromDirect || fromUcPath || fromQuery || "") || null;
+}
+
+function normalizeGoogleDriveImageUrl(url: URL) {
+  const fileId = extractGoogleDriveFileId(url);
+  if (!fileId) return null;
+  const safeId = encodeURIComponent(fileId);
+
+  // Most compatible direct image URL for public Drive files.
+  return `https://drive.google.com/uc?export=view&id=${safeId}`;
 }
 
 export function normalizeImageUrl(raw: unknown) {
@@ -23,16 +33,19 @@ export function normalizeImageUrl(raw: unknown) {
   try {
     const url = new URL(value);
     const host = cleanText(url.hostname).toLowerCase();
-    const isGoogleDrive = host === "drive.google.com" || host === "www.drive.google.com";
+    const normalizedHost = host.replace(/^www\./, "");
+    const isGoogleDrive =
+      normalizedHost === "drive.google.com" ||
+      normalizedHost === "docs.google.com" ||
+      normalizedHost === "drive.usercontent.google.com";
 
     if (isGoogleDrive) {
-      const fileId = extractGoogleDriveFileId(url);
-      if (!fileId) return value;
-      return `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w1600`;
+      return normalizeGoogleDriveImageUrl(url) ?? value;
     }
 
     return value;
   } catch {
+    if (/^data:image\//i.test(value) || value.startsWith("/")) return value;
     return value;
   }
 }

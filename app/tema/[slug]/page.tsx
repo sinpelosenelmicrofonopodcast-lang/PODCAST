@@ -10,6 +10,7 @@ import { DesktopSideAdSlot } from "@/components/promotions/DesktopSideAdSlot";
 import { supabaseServer } from "@/lib/supabaseServer";
 import type { PromoSection } from "@/lib/promoSection";
 import { extractNewsPathSegment, extractNewsPathSegmentFromUrl, newsHref } from "@/lib/newsRoute";
+import { normalizeImageUrl } from "@/lib/imageUrl";
 
 export const revalidate = 300;
 
@@ -30,6 +31,13 @@ type TopicHub = {
   description: string;
   promoSection: PromoSection;
 };
+
+function normalizeCoverRows<T extends { cover_url: string | null }>(rows: T[]): T[] {
+  return rows.map((row) => ({
+    ...row,
+    cover_url: normalizeImageUrl(row.cover_url)
+  }));
+}
 
 const HUBS: TopicHub[] = [
   { slug: "pr", label: "Puerto Rico", category: "PR", description: "Lo más caliente del país con contexto y análisis.", promoSection: "noticias" },
@@ -189,7 +197,7 @@ export default async function TemaHubPage({ params }: { params: { slug: string }
     })()
   ]);
 
-  const items = (itemsData ?? []) as NewsItem[];
+  const items = normalizeCoverRows((itemsData ?? []) as NewsItem[]);
   const newsIds = items.map((item) => item.id);
   const keyToId = new Map<string, string>();
   items.forEach((item) => {

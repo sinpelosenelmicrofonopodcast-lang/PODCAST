@@ -4,6 +4,7 @@ import { Footer } from "@/components/Footer";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { newsHref } from "@/lib/newsRoute";
+import { normalizeImageUrl } from "@/lib/imageUrl";
 
 export const revalidate = 300;
 
@@ -26,6 +27,13 @@ type BlogItem = {
   categories: string[] | null;
   tags: string[] | null;
 };
+
+function normalizeCoverRows<T extends { cover_url: string | null }>(rows: T[]): T[] {
+  return rows.map((row) => ({
+    ...row,
+    cover_url: normalizeImageUrl(row.cover_url)
+  }));
+}
 
 function normalize(value: string) {
   return String(value ?? "")
@@ -71,7 +79,7 @@ export default async function EmprendimientoPage() {
         .limit(16);
       data = fallback.data;
     }
-    newsItems = (data as NewsItem[]) ?? [];
+    newsItems = normalizeCoverRows((data as NewsItem[]) ?? []);
   }
 
   let blogItems: BlogItem[] = [];
@@ -83,7 +91,7 @@ export default async function EmprendimientoPage() {
       .limit(60);
 
     const needles = new Set(["emprendimiento", "emprender", "pyme", "negocio", "startup", "small business"]);
-    blogItems = ((data as BlogItem[]) ?? [])
+    blogItems = normalizeCoverRows((data as BlogItem[]) ?? [])
       .filter((item) => {
         const cats = (item.categories ?? []).map(normalize);
         const tags = (item.tags ?? []).map(normalize);
