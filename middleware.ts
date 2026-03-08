@@ -5,6 +5,7 @@ import {
   requiredPermissionForAdminPage,
   type StaffPermission
 } from "./lib/staffPermissions";
+import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "./lib/authCookies";
 import { canonicalHost } from "@/lib/seo/constants";
 import { isPrivateSeoPath } from "@/lib/seo/privateRoutes";
 
@@ -17,7 +18,6 @@ const SOCIAL_STAFF_APIS = new Set([
   "/api/social/meta/instagram/post-blog"
 ]);
 const SOCIAL_ADMIN_APIS = new Set(["/api/social/meta/facebook/diagnose"]);
-const ACCESS_TOKEN_COOKIE = "sp_access_token";
 
 type AccessInfo = {
   userId: string;
@@ -97,6 +97,45 @@ async function getAccessByToken(token: string): Promise<AccessInfo | null> {
   return { userId, roles, permissions, isAdmin, isStaff };
 }
 
+type RefreshedSession = {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+};
+
+async function refreshSessionByRefreshToken(refreshToken: string): Promise<RefreshedSession | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  if (!url || !anonKey || !refreshToken) return null;
+
+  const endpoint = `${url}/auth/v1/token?grant_type=refresh_token`;
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+    cache: "no-store"
+  }).catch(() => null);
+
+  if (!res?.ok) return null;
+  const json = (await res.json().catch(() => ({}))) as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+  };
+  const nextAccessToken = String(json?.access_token ?? "").trim();
+  const nextRefreshToken = String(json?.refresh_token ?? refreshToken).trim();
+  const expiresIn = Number(json?.expires_in ?? 3600);
+  if (!nextAccessToken || !nextRefreshToken) return null;
+  return {
+    accessToken: nextAccessToken,
+    refreshToken: nextRefreshToken,
+    expiresIn: Number.isFinite(expiresIn) ? Math.max(60, Math.floor(expiresIn)) : 3600
+  };
+}
+
 function denyPage(request: NextRequest, target: "/admin" | "/") {
   return withNoindex(NextResponse.redirect(new URL(target, request.url)));
 }
@@ -160,19 +199,27 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  const token = readBearer(request) || request.cookies.get(ACCESS_TOKEN_COOKIE)?.value || "";
-  if (!token) {
+  let token = readBearer(request) || request.cookies.get(ACCESS_TOKEN_COOKIE)?.value || "";
+  let access = token ? await getAccessByToken(token) : null;
+  let refreshedSession: RefreshedSession | null = null;
+
+  if (!access) {
+    const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value ?? "";
+    if (refreshToken) {
+      refreshedSession = await refreshSessionByRefreshToken(refreshToken);
+      if (refreshedSession?.accessToken) {
+        token = refreshedSession.accessToken;
+        access = await getAccessByToken(token);
+      }
+    }
+  }
+
+  if (!token || !access) {
     if (needsStaffPage) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);
       return withNoindex(NextResponse.redirect(loginUrl));
     }
-    return denyApi(401, "Unauthorized");
-  }
-
-  const access = await getAccessByToken(token);
-  if (!access) {
-    if (needsStaffPage) return denyPage(request, "/");
     return denyApi(401, "Unauthorized");
   }
 
@@ -201,6 +248,23 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next();
+  if (refreshedSession) {
+    const secure = process.env.NODE_ENV === "production";
+    response.cookies.set(ACCESS_TOKEN_COOKIE, refreshedSession.accessToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure,
+      path: "/",
+      maxAge: refreshedSession.expiresIn
+    });
+    response.cookies.set(REFRESH_TOKEN_COOKIE, refreshedSession.refreshToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30
+    });
+  }
   if (privateSeoPath) withNoindex(response);
   return response;
 }

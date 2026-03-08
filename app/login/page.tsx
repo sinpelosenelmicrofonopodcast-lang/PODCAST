@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { supabase } from "@/lib/supabaseClient";
 import { Navbar } from "@/components/Navbar";
 import { Logo } from "@/components/Logo";
@@ -34,8 +35,16 @@ export default function LoginPage() {
         })
       }).catch(() => null);
     }
-    setStatus("Ingreso exitoso. Redirigiendo al feed...");
-    router.push("/feed");
+    let nextPath = "/feed";
+    if (typeof window !== "undefined") {
+      const rawNext = new URLSearchParams(window.location.search).get("next") ?? "";
+      if (rawNext.startsWith("/") && !rawNext.startsWith("//")) {
+        nextPath = rawNext;
+      }
+    }
+
+    setStatus("Ingreso exitoso. Redirigiendo...");
+    router.push(nextPath as Route);
   };
 
   const handleReset = async () => {
