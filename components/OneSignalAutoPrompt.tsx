@@ -13,7 +13,8 @@ import {
 } from "@/lib/onesignalWeb";
 
 const PUSH_CHOICE_STORAGE_KEY = "spm_push_choice";
-const PUSH_PROMPT_SESSION_KEY = "spm_push_prompt_forced_session_v2";
+const PUSH_PROMPT_SESSION_KEY = "spm_push_prompt_forced_session_v3";
+const PUSH_PROMPT_LAST_DAY_KEY = "spm_push_prompt_last_day_v1";
 const SKIP_PATH_PREFIXES = ["/admin", "/entrar", "/unirme", "/dashboard"];
 
 type OneSignalAutoPromptProps = {
@@ -38,6 +39,13 @@ export function OneSignalAutoPrompt({ appId, safariWebId }: OneSignalAutoPromptP
     let cancelled = false;
     let initialDelayTimer: number | null = null;
     let postPromptDelayTimer: number | null = null;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const accepted = window.localStorage.getItem(PUSH_CHOICE_STORAGE_KEY) === "accepted";
+    if (accepted) return;
+    if (window.localStorage.getItem(PUSH_PROMPT_LAST_DAY_KEY) === today) return;
+    if (window.sessionStorage.getItem(PUSH_PROMPT_SESSION_KEY) === "1") return;
+
     queueOneSignalInit();
     const run = () => {
       initialDelayTimer = window.setTimeout(async () => {
@@ -48,15 +56,17 @@ export function OneSignalAutoPrompt({ appId, safariWebId }: OneSignalAutoPromptP
           if (!env.secureContext || !env.notificationApi) return;
           if (env.iosLike && !env.standalone) return;
 
-          if (window.sessionStorage.getItem(PUSH_PROMPT_SESSION_KEY) === "1") return;
-          window.sessionStorage.setItem(PUSH_PROMPT_SESSION_KEY, "1");
-
           const initial = await getOneSignalPushState();
           if (!initial.supported || initial.optedIn || initial.permission === "denied") {
+            window.localStorage.setItem(PUSH_PROMPT_LAST_DAY_KEY, today);
             return;
           }
 
-          await triggerOneSignalPrompt({ force: true });
+          const result = await triggerOneSignalPrompt({ force: true });
+          window.sessionStorage.setItem(PUSH_PROMPT_SESSION_KEY, "1");
+          if (result.shown || result.reason === "already_subscribed") {
+            window.localStorage.setItem(PUSH_PROMPT_LAST_DAY_KEY, today);
+          }
           postPromptDelayTimer = window.setTimeout(async () => {
             try {
               if (cancelled) return;
@@ -70,7 +80,7 @@ export function OneSignalAutoPrompt({ appId, safariWebId }: OneSignalAutoPromptP
             }
           }, 900);
         } catch {
-          // Silent fallback to avoid noisy unhandled promise rejections.
+          // No-op; keep day/session keys free so the user can retry quickly.
         }
       }, 1300);
     };

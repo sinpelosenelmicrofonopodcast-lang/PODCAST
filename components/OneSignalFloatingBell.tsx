@@ -24,7 +24,6 @@ export function OneSignalFloatingBell({ appId, safariWebId }: { appId?: string |
   const [state, setState] = useState<OneSignalPushState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hideForNativeBell, setHideForNativeBell] = useState(false);
 
   useEffect(() => {
     if (!hasExplicitConfig) return;
@@ -45,26 +44,6 @@ export function OneSignalFloatingBell({ appId, safariWebId }: { appId?: string |
       .catch((e) => setError(humanizeOneSignalError(e)))
       .finally(() => setLoading(false));
   }, [configured, refresh]);
-
-  useEffect(() => {
-    const env = oneSignalEnvironmentChecks();
-    if (env.iosLike && !env.standalone) {
-      setHideForNativeBell(false);
-      return;
-    }
-
-    const tick = () => {
-      const found = Boolean(
-        document.querySelector(".onesignal-bell-container") ||
-          document.querySelector(".onesignal-bell-launcher") ||
-          document.querySelector("iframe[src*='onesignal']")
-      );
-      setHideForNativeBell(found);
-    };
-    tick();
-    const timer = window.setInterval(tick, 1500);
-    return () => window.clearInterval(timer);
-  }, []);
 
   const onClick = useCallback(async () => {
     if (!configured) return;
@@ -128,7 +107,6 @@ export function OneSignalFloatingBell({ appId, safariWebId }: { appId?: string |
   }, [error, state]);
 
   const isDisabled = loading || !configured;
-  if (hideForNativeBell) return null;
 
   return (
     <button
