@@ -8,6 +8,7 @@ import { buildMemeTemplate } from "@/lib/images/meme-template";
 import { buildQuoteCard } from "@/lib/images/quote-card";
 import { buildThumbnail } from "@/lib/images/thumbnail";
 import { asString, asStringArray, isUuid, parseDate } from "@/lib/validations/common";
+import { cleanNewsCategories } from "@/lib/newsCategories";
 
 export type ArticleEditorRow = {
   id: string;
@@ -60,12 +61,13 @@ export async function scheduleArticle(service: SupabaseClient, articleId: string
 }
 
 async function upsertLegacyNewsItem(service: SupabaseClient, article: ArticleEditorRow) {
+  const categories = cleanNewsCategories([article.category, article.region]);
   const payload = {
     title: article.title,
     summary: article.summary,
     analysis: article.original_content ?? article.summary ?? article.title,
     source_url: article.source_url,
-    categories: [article.category ?? "Noticias", article.region ?? "Mundo"],
+    categories: categories.length > 0 ? categories : ["Mundo"],
     tags: article.tags ?? [],
     cover_url: article.cover_image_url,
     publication_state: "published",

@@ -15,6 +15,7 @@ import { buildSeoMetadata, newsSeoTemplate } from "@/lib/seo/meta";
 import { buildNewsArticleJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
 import { DEFAULT_OG_IMAGE } from "@/lib/seo/constants";
 import { normalizeImageUrl } from "@/lib/imageUrl";
+import { cleanNewsCategories } from "@/lib/newsCategories";
 
 export const revalidate = 180;
 
@@ -66,9 +67,6 @@ const t: Record<
   {
     back: string;
     notFound: string;
-    analysis: string;
-    confirmed: string;
-    breaking: string;
     published: string;
     readTime: string;
     keyPoints: string;
@@ -87,9 +85,6 @@ const t: Record<
   es: {
     back: "Volver a noticias",
     notFound: "Noticia no encontrada.",
-    analysis: "Análisis",
-    confirmed: "Confirmado",
-    breaking: "Última hora",
     published: "Publicado",
     readTime: "Tiempo de lectura",
     keyPoints: "Puntos clave",
@@ -107,9 +102,6 @@ const t: Record<
   en: {
     back: "Back to news",
     notFound: "Story not found.",
-    analysis: "Analysis",
-    confirmed: "Confirmed",
-    breaking: "Breaking",
     published: "Published",
     readTime: "Read time",
     keyPoints: "Key points",
@@ -127,13 +119,6 @@ const t: Record<
 };
 
 const pickUser = (users: CommentRow["users"]) => (Array.isArray(users) ? users[0] : users);
-
-function isRecent(dateValue?: string | null) {
-  if (!dateValue) return false;
-  const ms = new Date(dateValue).getTime();
-  if (!Number.isFinite(ms)) return false;
-  return Date.now() - ms <= 1000 * 60 * 60 * 24;
-}
 
 function formatDate(value?: string | null, lang: AppLang = "es") {
   if (!value) return "";
@@ -262,14 +247,6 @@ function extractKeyPoints(summary: string, blocks: ContentBlock[]) {
     .slice(0, 4);
 }
 
-function buildEditorialTags(item: NewsItem, lang: AppLang) {
-  const labels = t[lang];
-  const tags: string[] = [labels.confirmed];
-  if (isRecent(item.published_at)) tags.push(labels.breaking);
-  if (String(item.analysis ?? "").trim()) tags.push(labels.analysis);
-  return tags;
-}
-
 async function loadItem(supabase: ReturnType<typeof supabaseServer>, id: string) {
   const key = normalizeNewsKey(id);
   if (!key) return null;
@@ -350,7 +327,8 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
   let nextItem: RelatedNewsItem | null = null;
 
   if (item) {
-    const primaryCategory = String(item.categories?.[0] ?? "").trim();
+    const normalizedCategories = cleanNewsCategories(item.categories);
+    const primaryCategory = String(normalizedCategories[0] ?? "").trim();
 
     let relatedQuery = supabase
       .from("news_items")
@@ -479,7 +457,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
           ? paragraphIndexes[0]
           : -1;
   const readTime = estimateReadMinutes(`${item?.title ?? ""}\n${item?.summary ?? ""}\n${item?.analysis ?? ""}`);
-  const editorialTags = item ? buildEditorialTags(item, lang) : [];
+  const normalizedCategories = cleanNewsCategories(item?.categories);
   const videoEmbedUrl = getSupportedVideoEmbedUrl(item?.video_url);
   const articleSchema = item
     ? buildNewsArticleJsonLd({
@@ -491,7 +469,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
         dateModified: item.updated_at || item.published_at,
         authorName: "SPM News",
         tags: [],
-        category: item.categories?.[0] ?? null,
+        category: normalizedCategories[0] ?? null,
         isNews: true
       })
     : null;
@@ -526,12 +504,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                 </div>
                 <div className="news-article-hero-content-block">
                   <div className="news-article-badges">
-                    {editorialTags.map((tag) => (
-                      <span key={tag} className="news-badge">
-                        {tag}
-                      </span>
-                    ))}
-                    {(item.categories ?? []).slice(0, 3).map((cat) => (
+                    {normalizedCategories.slice(0, 3).map((cat) => (
                       <span key={cat} className="news-badge">
                         {cat}
                       </span>
@@ -626,7 +599,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                   {related.length > 0 ? (
                     <section className="card news-article-side-card">
                       <h3>
-                        {copy.moreIn} {(item.categories ?? [])[0] ?? "Sin Pelos"}
+                        {copy.moreIn} {normalizedCategories[0] ?? "Sin Pelos"}
                       </h3>
                       <div className="news-side-list">
                         {related.map((story) => (

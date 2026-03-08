@@ -6,6 +6,7 @@ import { postNewsToInstagram } from "@/lib/socialInstagram";
 import { rewriteNewsWithAI } from "@/lib/newsRewrite";
 import { getYouTubeVideoId } from "@/lib/youtube";
 import { publishFromSocialQueue } from "@/lib/social/publisher";
+import { cleanNewsCategories } from "@/lib/newsCategories";
 
 type QueueJob = {
   id: string;
@@ -368,6 +369,9 @@ export async function POST(request: NextRequest) {
           const nextPublishedAt = shouldPublish
             ? String(job.payload?.publishedAt ?? news.published_at ?? new Date().toISOString())
             : null;
+          const rewrittenCategories = cleanNewsCategories(rewritten.categories);
+          const currentCategories = cleanNewsCategories(news.categories ?? []);
+          const nextCategories = rewrittenCategories.length > 0 ? rewrittenCategories : currentCategories;
 
           const update = await service
             .from("news_items")
@@ -375,7 +379,7 @@ export async function POST(request: NextRequest) {
               title: rewritten.title,
               summary: rewritten.summary || null,
               analysis: rewritten.analysis || null,
-              categories: rewritten.categories.length > 0 ? rewritten.categories : news.categories,
+              categories: nextCategories.length > 0 ? nextCategories : ["Mundo"],
               tags: rewritten.tags.length > 0 ? rewritten.tags : news.tags,
               publication_state: shouldPublish ? "published" : "draft",
               published_at: nextPublishedAt,

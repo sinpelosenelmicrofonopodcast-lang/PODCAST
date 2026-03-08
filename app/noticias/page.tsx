@@ -4,7 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ShareButtons } from "@/components/ShareButtons";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { newsCategories } from "@/lib/newsCategories";
+import { cleanNewsCategories, newsCategories, normalizeNewsCategory } from "@/lib/newsCategories";
 import { ui } from "@/lib/i18n";
 import { getServerLang } from "@/lib/i18nServer";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
@@ -33,10 +33,11 @@ type NewsItem = {
   categories: string[] | null;
 };
 
-function normalizeCoverRows<T extends { cover_url: string | null }>(rows: T[]): T[] {
+function normalizeNewsRows(rows: NewsItem[]): NewsItem[] {
   return rows.map((row) => ({
     ...row,
-    cover_url: normalizeImageUrl(row.cover_url)
+    cover_url: normalizeImageUrl(row.cover_url),
+    categories: cleanNewsCategories(row.categories)
   }));
 }
 
@@ -56,7 +57,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
   const supabase = supabaseServer();
   const lang = getServerLang();
   const t = ui[lang];
-  const category = searchParams?.cat;
+  const category = normalizeNewsCategory(searchParams?.cat) ?? undefined;
   const sort = searchParams?.sort ?? "latest";
   const pageNumRaw = Number(searchParams?.page ?? "1");
   const pageNum = Number.isFinite(pageNumRaw) ? Math.max(1, Math.floor(pageNumRaw)) : 1;
@@ -106,7 +107,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
     total = sorted.length;
     totalPages = Math.max(1, Math.ceil(total / perPage));
     const start = (pageNum - 1) * perPage;
-    items = normalizeCoverRows(sorted.slice(start, start + perPage));
+    items = normalizeNewsRows(sorted.slice(start, start + perPage));
   } else {
     let countQuery = supabase.from("news_items").select("id", { count: "exact", head: true }).eq("publication_state", "published");
     if (category) countQuery = countQuery.contains("categories", [category]);
@@ -144,7 +145,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
       error = r.error;
     }
     if (error) data = [];
-    items = normalizeCoverRows((data ?? []) as NewsItem[]);
+    items = normalizeNewsRows((data ?? []) as NewsItem[]);
   }
 
   let trendingItems: any[] = [];
@@ -251,6 +252,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
       .map((item) => ({
         ...item,
         cover_url: normalizeImageUrl(item.cover_url),
+        categories: cleanNewsCategories(item.categories),
         comments_count: counts.get(item.id) ?? 0,
         views_count: viewCounts.get(item.id) ?? 0,
         shares_count: shareCounts.get(item.id) ?? 0,
@@ -394,7 +396,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                     ) : null}
                     <div className="news-mag-lead-body">
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {(lead.categories ?? []).slice(0, 3).map((cat: string) => (
+                        {cleanNewsCategories(lead.categories).slice(0, 3).map((cat: string) => (
                           <span key={cat} className="news-badge">
                             {cat}
                           </span>
@@ -470,7 +472,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                       <div style={{ display: "grid", gap: 8 }}>
                         <div>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            {(item.categories ?? []).map((cat: string) => (
+                            {cleanNewsCategories(item.categories).map((cat: string) => (
                               <span key={cat} className="news-badge">
                                 {cat}
                               </span>

@@ -7,6 +7,7 @@ import { normalizeFeedItemToCandidate } from "@/lib/news/normalize";
 import { computeControversyScore, computeInitialDiscoverScore } from "@/lib/news/score";
 import { slugify } from "@/lib/validations/common";
 import { normalizeImageUrl } from "@/lib/imageUrl";
+import { cleanNewsCategories } from "@/lib/newsCategories";
 
 type IngestOptions = {
   sourceLimit?: number;
@@ -64,12 +65,13 @@ async function ensureUniqueSlug(service: SupabaseClient, baseSlug: string) {
 
 async function mirrorToLegacyNewsItems(service: SupabaseClient, candidate: IngestedCandidate, status: "draft" | "published") {
   const coverUrl = normalizeImageUrl(candidate.featuredImageUrl);
+  const categories = cleanNewsCategories([candidate.category ?? "Mundo", candidate.region ?? null]);
   const payload = {
     title: candidate.title,
     summary: candidate.summary || null,
     analysis: candidate.content || candidate.summary || candidate.title,
     source_url: candidate.sourceUrl,
-    categories: [candidate.category ?? "Mundo", ...(candidate.region ? [candidate.region] : [])],
+    categories: categories.length > 0 ? categories : ["Mundo"],
     tags: candidate.tags,
     cover_url: coverUrl,
     publication_state: status,

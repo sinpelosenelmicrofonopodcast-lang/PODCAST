@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
-import { newsCategories } from "@/lib/newsCategories";
+import { cleanNewsCategories, newsCategories } from "@/lib/newsCategories";
 import { toast } from "@/lib/toast";
 import { newsHref } from "@/lib/newsRoute";
 import { normalizeImageUrl } from "@/lib/imageUrl";
@@ -70,6 +70,11 @@ export default function AdminNewsPage() {
   const [rewritingId, setRewritingId] = useState<string | null>(null);
   const router = useRouter();
 
+  const normalizeNewsRow = (row: NewsItem): NewsItem => ({
+    ...row,
+    categories: cleanNewsCategories(row.categories)
+  });
+
   const loadItems = async () => {
     const primary = await supabase
       .from("news_items")
@@ -87,10 +92,10 @@ export default function AdminNewsPage() {
         .from("news_items")
         .select("id, title, summary, analysis, source_url, cover_url, categories, tags, published_at")
         .order("published_at", { ascending: false });
-      setItems((fallback.data as NewsItem[]) ?? []);
+      setItems(((fallback.data as NewsItem[]) ?? []).map(normalizeNewsRow));
       return;
     }
-    setItems((primary.data as NewsItem[]) ?? []);
+    setItems(((primary.data as NewsItem[]) ?? []).map(normalizeNewsRow));
   };
 
   useEffect(() => {
@@ -202,6 +207,7 @@ export default function AdminNewsPage() {
       .filter(Boolean);
     const normalizedCoverUrl = normalizeImageUrl(coverUrl);
 
+    const cleanedCategories = cleanNewsCategories(categories);
     const payload = {
       title,
       summary: summary ? summary : null,
@@ -209,7 +215,7 @@ export default function AdminNewsPage() {
       source_url: sourceUrl ? sourceUrl : null,
       cover_url: normalizedCoverUrl ?? null,
       video_url: videoUrl ? videoUrl : null,
-      categories: categories && categories.length > 0 ? categories : [newsCategories[0]],
+      categories: cleanedCategories.length > 0 ? cleanedCategories : [newsCategories[0]],
       tags: tagList,
       publication_state: publishNow ? "published" : "draft"
     };
@@ -445,7 +451,8 @@ export default function AdminNewsPage() {
     setSourceUrl(item.source_url ?? "");
     setCoverUrl(normalizeImageUrl(item.cover_url) ?? item.cover_url ?? "");
     setVideoUrl(item.video_url ?? "");
-    setCategories(item.categories && item.categories.length > 0 ? item.categories : [newsCategories[0]]);
+    const cleaned = cleanNewsCategories(item.categories);
+    setCategories(cleaned.length > 0 ? cleaned : [newsCategories[0]]);
     setTags(item.tags?.join(", ") ?? "");
     setPublishNow((item.publication_state ?? "published") !== "draft");
   };

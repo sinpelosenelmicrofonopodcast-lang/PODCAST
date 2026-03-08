@@ -1,3 +1,5 @@
+import { cleanNewsCategories } from "@/lib/newsCategories";
+
 type RewriteInput = {
   sourceName: string;
   sourceUrl: string;
@@ -120,7 +122,9 @@ export async function rewriteNewsWithAI(input: RewriteInput): Promise<RewriteOut
   const title = safeText(parsed.title, input.originalTitle);
   const summary = safeText(parsed.summary, input.originalSummary).slice(0, 280);
   const analysis = safeText(parsed.analysis, input.originalSummary || input.originalTitle);
-  const categories = asStringArray(parsed.categories);
+  const parsedCategories = cleanNewsCategories(asStringArray(parsed.categories));
+  const currentCategories = cleanNewsCategories(input.currentCategories ?? []);
+  const categories = parsedCategories.length > 0 ? parsedCategories : currentCategories;
   const tags = asStringArray(parsed.tags);
   const needsReview = Boolean(parsed.needs_review);
 
