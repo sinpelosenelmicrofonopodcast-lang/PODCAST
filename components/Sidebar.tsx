@@ -31,6 +31,7 @@ const links: LinkItem[] = [
   { href: "/admin/newsletter", label: "Newsletter", required: "manage_newsletter" },
   { href: "/admin/guest-requests", label: "Invitados", required: "manage_guest_requests" },
   { href: "/admin/auto-posts", label: "Auto Posts", adminOnly: true },
+  { href: "/admin/facebook-fans", label: "Facebook Fans", adminOnly: true },
   { href: "/admin/mic-brawl", label: "Mic Brawl", adminOnly: true },
   { href: "/admin/users", label: "Usuarios", adminOnly: true },
   { href: "/admin/reports", label: "Reportes", required: "view_reports" },

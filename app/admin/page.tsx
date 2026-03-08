@@ -176,6 +176,15 @@ export default function AdminDashboard() {
         ) : null}
         {access.isAdmin ? (
           <div className="card">
+            <h3>Facebook Fans Activos</h3>
+            <p className="muted">CRM interno de comentaristas y reacciones para detectar superfans activos.</p>
+            <Link className="button secondary" href="/admin/facebook-fans">
+              Abrir módulo
+            </Link>
+          </div>
+        ) : null}
+        {access.isAdmin ? (
+          <div className="card">
             <h3>SPM Arcade / Mic Brawl</h3>
             <p className="muted">Monitorea salas activas, leaderboard, resets y skins del juego.</p>
             <Link className="button secondary" href="/admin/mic-brawl">

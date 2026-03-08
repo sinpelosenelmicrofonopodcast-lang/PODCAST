@@ -67,6 +67,7 @@ export function hasAnyPermission(access: AccessShape, required: StaffPermission 
 export function requiredPermissionForAdminPage(pathname: string): StaffPermission | "admin" | null {
   if (pathname === "/admin" || pathname === "/admin/") return null;
   if (pathname.startsWith("/admin/auto-posts")) return "admin";
+  if (pathname.startsWith("/admin/facebook-fans")) return "admin";
   if (pathname.startsWith("/admin/users")) return "admin";
   if (pathname.startsWith("/admin/mic-brawl")) return "admin";
   if (pathname.startsWith("/admin/home")) return "manage_home";
@@ -89,6 +90,7 @@ export function requiredPermissionForAdminPage(pathname: string): StaffPermissio
 export function requiredPermissionForAdminApi(pathname: string): StaffPermission | "admin" | null {
   if (pathname === "/api/admin/me") return null;
   if (pathname.startsWith("/api/admin/auto-posts")) return "admin";
+  if (pathname.startsWith("/api/admin/facebook-fans")) return "admin";
   if (pathname.startsWith("/api/admin/users")) return "admin";
   if (pathname.startsWith("/api/admin/mic-brawl")) return "admin";
   if (pathname.startsWith("/api/admin/stats")) return "view_stats";
