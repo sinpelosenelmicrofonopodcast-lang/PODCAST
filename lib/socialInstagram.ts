@@ -41,6 +41,20 @@ function normalizePublishTarget(value?: string | null) {
   return String(value ?? "").toLowerCase() === "story" ? "story" : "feed";
 }
 
+function isRetryableMetaError(status: number, message: string, code?: number, subcode?: number) {
+  if (status >= 500 || status === 429) return true;
+  if (code === 4 || code === 17 || code === 32) return true;
+  if (subcode === 2207008 || subcode === 2207027) return true;
+
+  const msg = message.toLowerCase();
+  return (
+    msg.includes("media id is not available") ||
+    msg.includes("is still processing") ||
+    msg.includes("try again") ||
+    msg.includes("temporarily unavailable")
+  );
+}
+
 async function graphPostWithRetry(url: string, form: URLSearchParams, attempts = 3) {
   let lastError = "Meta API error";
 
@@ -55,8 +69,11 @@ async function graphPostWithRetry(url: string, form: URLSearchParams, attempts =
       const json = await res.json().catch(() => ({} as any));
       if (res.ok) return { ok: true as const, data: json };
 
-      lastError = String(json?.error?.message ?? `Meta API HTTP ${res.status}`);
-      const isRetryable = res.status >= 500 || res.status === 429;
+      const errorMessage = String(json?.error?.message ?? `Meta API HTTP ${res.status}`);
+      const errorCode = Number(json?.error?.code ?? 0) || undefined;
+      const errorSubcode = Number(json?.error?.error_subcode ?? 0) || undefined;
+      lastError = errorMessage;
+      const isRetryable = isRetryableMetaError(res.status, errorMessage, errorCode, errorSubcode);
       if (!isRetryable || i === attempts - 1) break;
     } catch (e: any) {
       lastError = String(e?.message ?? "Network error");
@@ -66,6 +83,50 @@ async function graphPostWithRetry(url: string, form: URLSearchParams, attempts =
   }
 
   throw new Error(lastError);
+}
+
+async function waitForContainerReady(
+  graphVersion: string,
+  creationId: string,
+  accessToken: string,
+  maxAttempts = 15
+) {
+  let lastStatus = "UNKNOWN";
+  for (let i = 0; i < maxAttempts; i += 1) {
+    const statusUrl = new URL(`https://graph.facebook.com/${graphVersion}/${encodeURIComponent(creationId)}`);
+    statusUrl.searchParams.set("fields", "status_code,status,status_type");
+    statusUrl.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(statusUrl.toString(), { cache: "no-store" });
+    const json = await res.json().catch(() => ({} as any));
+
+    if (!res.ok) {
+      const message = String(json?.error?.message ?? `Meta API HTTP ${res.status}`);
+      const code = Number(json?.error?.code ?? 0) || undefined;
+      const subcode = Number(json?.error?.error_subcode ?? 0) || undefined;
+      if (!isRetryableMetaError(res.status, message, code, subcode) || i === maxAttempts - 1) {
+        throw new Error(`No se pudo validar estado de Instagram media: ${message}`);
+      }
+      await sleep(1000 * (i + 1));
+      continue;
+    }
+
+    const status = String(json?.status_code ?? json?.status ?? json?.status_type ?? "")
+      .trim()
+      .toUpperCase();
+    if (!status || status === "FINISHED" || status === "PUBLISHED") return;
+
+    lastStatus = status;
+    if (status === "ERROR" || status === "EXPIRED" || status === "ERROR_INVALID_MEDIA") {
+      throw new Error(`Instagram no pudo procesar la media (status=${status}).`);
+    }
+
+    if (i < maxAttempts - 1) {
+      await sleep(1500);
+    }
+  }
+
+  throw new Error(`Instagram aún procesa la media (status=${lastStatus}). Reintenta en 1-2 minutos.`);
 }
 
 async function resolveIgUserId(config: ReturnType<typeof getConfig>) {
@@ -155,6 +216,7 @@ export async function postNewsToInstagram(input: InstagramPostNewsInput) {
   const createRes = await graphPostWithRetry(createUrl, createForm);
   const creationId = String(createRes.data?.id ?? "").trim();
   if (!creationId) throw new Error("Instagram no devolvió creation_id.");
+  await waitForContainerReady(graphVersion, creationId, igAccessToken);
 
   const publishForm = new URLSearchParams();
   publishForm.set("creation_id", creationId);
@@ -207,6 +269,7 @@ export async function postBlogToInstagram(input: InstagramPostBlogInput) {
   const createRes = await graphPostWithRetry(createUrl, createForm);
   const creationId = String(createRes.data?.id ?? "").trim();
   if (!creationId) throw new Error("Instagram no devolvió creation_id.");
+  await waitForContainerReady(graphVersion, creationId, igAccessToken);
 
   const publishForm = new URLSearchParams();
   publishForm.set("creation_id", creationId);
