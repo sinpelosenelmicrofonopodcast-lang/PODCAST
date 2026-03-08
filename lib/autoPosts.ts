@@ -1,3 +1,5 @@
+import { postToFacebookPageFeed } from "@/lib/socialFacebook";
+
 export const SPM_AUTOPOST_TIMEZONE = "America/Chicago";
 
 type Slot = {
@@ -441,24 +443,15 @@ export async function publishScheduledPostToFacebook(input: { message: string })
   const message = normalizeMessage(String(input.message ?? ""), 500);
   if (!message) throw new Error("Mensaje vacío para publicar.");
 
-  const form = new URLSearchParams();
-  form.set("message", message);
-  form.set("access_token", cfg.accessToken);
-
-  const res = await fetch(`https://graph.facebook.com/${cfg.graphVersion}/${cfg.pageId}/feed`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: form.toString(),
-    cache: "no-store"
+  const posted = await postToFacebookPageFeed({
+    pageId: cfg.pageId,
+    pageAccessToken: cfg.accessToken,
+    graphVersion: cfg.graphVersion,
+    message
   });
-
-  const json = await res.json().catch(() => ({} as any));
-  if (!res.ok) {
-    throw new Error(String(json?.error?.message ?? `Meta API HTTP ${res.status}`));
-  }
 
   return {
     ok: true as const,
-    postId: String(json?.id ?? "")
+    postId: posted.postId
   };
 }
