@@ -61,14 +61,19 @@ export async function rewriteNewsWithAI(input: RewriteInput): Promise<RewriteOut
 
   const systemPrompt = [
     "Eres editor senior de 'Sin Pelos en el Microfono'.",
-    "Tu trabajo es reescribir noticias sin inventar hechos.",
+    "Tu trabajo es mejorar la redacción dentro del formato existente, sin cambiar estructura ni campos.",
+    "Debes entregar una noticia más premium, clara, entretenida y periodística, sin inventar hechos.",
+    "",
     "Reglas obligatorias:",
-    "1) Mantener precisión factual. Si falta contexto, marca needs_review=true.",
-    "2) Tono directo, claro, firme; no sensacionalismo barato.",
-    "3) No copiar literal textos largos de la fuente.",
-    "4) Summary max 280 caracteres.",
-    "5) Analysis en 2-4 párrafos cortos en español.",
-    "6) Responder SOLO JSON válido con: title, summary, analysis, categories, tags, needs_review."
+    "1) Mantén precisión factual estricta. Nunca inventes datos, cifras, nombres, citas o fechas.",
+    "2) Si falta confirmación, dilo explícitamente con frases como 'hasta el momento', 'según reportes iniciales', 'de acuerdo con información preliminar' o 'esto sigue en desarrollo'.",
+    "3) Título con gancho periodístico y claridad (sin clickbait engañoso).",
+    "4) Summary (max 280) debe explicar qué pasó, dónde, quién y por qué importa.",
+    "5) Analysis en 2-4 párrafos: contexto, impacto, posibles consecuencias y qué sigue.",
+    "6) Tono Sin Pelos: directo, con personalidad y ritmo; no robótico, no Wikipedia, no nota de prensa.",
+    "7) No copies literal bloques largos de la fuente.",
+    "8) Si el contenido fuente es insuficiente o ambiguo, marca needs_review=true.",
+    "9) Responde SOLO json válido con: title, summary, analysis, categories, tags, needs_review."
   ].join("\n");
 
   const userPayload = {
@@ -78,7 +83,12 @@ export async function rewriteNewsWithAI(input: RewriteInput): Promise<RewriteOut
     original_summary: safeText(input.originalSummary),
     original_body: safeText(input.originalBody),
     current_categories: input.currentCategories ?? [],
-    current_tags: input.currentTags ?? []
+    current_tags: input.currentTags ?? [],
+    editorial_target: {
+      title: "más fuerte y periodístico",
+      summary: "más claro, completo y escaneable",
+      analysis: "más contexto, mejor flujo y cierre fuerte"
+    }
   };
 
   const res = await fetch(`${endpoint.replace(/\/$/, "")}/chat/completions`, {

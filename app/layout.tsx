@@ -94,6 +94,9 @@ OneSignalDeferred.push(async function(OneSignal) {
         ) : null}
       </head>
       <body>
+        <a className="skip-link" href="#main-content">
+          Saltar al contenido
+        </a>
         <div className="splash" aria-hidden="true">
           <div className="splash-logo" />
         </div>
@@ -104,7 +107,7 @@ OneSignalDeferred.push(async function(OneSignal) {
         <BottomStickyPromo />
         <PromoPopup />
         <Toaster />
-        {children}
+        <div id="main-content">{children}</div>
       </body>
     </html>
   );

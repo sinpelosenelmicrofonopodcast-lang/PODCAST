@@ -76,6 +76,7 @@ export default async function PodcastEpisodePage({ params }: { params: { slug: s
                 src={episode.thumbnail_url}
                 alt={episode.title}
                 loading="eager"
+                decoding="async"
                 style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover", borderRadius: 12 }}
               />
             ) : null}
@@ -96,14 +97,14 @@ export default async function PodcastEpisodePage({ params }: { params: { slug: s
 
           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
             {prevEpisode ? (
-              <a className="button secondary" href={`/podcast/${encodeURIComponent(prevEpisode.slug)}`}>
+              <Link className="button secondary" href={`/podcast/${encodeURIComponent(prevEpisode.slug)}`}>
                 Episodio anterior
-              </a>
+              </Link>
             ) : null}
             {nextEpisode ? (
-              <a className="button secondary" href={`/podcast/${encodeURIComponent(nextEpisode.slug)}`}>
+              <Link className="button secondary" href={`/podcast/${encodeURIComponent(nextEpisode.slug)}`}>
                 Siguiente episodio
-              </a>
+              </Link>
             ) : null}
           </div>
 
@@ -117,9 +118,9 @@ export default async function PodcastEpisodePage({ params }: { params: { slug: s
                   <article key={item.id} className="card" style={{ display: "grid", gap: 8 }}>
                     <h3 style={{ margin: 0 }}>{item.title}</h3>
                     <p className="muted">{item.description ?? "Episodio completo."}</p>
-                    <a className="button secondary" href={`/podcast/${encodeURIComponent(item.slug)}`}>
+                    <Link className="button secondary" href={`/podcast/${encodeURIComponent(item.slug)}`}>
                       Ver episodio
-                    </a>
+                    </Link>
                   </article>
                 ))}
               </div>

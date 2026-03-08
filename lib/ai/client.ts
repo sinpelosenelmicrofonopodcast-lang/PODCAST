@@ -21,6 +21,17 @@ export async function runJsonChat(messages: ChatMessage[]) {
   const model = String(process.env.OPENAI_NEWS_MODEL ?? "gpt-4o-mini").trim();
   const endpoint = `${String(process.env.OPENAI_API_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "")}/chat/completions`;
 
+  const hasJsonKeyword = messages.some((msg) => /\bjson\b/i.test(String(msg.content ?? "")));
+  const normalizedMessages = hasJsonKeyword
+    ? messages
+    : [
+        {
+          role: "system" as const,
+          content: "Return valid json only. Responde solo en formato json válido."
+        },
+        ...messages
+      ];
+
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -31,7 +42,7 @@ export async function runJsonChat(messages: ChatMessage[]) {
       model,
       temperature: 0.25,
       response_format: { type: "json_object" },
-      messages
+      messages: normalizedMessages
     }),
     cache: "no-store"
   });

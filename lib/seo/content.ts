@@ -84,6 +84,21 @@ function maybeSlugFromSource(source?: string | null, fallback = "") {
   }
 }
 
+function safeTimestamp(value?: string | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+  const ts = new Date(raw).getTime();
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function isShortLikeSource(sourceUrl?: string | null, metrics?: { durationSeconds?: number; isShort?: boolean } | null) {
+  const url = String(sourceUrl ?? "").toLowerCase();
+  const duration = Number(metrics?.durationSeconds ?? 0);
+  if (metrics?.isShort === true) return true;
+  if (Number.isFinite(duration) && duration > 0 && duration <= 180) return true;
+  return url.includes("/shorts/");
+}
+
 export async function getPublishedPosts(limit = 100): Promise<SeoPost[]> {
   const supabase = supabaseServer();
   const primary = await supabase
@@ -182,19 +197,65 @@ export async function getPostBySlug(slug: string): Promise<SeoPost | null> {
 
 export async function getPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> {
   const supabase = supabaseServer();
+  const desiredLimit = Math.max(1, Math.floor(Number(limit) || 100));
+  const preloadLimit = Math.max(desiredLimit, Math.min(2000, Math.max(desiredLimit * 4, 200)));
   const primary = await supabase
     .from("episodes")
     .select("id, slug, title, description, youtube_url, audio_url, thumbnail_url, duration_seconds, is_published, published_at, updated_at")
     .eq("is_published", true)
     .order("published_at", { ascending: false })
-    .limit(limit);
-  if (!primary.error && (primary.data ?? []).length > 0) return (primary.data ?? []) as SeoEpisode[];
+    .limit(preloadLimit);
+  if (!primary.error && (primary.data ?? []).length > 0) {
+    const rows = (primary.data ?? []) as SeoEpisode[];
+    const orderLookupLimit = Math.max(desiredLimit, Math.min(5000, Math.max(desiredLimit * 6, 500)));
+    const orderRows = await supabase
+      .from("external_posts")
+      .select("source_url, posted_at, metrics")
+      .not("source_url", "is", null)
+      .not("posted_at", "is", null)
+      .or("platform.ilike.%youtube%,source_url.ilike.%youtube.com%,source_url.ilike.%youtu.be%")
+      .order("posted_at", { ascending: false })
+      .limit(orderLookupLimit);
+
+    const postedAtByVideoId = new Map<string, string>();
+    for (const row of (orderRows.data ?? []) as Array<{ source_url?: string | null; posted_at?: string | null; metrics?: any }>) {
+      const sourceUrl = String(row?.source_url ?? "");
+      if (!sourceUrl) continue;
+      if (isShortLikeSource(sourceUrl, row?.metrics ?? null)) continue;
+      const videoId = getYouTubeVideoId(sourceUrl);
+      if (!videoId) continue;
+      if (postedAtByVideoId.has(videoId)) continue;
+      const postedAt = String(row?.posted_at ?? "").trim();
+      if (!postedAt) continue;
+      postedAtByVideoId.set(videoId, postedAt);
+    }
+
+    const sorted = rows
+      .map((episode) => {
+        const byYoutubeId =
+          getYouTubeVideoId(episode.youtube_url) ??
+          (/^[a-zA-Z0-9_-]{11}$/.test(String(episode.slug ?? "")) ? String(episode.slug) : null);
+        const youtubePostedAt = byYoutubeId ? postedAtByVideoId.get(byYoutubeId) ?? null : null;
+        const effectivePublishedAt = youtubePostedAt ?? episode.published_at ?? episode.updated_at ?? null;
+        return {
+          ...episode,
+          published_at: effectivePublishedAt
+        } satisfies SeoEpisode;
+      })
+      .sort((a, b) => {
+        const byPublished = safeTimestamp(b.published_at) - safeTimestamp(a.published_at);
+        if (byPublished !== 0) return byPublished;
+        return safeTimestamp(b.updated_at) - safeTimestamp(a.updated_at);
+      });
+
+    return sorted.slice(0, desiredLimit);
+  }
 
   const fallback = await supabase
     .from("external_posts")
     .select("id, title, caption, source_url, media_url, posted_at, metrics")
     .order("posted_at", { ascending: false })
-    .limit(Math.max(limit * 3, 200));
+    .limit(Math.max(desiredLimit * 3, 200));
 
   const seen = new Set<string>();
   const out: SeoEpisode[] = [];
@@ -220,7 +281,7 @@ export async function getPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> {
       published_at: row.posted_at ?? null,
       updated_at: row.posted_at ?? null
     });
-    if (out.length >= limit) break;
+    if (out.length >= desiredLimit) break;
   }
   return out;
 }
@@ -336,4 +397,3 @@ export async function getPublishedPostsByRegion(region: string, limit = 48) {
     .filter((row) => String(row.region ?? "").toUpperCase() === normalized.toUpperCase())
     .slice(0, limit);
 }
-

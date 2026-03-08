@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getYouTubeVideoId } from "@/lib/youtube";
 import type { ExternalPodcastPost } from "@/lib/feedEpisodes";
 
@@ -49,12 +49,12 @@ export function EpisodesInfinite({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-
-  const itemIds = useMemo(() => new Set(items.map((item) => item.id)), [items]);
+  const loadingRef = useRef(false);
 
   const loadMore = useCallback(async () => {
-    if (loading || !hasMore) return;
+    if (loadingRef.current || !hasMore) return;
 
+    loadingRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -68,12 +68,13 @@ export function EpisodesInfinite({
     if (!res?.ok || !json?.ok) {
       setError(json?.error ?? "No se pudieron cargar más episodios.");
       setLoading(false);
+      loadingRef.current = false;
       return;
     }
 
     setItems((prev) => {
       const next = [...prev];
-      const seen = new Set(itemIds);
+      const seen = new Set(prev.map((item) => item.id));
       (json.items ?? []).forEach((item) => {
         if (seen.has(item.id)) return;
         seen.add(item.id);
@@ -85,7 +86,8 @@ export function EpisodesInfinite({
     setCursor(json.nextCursor ?? null);
     setHasMore(Boolean(json.hasMore));
     setLoading(false);
-  }, [cursor, hasMore, itemIds, loading, pageSize]);
+    loadingRef.current = false;
+  }, [cursor, hasMore, pageSize]);
 
   useEffect(() => {
     if (!sentinelRef.current || !hasMore) return;
@@ -164,7 +166,7 @@ export function EpisodesInfinite({
       </div>
 
       {error ? (
-        <p className="muted" style={{ marginTop: 12 }}>
+        <p className="muted" style={{ marginTop: 12 }} role="status" aria-live="polite">
           {error}
         </p>
       ) : null}
