@@ -9,6 +9,7 @@ import {
   summarizeDescription,
   type NewsSource
 } from "@/lib/newsAutomation";
+import { runNewsIngestionPipeline } from "@/lib/news/pipeline";
 import { createAutomationJob, logPipelineEvent, normalizeSourceUrl, updateAutomationJob } from "@/lib/pipelineOps";
 
 function getServiceClient() {
@@ -339,7 +340,23 @@ export async function POST(request: NextRequest) {
       payload: { scanned, created, skipped, failed }
     });
 
-    return NextResponse.json({ ok: true, scanned, created, skipped, failed });
+    const viralPipeline = await runNewsIngestionPipeline(
+      {
+        sourceLimit: 30,
+        perSourceLimit: 12,
+        timeoutMs: 12000
+      },
+      service
+    ).catch(() => null);
+
+    return NextResponse.json({
+      ok: true,
+      scanned,
+      created,
+      skipped,
+      failed,
+      viralPipeline
+    });
   } catch (e: any) {
     if (rootJobId) {
       await logPipelineEvent(service, {

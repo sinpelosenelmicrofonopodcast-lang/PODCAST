@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { hasAnyPermission, type StaffPermission } from "@/lib/staffPermissions";
 import type { Route } from "next";
 
@@ -24,12 +24,14 @@ const links: LinkItem[] = [
   { href: "/admin/stats", label: "Estadísticas", required: "view_stats" },
   { href: "/admin/content", label: "Contenido", required: "manage_home" },
   { href: "/admin/news", label: "Noticias", required: "manage_news" },
+  { href: "/admin/news-engine", label: "News Engine", required: "manage_news" },
   { href: "/admin/news-sources", label: "Fuentes RSS", required: "manage_news_sources" },
   { href: "/admin/blog", label: "Blog", required: "manage_blog" },
   { href: "/admin/events", label: "Eventos", required: "manage_events" },
   { href: "/admin/promotions", label: "Promociones", required: "manage_promotions" },
   { href: "/admin/newsletter", label: "Newsletter", required: "manage_newsletter" },
   { href: "/admin/guest-requests", label: "Invitados", required: "manage_guest_requests" },
+  { href: "/admin/confessions", label: "Confesiones", required: "moderate_confessions" },
   { href: "/admin/auto-posts", label: "Auto Posts", adminOnly: true },
   { href: "/admin/facebook-fans", label: "Facebook Fans", adminOnly: true },
   { href: "/admin/mic-brawl", label: "Mic Brawl", adminOnly: true },
@@ -38,35 +40,8 @@ const links: LinkItem[] = [
   { href: "/admin/schedule", label: "Programación", required: "view_schedule" }
 ];
 
-async function loadAccess(): Promise<AccessState> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token ?? "";
-  if (!token) return { isAdmin: false, permissions: [] };
-  const res = await fetch("/api/admin/me", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
-  if (!res?.ok) return { isAdmin: false, permissions: [] };
-  const json = await res.json().catch(() => ({}));
-  return {
-    isAdmin: Boolean(json?.isAdmin),
-    permissions: Array.isArray(json?.permissions) ? (json.permissions as StaffPermission[]) : []
-  };
-}
-
-export function Sidebar({ active }: { active: string }) {
-  const [access, setAccess] = useState<AccessState>({ isAdmin: false, permissions: [] });
-
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      const next = await loadAccess();
-      if (!mounted) return;
-      setAccess(next);
-    };
-    run();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
+export function Sidebar({ access }: { access: AccessState }) {
+  const active = usePathname() ?? "";
   const visibleLinks = useMemo(
     () =>
       links.filter((link) => {

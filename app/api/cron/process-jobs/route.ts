@@ -5,6 +5,7 @@ import { postBlogToFacebook, postEpisodeToFacebook, postNewsToFacebook } from "@
 import { postNewsToInstagram } from "@/lib/socialInstagram";
 import { rewriteNewsWithAI } from "@/lib/newsRewrite";
 import { getYouTubeVideoId } from "@/lib/youtube";
+import { publishFromSocialQueue } from "@/lib/social/publisher";
 
 type QueueJob = {
   id: string;
@@ -483,7 +484,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, total: jobs.length, done, failed, skipped });
+    const socialQueue = await publishFromSocialQueue(service, 20).catch(() => ({
+      queued: 0,
+      done: 0,
+      failed: 0
+    }));
+
+    return NextResponse.json({
+      ok: true,
+      total: jobs.length,
+      done,
+      failed,
+      skipped,
+      socialQueue
+    });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });
   }

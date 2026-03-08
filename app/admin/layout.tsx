@@ -12,10 +12,10 @@ export const metadata: Metadata = buildSeoMetadata({
 });
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await requireStaffPageOrRedirect("/admin");
+  const access = await requireStaffPageOrRedirect("/admin");
 
   return (
-    <AdminShell>
+    <AdminShell access={{ isAdmin: access.isAdmin, permissions: access.permissions }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <Link className="button secondary" href="/">
           Volver al Home

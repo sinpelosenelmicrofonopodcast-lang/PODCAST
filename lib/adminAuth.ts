@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { type NextRequest } from "next/server";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from "@/lib/authCookies";
 import { hasAnyPermission, isStaffPermission, type StaffPermission } from "@/lib/staffPermissions";
 
@@ -104,6 +105,21 @@ async function resolveAccessByToken(
   };
 }
 
+const resolveAccessByTokenCachedInternal = cache(
+  async (
+    token: string,
+    url: string,
+    anonKey: string,
+    serviceKey: string
+  ): Promise<{ ok: true; access: UserAccess } | { ok: false; status: number; error: string }> => {
+    return resolveAccessByToken(token, { url, anonKey, serviceKey });
+  }
+);
+
+async function resolveAccessByTokenCached(token: string, config: EnvConfig) {
+  return resolveAccessByTokenCachedInternal(token, config.url, config.anonKey, config.serviceKey);
+}
+
 async function refreshSessionByToken(
   refreshToken: string,
   config: EnvConfig
@@ -140,7 +156,7 @@ async function resolveAccessWithFallback(
   | { ok: false; status: number; error: string }
 > {
   if (accessToken) {
-    const direct = await resolveAccessByToken(accessToken, config);
+    const direct = await resolveAccessByTokenCached(accessToken, config);
     if (direct.ok) return { ok: true, access: direct.access, refreshed: null };
     if (direct.status !== 401 || !refreshToken) return direct;
   } else if (!refreshToken) {
@@ -149,7 +165,7 @@ async function resolveAccessWithFallback(
 
   const refreshed = await refreshSessionByToken(refreshToken, config);
   if (!refreshed) return { ok: false, status: 401, error: "Sesión inválida." };
-  const retried = await resolveAccessByToken(refreshed.accessToken, config);
+  const retried = await resolveAccessByTokenCached(refreshed.accessToken, config);
   if (!retried.ok) return retried;
   return { ok: true, access: retried.access, refreshed };
 }
@@ -226,7 +242,7 @@ export async function getAccessFromToken(token: string): Promise<
 > {
   const config = getEnvConfig();
   if (!config) return { ok: false, status: 500, error: "Faltan variables de Supabase en servidor." };
-  const resolved = await resolveAccessByToken(token, config);
+  const resolved = await resolveAccessByTokenCached(token, config);
   if (!resolved.ok) return resolved;
   return {
     ok: true,

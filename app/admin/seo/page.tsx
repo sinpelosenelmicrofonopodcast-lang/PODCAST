@@ -49,8 +49,8 @@ export default async function AdminSeoPage() {
   const queueRows = queueRowsRes.data ?? [];
   const auditRows = auditRowsRes.data ?? [];
   const sitemapCount = posts.length + episodes.length + events.length + PUBLIC_CORE_PAGES.length;
-  const lastQueueRun = queueRows[0]?.updated_at ?? null;
-  const lastAuditRun = auditRows[0]?.created_at ?? null;
+  const lastQueueRun = typeof queueRows[0]?.updated_at === "string" ? queueRows[0].updated_at : null;
+  const lastAuditRun = typeof auditRows[0]?.created_at === "string" ? auditRows[0].created_at : null;
   const ctrOpportunities = (gsc?.rows ?? [])
     .filter((row) => row.impressions >= 100 && row.ctr <= 0.01)
     .sort((a, b) => b.impressions - a.impressions)

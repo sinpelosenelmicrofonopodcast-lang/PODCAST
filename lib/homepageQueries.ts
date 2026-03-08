@@ -197,12 +197,15 @@ const DEFAULT_HERO_SUBTITLE = "Cobertura diaria estilo redacción digital: rápi
 
 const FEED_DEFAULT_LIMIT = 8;
 const MAX_FEED_LIMIT = 24;
+let cachedServiceClient: ReturnType<typeof createClient> | null = null;
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   if (!url || !serviceKey) return null;
-  return createClient(url, serviceKey, { auth: { persistSession: false } });
+  if (cachedServiceClient) return cachedServiceClient;
+  cachedServiceClient = createClient(url, serviceKey, { auth: { persistSession: false } });
+  return cachedServiceClient;
 }
 
 function toArray(input: unknown): string[] {
@@ -654,11 +657,11 @@ async function collectNewsEngagement(news: HomeNewsItem[], windowHours: number) 
     if (svc) {
       const viewsResp = await svc
         .from("page_visits")
-        .select("path, visited_at")
+        .select("path")
         .gte("visited_at", toIsoHoursAgo(windowHours))
         .like("path", "/noticias/%")
         .order("visited_at", { ascending: false })
-        .limit(50000);
+        .limit(20000);
 
       if (!viewsResp.error) {
         (viewsResp.data ?? []).forEach((row: any) => {

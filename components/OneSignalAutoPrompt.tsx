@@ -36,37 +36,50 @@ export function OneSignalAutoPrompt({ appId, safariWebId }: OneSignalAutoPromptP
     if (SKIP_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return;
 
     let cancelled = false;
+    let initialDelayTimer: number | null = null;
+    let postPromptDelayTimer: number | null = null;
     queueOneSignalInit();
+    const run = () => {
+      initialDelayTimer = window.setTimeout(async () => {
+        try {
+          if (cancelled) return;
 
-    const run = async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 1300));
-      if (cancelled) return;
+          const env = oneSignalEnvironmentChecks();
+          if (!env.secureContext || !env.notificationApi) return;
+          if (env.iosLike && !env.standalone) return;
 
-      const env = oneSignalEnvironmentChecks();
-      if (!env.secureContext || !env.notificationApi) return;
-      if (env.iosLike && !env.standalone) return;
+          if (window.sessionStorage.getItem(PUSH_PROMPT_SESSION_KEY) === "1") return;
+          window.sessionStorage.setItem(PUSH_PROMPT_SESSION_KEY, "1");
 
-      if (window.sessionStorage.getItem(PUSH_PROMPT_SESSION_KEY) === "1") return;
-      window.sessionStorage.setItem(PUSH_PROMPT_SESSION_KEY, "1");
+          const initial = await getOneSignalPushState();
+          if (!initial.supported || initial.optedIn || initial.permission === "denied") {
+            return;
+          }
 
-      const initial = await getOneSignalPushState();
-      if (!initial.supported || initial.optedIn || initial.permission === "denied") {
-        return;
-      }
-
-      await triggerOneSignalPrompt({ force: true });
-      await new Promise((resolve) => window.setTimeout(resolve, 900));
-
-      const next = await getOneSignalPushState();
-      if (next.optedIn) {
-        window.localStorage.setItem(PUSH_CHOICE_STORAGE_KEY, "accepted");
-        await applyDefaultOneSignalInterestTags();
-      }
+          await triggerOneSignalPrompt({ force: true });
+          postPromptDelayTimer = window.setTimeout(async () => {
+            try {
+              if (cancelled) return;
+              const next = await getOneSignalPushState();
+              if (next.optedIn) {
+                window.localStorage.setItem(PUSH_CHOICE_STORAGE_KEY, "accepted");
+                await applyDefaultOneSignalInterestTags();
+              }
+            } catch {
+              // No-op; next route view will retry lightweight tag sync.
+            }
+          }, 900);
+        } catch {
+          // Silent fallback to avoid noisy unhandled promise rejections.
+        }
+      }, 1300);
     };
 
-    run().catch(() => null);
+    run();
     return () => {
       cancelled = true;
+      if (initialDelayTimer) window.clearTimeout(initialDelayTimer);
+      if (postPromptDelayTimer) window.clearTimeout(postPromptDelayTimer);
     };
   }, [configured, pathname]);
 

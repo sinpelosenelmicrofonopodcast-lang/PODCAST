@@ -1,13 +1,22 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { PageViewTracker } from "@/components/PageViewTracker";
-import { OneSignalInit } from "@/components/OneSignalInit";
-import { OneSignalAutoPrompt } from "@/components/OneSignalAutoPrompt";
-import { Toaster } from "@/components/Toaster";
-import { BottomStickyPromo } from "@/components/promotions/BottomStickyPromo";
-import { PromoPopup } from "@/components/promotions/PromoPopup";
-import { TermsConsentPopup } from "@/components/TermsConsentPopup";
+import dynamic from "next/dynamic";
 import { CANONICAL_SITE_URL } from "@/lib/seo/constants";
+
+const PageViewTracker = dynamic(() => import("@/components/PageViewTracker").then((m) => m.PageViewTracker), { ssr: false });
+const OneSignalInit = dynamic(() => import("@/components/OneSignalInit").then((m) => m.OneSignalInit), { ssr: false });
+const OneSignalAutoPrompt = dynamic(() => import("@/components/OneSignalAutoPrompt").then((m) => m.OneSignalAutoPrompt), {
+  ssr: false
+});
+const Toaster = dynamic(() => import("@/components/Toaster").then((m) => m.Toaster), { ssr: false });
+const BottomStickyPromo = dynamic(
+  () => import("@/components/promotions/BottomStickyPromo").then((m) => m.BottomStickyPromo),
+  { ssr: false }
+);
+const PromoPopup = dynamic(() => import("@/components/promotions/PromoPopup").then((m) => m.PromoPopup), { ssr: false });
+const TermsConsentPopup = dynamic(() => import("@/components/TermsConsentPopup").then((m) => m.TermsConsentPopup), {
+  ssr: false
+});
 
 const siteUrl = CANONICAL_SITE_URL;
 const iconImage = `${siteUrl}/logo.png`;

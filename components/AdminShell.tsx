@@ -1,13 +1,18 @@
-"use client";
-
-import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
+import type { StaffPermission } from "@/lib/staffPermissions";
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+type AdminShellProps = {
+  children: React.ReactNode;
+  access: {
+    isAdmin: boolean;
+    permissions: StaffPermission[];
+  };
+};
+
+export function AdminShell({ children, access }: AdminShellProps) {
   return (
     <div className="layout">
-      <Sidebar active={pathname} />
+      <Sidebar access={access} />
       <div style={{ padding: 32 }}>{children}</div>
     </div>
   );

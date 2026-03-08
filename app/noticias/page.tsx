@@ -80,7 +80,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
       rankedErr = r.error;
     }
     if (rankedErr) rankedBase = [];
-    const ranked = rankedBase ?? [];
+    const ranked = (rankedBase ?? []) as NewsItem[];
     const ids = ranked.map((item) => item.id);
     const { data: comments } = await supabase
       .from("comments")
@@ -89,7 +89,11 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
       .in("content_id", ids.length > 0 ? ids : ["00000000-0000-0000-0000-000000000000"]);
 
     const counts = new Map<string, number>();
-    (comments ?? []).forEach((c) => counts.set(c.content_id, (counts.get(c.content_id) ?? 0) + 1));
+    (comments ?? []).forEach((c) => {
+      const contentId = String((c as any)?.content_id ?? "").trim();
+      if (!contentId) return;
+      counts.set(contentId, (counts.get(contentId) ?? 0) + 1);
+    });
     const sorted = [...ranked].sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0));
     total = sorted.length;
     totalPages = Math.max(1, Math.ceil(total / perPage));
@@ -172,7 +176,11 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
       .eq("content_type", "news")
       .in("content_id", ids.length > 0 ? ids : ["00000000-0000-0000-0000-000000000000"]);
     const counts = new Map<string, number>();
-    (comments ?? []).forEach((c) => counts.set(c.content_id, (counts.get(c.content_id) ?? 0) + 1));
+    (comments ?? []).forEach((c) => {
+      const contentId = String((c as any)?.content_id ?? "").trim();
+      if (!contentId) return;
+      counts.set(contentId, (counts.get(contentId) ?? 0) + 1);
+    });
 
     // Views: real page visits for /noticias/:id within 30d.
     const viewCounts = new Map<string, number>();

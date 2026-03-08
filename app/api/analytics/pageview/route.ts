@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = supabaseServer();
-    const { data: userData } = await supabase.auth.getUser();
     const visitedAt = new Date().toISOString();
 
     const row = {
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest) {
       path,
       referrer,
       user_agent: userAgent,
-      user_id: userData.user?.id ?? null,
+      user_id: null,
       visited_at: visitedAt,
       country_code: countryCode ? String(countryCode).toUpperCase() : null,
       country: countryName ? String(countryName) : null,
@@ -52,7 +51,7 @@ export async function POST(request: NextRequest) {
         path,
         referrer,
         user_agent: userAgent,
-        user_id: userData.user?.id ?? null,
+        user_id: null,
         visited_at: visitedAt
       });
       if (fallback.error) return NextResponse.json({ ok: false, error: fallback.error.message }, { status: 400 });

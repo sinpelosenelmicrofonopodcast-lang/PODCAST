@@ -1,11 +1,9 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { StatCard } from "@/components/StatCard";
 import { AdminSyncYouTube } from "@/components/AdminSyncYouTube";
 import { hasAnyPermission, type StaffPermission } from "@/lib/staffPermissions";
+import { requireStaffPageOrRedirect } from "@/lib/adminAuth";
+import { supabaseService } from "@/lib/supabaseService";
 
 type Counts = {
   news: number;
@@ -16,72 +14,42 @@ type Counts = {
   users: number;
 };
 
-export default function AdminDashboard() {
-  const [counts, setCounts] = useState<Counts>({
+export default async function AdminDashboard() {
+  const access = await requireStaffPageOrRedirect("/admin");
+  const can = (permission: StaffPermission) => hasAnyPermission(access, permission);
+
+  const counts: Counts = {
     news: 0,
     blogs: 0,
     events: 0,
     promotions: 0,
     guestsNew: 0,
     users: 0
-  });
-  const [status, setStatus] = useState<string | null>(null);
-  const [access, setAccess] = useState<{ isAdmin: boolean; permissions: StaffPermission[] }>({
-    isAdmin: false,
-    permissions: []
-  });
+  };
 
-  const can = (permission: StaffPermission) => hasAnyPermission(access, permission);
+  let status: string | null = null;
 
-  useEffect(() => {
-    const load = async () => {
-      setStatus(null);
-      let localAccess: { isAdmin: boolean; permissions: StaffPermission[] } = { isAdmin: false, permissions: [] };
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token ?? "";
-      if (token) {
-        const meRes = await fetch("/api/admin/me", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
-        if (meRes?.ok) {
-          const me = await meRes.json().catch(() => ({}));
-          localAccess = {
-            isAdmin: Boolean(me?.isAdmin),
-            permissions: Array.isArray(me?.permissions) ? (me.permissions as StaffPermission[]) : []
-          };
-          setAccess(localAccess);
-        }
-      }
+  if (can("view_stats")) {
+    const service = supabaseService();
+    const [newsR, blogsR, eventsR, promoR, guestR, usersR] = await Promise.all([
+      service.from("news_items").select("id", { count: "exact", head: true }),
+      service.from("blog_posts").select("id", { count: "exact", head: true }),
+      service.from("live_events").select("id", { count: "exact", head: true }),
+      service.from("promotions").select("id", { count: "exact", head: true }),
+      service.from("guest_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
+      service.from("users").select("id", { count: "exact", head: true })
+    ]);
 
-      if (!hasAnyPermission(localAccess, "view_stats")) {
-        return;
-      }
+    const error = newsR.error || blogsR.error || eventsR.error || promoR.error || guestR.error || usersR.error;
+    if (error) status = error.message;
 
-      const [newsR, blogsR, eventsR, promoR, guestR, usersR] = await Promise.all([
-        supabase.from("news_items").select("*", { count: "exact", head: true }),
-        supabase.from("blog_posts").select("*", { count: "exact", head: true }),
-        supabase.from("live_events").select("*", { count: "exact", head: true }),
-        supabase.from("promotions").select("*", { count: "exact", head: true }),
-        supabase.from("guest_requests").select("*", { count: "exact", head: true }).eq("status", "new"),
-        supabase.from("users").select("*", { count: "exact", head: true })
-      ]);
-
-      const error =
-        newsR.error || blogsR.error || eventsR.error || promoR.error || guestR.error || usersR.error;
-      if (error) {
-        setStatus(error.message);
-      }
-
-      setCounts({
-        news: newsR.count ?? 0,
-        blogs: blogsR.count ?? 0,
-        events: eventsR.count ?? 0,
-        promotions: promoR.count ?? 0,
-        guestsNew: guestR.count ?? 0,
-        users: usersR.count ?? 0
-      });
-    };
-
-    load();
-  }, []);
+    counts.news = newsR.count ?? 0;
+    counts.blogs = blogsR.count ?? 0;
+    counts.events = eventsR.count ?? 0;
+    counts.promotions = promoR.count ?? 0;
+    counts.guestsNew = guestR.count ?? 0;
+    counts.users = usersR.count ?? 0;
+  }
 
   return (
     <main>
@@ -162,6 +130,15 @@ export default function AdminDashboard() {
                 </Link>
               ) : null}
             </div>
+          </div>
+        ) : null}
+        {can("manage_news") ? (
+          <div className="card">
+            <h3>News Engine Viral OS</h3>
+            <p className="muted">Pipeline de ingestión, tendencias, assets, social queue y analytics viral.</p>
+            <Link className="button secondary" href="/admin/news-engine">
+              Abrir News Engine
+            </Link>
           </div>
         ) : null}
         {can("manage_news_sources") ? <AdminSyncYouTube /> : null}

@@ -9,8 +9,15 @@ Plataforma adulta 21+ con feed unificado, comunidad propia, foro sin censura ide
 ## Setup
 1. Crear proyecto en Supabase.
 2. Ejecutar el esquema en `supabase/schema.sql`.
-3. (Opcional) Ejecutar `supabase/seed.sql` para datos de prueba.
-4. Crear `.env.local` con:
+3. Ejecutar migraciones aditivas (orden recomendado):
+   - `supabase/automation_jobs_observability.sql`
+   - `supabase/news_automation_sources.sql`
+   - `supabase/news_ai_rewrite.sql`
+   - `supabase/seo_autopilot.sql`
+   - `supabase/facebook_fans_activos.sql`
+   - `supabase/viral_content_os.sql`
+4. (Opcional) Ejecutar `supabase/seed.sql` para datos de prueba.
+5. Crear `.env.local` con:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=...
@@ -38,7 +45,7 @@ FACEBOOK_PAGE_ID=...
 FACEBOOK_PAGE_ACCESS_TOKEN=...
 ```
 
-5. Instalar dependencias y correr dev:
+6. Instalar dependencias y correr dev:
 
 ```bash
 pnpm install
@@ -83,6 +90,41 @@ pnpm dev
 - `/zona-cruda` zona paga
 - `/admin` panel admin
 - `/admin/auto-posts` programación de Auto Posts (admin)
+- `/admin/news-engine` Viral Content Operating System (ingestión/trends/social/analytics)
+- `/admin/confessions` moderación de confesiones
+
+## Viral Content OS (Phase 1 MVP)
+- DB nueva (additive): `supabase/viral_content_os.sql`
+- Seed demo opcional: `supabase/seed_viral_os.sql`
+- Nuevos módulos:
+  - `lib/news/*` (fetch/dedupe/normalize/score/pipeline/editorial)
+  - `lib/trends/*` (Google Trends + fallback providers)
+  - `lib/ai/*` (rewrite/summarize/social/poll/reel)
+  - `lib/images/*` (cover/quote/meme/thumbnail templates)
+  - `lib/social/*` (publisher + adapters)
+  - `lib/analytics/*` (event tracking + aggregation)
+- Endpoints nuevos:
+  - Cron: `/api/cron/trends`, `/api/cron/publish-scheduled`, `/api/cron/rescore`, `/api/cron/content-resurfacer`, `/api/cron/analytics-aggregation`
+  - Admin actions: `/api/admin/articles/:id/{rewrite|generate-assets|publish|schedule|generate-poll|generate-social}`
+  - Público: `/api/feed`, `/api/trending`, `/api/comments`, `/api/comments/vote`, `/api/polls/vote`, `/api/confessions`, `/api/social/publish`
+- Rutas públicas nuevas:
+  - `/memes`
+  - `/reels`
+  - `/bochinche`
+
+## Cron (Vercel)
+- `vercel.json` ya incluye:
+  - news-ingest cada 10 min
+  - trends cada 30 min
+  - publish-scheduled cada 5 min
+  - process-jobs cada 5 min
+  - rescore cada 15 min
+  - content-resurfacer cada 6 horas
+  - analytics-aggregation cada 1 hora
+  - SEO y auto-posts mantienen scheduling
+
+## Variables de entorno
+- Usa `.env.example` como plantilla completa (incluye AI, Meta, OneSignal, trends y feature flags).
 
 ## Auto Posts (Dashboard)
 - Ejecutar migración: `supabase/auto_posts.sql`.

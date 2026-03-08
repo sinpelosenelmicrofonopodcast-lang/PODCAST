@@ -1,11 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 
+let serviceClient: ReturnType<typeof createClient> | null = null;
+
 export function supabaseService() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   if (!url || !serviceRoleKey) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.");
   }
-  return createClient(url, serviceRoleKey, { auth: { persistSession: false } });
+  if (serviceClient) return serviceClient;
+  serviceClient = createClient(url, serviceRoleKey, { auth: { persistSession: false } });
+  return serviceClient;
 }
-
