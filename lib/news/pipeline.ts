@@ -8,6 +8,8 @@ import { computeControversyScore, computeInitialDiscoverScore } from "@/lib/news
 import { slugify } from "@/lib/validations/common";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { cleanNewsCategories } from "@/lib/newsCategories";
+import { buildSpmCoverTemplate } from "@/lib/images/spm-cover-template";
+import { assessNewsCandidateQuality } from "@/lib/news/quality";
 
 type IngestOptions = {
   sourceLimit?: number;
@@ -63,8 +65,13 @@ async function ensureUniqueSlug(service: SupabaseClient, baseSlug: string) {
   return `${baseSlug}-${Date.now().toString().slice(-6)}`;
 }
 
-async function mirrorToLegacyNewsItems(service: SupabaseClient, candidate: IngestedCandidate, status: "draft" | "published") {
-  const coverUrl = normalizeImageUrl(candidate.featuredImageUrl);
+async function mirrorToLegacyNewsItems(
+  service: SupabaseClient,
+  candidate: IngestedCandidate,
+  status: "draft" | "published",
+  coverUrlOverride?: string | null
+) {
+  const coverUrl = normalizeImageUrl(coverUrlOverride ?? candidate.featuredImageUrl);
   const categories = cleanNewsCategories([candidate.category ?? "Mundo", candidate.region ?? null]);
   const payload = {
     title: candidate.title,
@@ -116,11 +123,34 @@ async function insertArticle(service: SupabaseClient, candidate: IngestedCandida
   const rawSlug = slugify(candidate.title);
   const slug = await ensureUniqueSlug(service, rawSlug);
 
-  const status = source.auto_publish === true ? "published" : "pending_review";
+  const autoPublish = source.auto_publish === true;
   const discoverScore = computeInitialDiscoverScore(candidate);
   const controversyScore = computeControversyScore(`${candidate.title} ${candidate.summary}`);
 
-  const coverUrl = normalizeImageUrl(candidate.featuredImageUrl);
+  let coverUrl = normalizeImageUrl(candidate.featuredImageUrl);
+  let generatedCover = false;
+  let coverError: string | null = null;
+
+  if (!coverUrl) {
+    try {
+      const generated = buildSpmCoverTemplate({
+        title: candidate.title,
+        kicker: candidate.category ?? "NOTICIAS"
+      });
+      coverUrl = generated.dataUrl;
+      generatedCover = true;
+    } catch (error: any) {
+      coverError = String(error?.message ?? "cover_generation_failed");
+    }
+  }
+
+  const quality = assessNewsCandidateQuality({
+    title: candidate.title,
+    summary: candidate.summary,
+    content: candidate.content,
+    hasImage: Boolean(coverUrl)
+  });
+  const status = autoPublish && quality.readyForAutoPublish ? "published" : "pending_review";
 
   const payload = {
     source_id: source.id,
@@ -148,14 +178,23 @@ async function insertArticle(service: SupabaseClient, candidate: IngestedCandida
     ai_metadata: {
       source_hash: candidate.hash,
       ingestion: "rss",
-      source: source.name
+      source: source.name,
+      quality: {
+        score: quality.qualityScore,
+        review_reasons: quality.reviewReasons,
+        likely_spanish: quality.isLikelySpanish
+      },
+      cover: {
+        generated: generatedCover,
+        generation_error: coverError
+      }
     },
     seo: {
       title: `${candidate.title} | SPM News`,
       description: `${candidate.summary || candidate.title}`.slice(0, 155)
     },
     social: {
-      facebook_auto: source.auto_post_facebook === true,
+      facebook_auto: source.auto_post_facebook === true && status === "published",
       push_auto: true
     }
   };
@@ -168,7 +207,7 @@ async function insertArticle(service: SupabaseClient, candidate: IngestedCandida
 
   if (!data?.id) return null;
 
-  if (source.auto_post_facebook === true) {
+  if (source.auto_post_facebook === true && status === "published") {
     await service.from("social_publications").insert({
       article_id: data.id,
       platform: "facebook",
@@ -181,7 +220,11 @@ async function insertArticle(service: SupabaseClient, candidate: IngestedCandida
     });
   }
 
-  return data as { id: string; slug: string; status: "draft" | "pending_review" | "scheduled" | "published" | "rejected" | "archived" };
+  return {
+    ...(data as { id: string; slug: string; status: "draft" | "pending_review" | "scheduled" | "published" | "rejected" | "archived" }),
+    quality,
+    cover_url: coverUrl
+  };
 }
 
 async function sourceAlreadyIngested(service: SupabaseClient, sourceUrl: string) {
@@ -236,8 +279,8 @@ async function ingestSource(service: SupabaseClient, source: NewsSourceRow, opti
 
       created += 1;
 
-      if (source.auto_publish !== false) {
-        const legacyId = await mirrorToLegacyNewsItems(service, candidate, "published");
+      if (inserted.status === "published") {
+        const legacyId = await mirrorToLegacyNewsItems(service, candidate, "published", inserted.cover_url);
         if (legacyId) {
           mirroredToLegacy += 1;
           await service.from("news_articles").update({ legacy_news_item_id: legacyId }).eq("id", inserted.id);

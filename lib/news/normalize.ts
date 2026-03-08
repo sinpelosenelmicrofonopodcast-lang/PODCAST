@@ -27,8 +27,9 @@ export function normalizeFeedItemToCandidate(input: {
   hash: string;
 }): IngestedCandidate {
   const title = asString(input.feedItem.title, 240);
-  const summary = asString(input.feedItem.description, 400);
   const content = sanitizeText(input.feedItem.description || input.feedItem.title);
+  const summaryFromFeed = asString(input.feedItem.description, 400);
+  const summary = summaryFromFeed || asString(content, 320) || asString(title, 220);
   const category = normalizeCategory(input.source, title, summary);
   const categories = inferCategories({
     region: input.source.region ?? null,

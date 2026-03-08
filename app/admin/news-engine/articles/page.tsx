@@ -13,7 +13,7 @@ export default async function AdminNewsEngineArticlesPage() {
 
   const { data, error } = await service
     .from("news_articles")
-    .select("id, title, slug, status, category, region, published_at, publish_at, trending_score, discover_score")
+    .select("id, title, slug, status, category, region, summary, excerpt, cover_image_url, ai_metadata, published_at, publish_at, trending_score, discover_score")
     .order("created_at", { ascending: false })
     .limit(40);
 
@@ -35,7 +35,16 @@ export default async function AdminNewsEngineArticlesPage() {
               /noticias/{item.slug} · {item.category ?? "—"} · {item.region ?? "—"}
             </p>
             <p className="muted" style={{ margin: 0 }}>
+              {String(item.summary ?? item.excerpt ?? "").trim() || "Sin resumen útil (requiere revisión)."}
+            </p>
+            <p className="muted" style={{ margin: 0 }}>
               Publish at: {fmtDate(item.publish_at)} · Published: {fmtDate(item.published_at)} · Trend: {Number(item.trending_score ?? 0).toFixed(2)} · Discover: {Number(item.discover_score ?? 0).toFixed(2)}
+            </p>
+            <p className="muted" style={{ margin: 0 }}>
+              Imagen: {item.cover_image_url ? "OK" : "Falta"} · Calidad: {Number(item?.ai_metadata?.quality?.score ?? 0).toFixed(0)}
+              {Array.isArray(item?.ai_metadata?.quality?.review_reasons) && item.ai_metadata.quality.review_reasons.length > 0
+                ? ` · Review: ${item.ai_metadata.quality.review_reasons.join(", ")}`
+                : ""}
             </p>
             <NewsEngineArticleActions articleId={item.id} />
           </article>

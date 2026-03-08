@@ -23,7 +23,7 @@ export async function publishFromSocialQueue(service: SupabaseClient, limit = 20
     try {
       const articleRes = await service
         .from("news_articles")
-        .select("id, slug, title, summary, cover_image_url, reel_video_url")
+        .select("id, slug, title, summary, cover_image_url, reel_video_url, status")
         .eq("id", (row as any).article_id)
         .limit(1)
         .maybeSingle();
@@ -38,7 +38,12 @@ export async function publishFromSocialQueue(service: SupabaseClient, limit = 20
         summary: string | null;
         cover_image_url: string | null;
         reel_video_url: string | null;
+        status: string | null;
       };
+
+      if (String(article.status ?? "") !== "published") {
+        throw new Error("Artículo no publicado: bloqueado para distribución social.");
+      }
 
       const message = String(payload.message ?? article.summary ?? article.title).slice(0, 600);
       const link = String(payload.link ?? `/noticias/${article.slug}`);
