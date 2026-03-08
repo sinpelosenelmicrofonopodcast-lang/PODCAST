@@ -1,15 +1,15 @@
 {
   "crons": [
-    { "path": "/api/cron/auto-posts/publish", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/youtube-sync", "schedule": "0 */6 * * *" },
-    { "path": "/api/cron/news-ingest", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/trends", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/publish-scheduled", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/process-jobs", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/rescore", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/content-resurfacer", "schedule": "0 */6 * * *" },
-    { "path": "/api/cron/analytics-aggregation", "schedule": "0 * * * *" },
-    { "path": "/api/cron/seo", "schedule": "0 */6 * * *" },
-    { "path": "/api/cron/seo-daily", "schedule": "20 7 * * *" }
+    { "path": "/api/cron/auto-posts/publish", "schedule": "5 3 * * *" },
+    { "path": "/api/cron/youtube-sync", "schedule": "15 3 * * *" },
+    { "path": "/api/cron/news-ingest", "schedule": "25 3 * * *" },
+    { "path": "/api/cron/trends", "schedule": "35 3 * * *" },
+    { "path": "/api/cron/publish-scheduled", "schedule": "45 3 * * *" },
+    { "path": "/api/cron/process-jobs", "schedule": "55 3 * * *" },
+    { "path": "/api/cron/rescore", "schedule": "5 4 * * *" },
+    { "path": "/api/cron/content-resurfacer", "schedule": "15 4 * * *" },
+    { "path": "/api/cron/analytics-aggregation", "schedule": "25 4 * * *" },
+    { "path": "/api/cron/seo", "schedule": "35 4 * * *" },
+    { "path": "/api/cron/seo-daily", "schedule": "45 4 * * *" }
   ]
 }
