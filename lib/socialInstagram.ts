@@ -94,7 +94,7 @@ async function waitForContainerReady(
   let lastStatus = "UNKNOWN";
   for (let i = 0; i < maxAttempts; i += 1) {
     const statusUrl = new URL(`https://graph.facebook.com/${graphVersion}/${encodeURIComponent(creationId)}`);
-    statusUrl.searchParams.set("fields", "status_code,status,status_type");
+    statusUrl.searchParams.set("fields", "status_code");
     statusUrl.searchParams.set("access_token", accessToken);
 
     const res = await fetch(statusUrl.toString(), { cache: "no-store" });
@@ -111,7 +111,7 @@ async function waitForContainerReady(
       continue;
     }
 
-    const status = String(json?.status_code ?? json?.status ?? json?.status_type ?? "")
+    const status = String(json?.status_code ?? "")
       .trim()
       .toUpperCase();
     if (!status || status === "FINISHED" || status === "PUBLISHED") return;
