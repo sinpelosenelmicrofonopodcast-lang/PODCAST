@@ -69,6 +69,7 @@ export function requiredPermissionForAdminPage(pathname: string): StaffPermissio
   if (pathname.startsWith("/admin/news-engine")) return "manage_news";
   if (pathname.startsWith("/admin/confessions")) return "moderate_confessions";
   if (pathname.startsWith("/admin/auto-posts")) return "admin";
+  if (pathname.startsWith("/admin/social-replies")) return "admin";
   if (pathname.startsWith("/admin/facebook-fans")) return "admin";
   if (pathname.startsWith("/admin/users")) return "admin";
   if (pathname.startsWith("/admin/mic-brawl")) return "admin";
@@ -95,6 +96,7 @@ export function requiredPermissionForAdminApi(pathname: string): StaffPermission
   if (pathname.startsWith("/api/admin/news-engine")) return "manage_news";
   if (pathname.startsWith("/api/admin/articles")) return "manage_news";
   if (pathname.startsWith("/api/admin/auto-posts")) return "admin";
+  if (pathname.startsWith("/api/admin/social-replies")) return "admin";
   if (pathname.startsWith("/api/admin/facebook-fans")) return "admin";
   if (pathname.startsWith("/api/admin/users")) return "admin";
   if (pathname.startsWith("/api/admin/mic-brawl")) return "admin";

@@ -29,7 +29,7 @@ export default async function AdminNewsEnginePage() {
 
       <div className="grid" style={{ marginTop: 20, gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))" }}>
         <Link className="card" href="/admin/news-engine/articles"><h3>Artículos</h3><p className="muted">Borrador, rewrite IA, assets, publicar y social queue.</p></Link>
-        <Link className="card" href="/admin/news-engine/sources"><h3>Fuentes</h3><p className="muted">RSS/API/trend, prioridad y estado de ingestión.</p></Link>
+        <Link className="card" href="/admin/news-sources"><h3>Fuentes</h3><p className="muted">RSS/API/trend, prioridad y estado de ingestión.</p></Link>
         <Link className="card" href="/admin/news-engine/trends"><h3>Tendencias</h3><p className="muted">Keywords calientes por región y proveedor.</p></Link>
         <Link className="card" href="/admin/news-engine/assets"><h3>Assets</h3><p className="muted">Generación y revisión de cover/meme/quote/reel thumbnail.</p></Link>
         <Link className="card" href="/admin/news-engine/social"><h3>Distribución social</h3><p className="muted">Cola de publicaciones y resultados por red.</p></Link>

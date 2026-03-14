@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { authJsonFetch } from "@/lib/clientApi";
 
 export function ConfessionModerationActions({ confessionId }: { confessionId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -10,22 +10,13 @@ export function ConfessionModerationActions({ confessionId }: { confessionId: st
   const setConfessionStatus = async (nextStatus: "approved" | "rejected" | "published") => {
     setBusy(nextStatus);
     setStatus(null);
-    const session = await supabase.auth.getSession();
-    const token = session.data.session?.access_token ?? "";
-
-    const res = await fetch(`/api/admin/confessions/${confessionId}`, {
+    const { response, json } = await authJsonFetch(`/api/admin/confessions/${confessionId}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ status: nextStatus })
+      jsonBody: { status: nextStatus }
     });
-
-    const json = await res.json().catch(() => ({}));
     setBusy(null);
 
-    if (!res.ok || !json?.ok) {
+    if (!response.ok || !json?.ok) {
       setStatus(json?.error ?? "No se pudo actualizar.");
       return;
     }

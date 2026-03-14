@@ -2,7 +2,7 @@
 
 import { startTransition, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { authJsonFetch } from "@/lib/clientApi";
 
 type SocialPlatform = "facebook" | "instagram" | "x" | "tiktok";
 
@@ -54,15 +54,6 @@ const PLATFORM_META: Array<{ value: SocialPlatform; label: string }> = [
   { value: "x", label: "X" },
   { value: "tiktok", label: "TikTok" }
 ];
-
-async function authHeaders() {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token ?? "";
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json"
-  };
-}
 
 function fmtDate(value?: string | null) {
   if (!value) return "—";
@@ -120,16 +111,13 @@ export function NewsEngineArticleActions({ article }: Props) {
     setBusy(path);
     setStatus(null);
 
-    const res = await fetch(path, {
+    const { response, json } = await authJsonFetch(path, {
       method: options?.method ?? "POST",
-      headers: await authHeaders(),
-      body: options?.body ? JSON.stringify(options.body) : undefined
+      jsonBody: options?.body
     });
-
-    const json = await res.json().catch(() => ({}));
     setBusy(null);
 
-    if (!res.ok || !json?.ok) {
+    if (!response.ok || !json?.ok) {
       setStatus(json?.error ?? "No se pudo completar la acción.");
       return null;
     }

@@ -107,6 +107,72 @@ export async function postToFacebookPageFeed(input: {
   }
 }
 
+export async function postToFacebookPagePhoto(input: {
+  imageUrl: string;
+  caption?: string | null;
+  pageId?: string | null;
+  pageAccessToken?: string | null;
+  graphVersion?: string | null;
+}) {
+  const imageUrl = String(input.imageUrl ?? "").trim();
+  const caption = String(input.caption ?? "").trim();
+  if (!imageUrl) throw new Error("Imagen vacia para Facebook.");
+
+  const publishWithToken = async (token: string, pageId: string, graphVersion: string) => {
+    const form = new URLSearchParams();
+    form.set("url", imageUrl);
+    if (caption) form.set("caption", caption);
+    form.set("access_token", token);
+
+    return metaFetchJson<{ id?: string; post_id?: string; error?: MetaErrorPayload }>(
+      `https://graph.facebook.com/${graphVersion}/${encodeURIComponent(pageId)}/photos`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form.toString()
+      }
+    );
+  };
+
+  const resolved = await resolvePageAccessToken();
+  let pageId = String(input.pageId ?? resolved.pageId).trim();
+  let graphVersion = String(input.graphVersion ?? resolved.graphVersion).trim() || resolved.graphVersion;
+  let pageAccessToken = String(input.pageAccessToken ?? resolved.accessToken).trim();
+  if (!pageId || !pageAccessToken) {
+    throw new Error("Faltan FACEBOOK_PAGE_ID/META_PAGE_ID o un token Meta valido.");
+  }
+
+  try {
+    const publish = await publishWithToken(pageAccessToken, pageId, graphVersion);
+    return {
+      ok: true as const,
+      postId: String(publish.json?.post_id ?? publish.json?.id ?? "")
+    };
+  } catch (error: any) {
+    if (!isPermissionLikeError(error)) {
+      throw error instanceof Error ? error : new Error(String(error ?? "Meta API error"));
+    }
+
+    const refreshed = await resolvePageAccessToken({ forceRefresh: true });
+    pageId = String(input.pageId ?? refreshed.pageId).trim();
+    graphVersion = String(input.graphVersion ?? refreshed.graphVersion).trim() || refreshed.graphVersion;
+    pageAccessToken = String(input.pageAccessToken ?? refreshed.accessToken).trim();
+
+    try {
+      const publish = await publishWithToken(pageAccessToken, pageId, graphVersion);
+      return {
+        ok: true as const,
+        postId: String(publish.json?.post_id ?? publish.json?.id ?? "")
+      };
+    } catch (retryError: any) {
+      if (retryError instanceof Error) {
+        throw retryError;
+      }
+      throw new Error(buildMetaError(retryError as MetaErrorPayload | null));
+    }
+  }
+}
+
 function shortText(value: string, max = 320) {
   const clean = String(value ?? "").trim();
   if (clean.length <= max) return clean;

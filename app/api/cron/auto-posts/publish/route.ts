@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { publishScheduledPostToFacebook } from "@/lib/autoPosts";
+import { publishScheduledPost } from "@/lib/autoPosts";
 import { withScheduledPostsMigrationHint } from "@/lib/supabaseErrorHints";
 
 type ScheduledPost = {
   id: string;
+  platform: "facebook_page" | "instagram_feed" | "instagram_story";
   message: string;
+  media_url: string | null;
+  link_url: string | null;
+  publish_as: "feed" | "story" | null;
   scheduled_for: string;
   status: string;
 };
@@ -29,7 +33,7 @@ async function claimDueScheduledPostsFallback(service: any, limit: number) {
   const nowIso = new Date().toISOString();
   const { data, error } = await service
     .from("scheduled_posts")
-    .select("id, message, scheduled_for, status")
+    .select("id, platform, message, media_url, link_url, publish_as, scheduled_for, status")
     .eq("status", "queued")
     .lte("scheduled_for", nowIso)
     .order("scheduled_for", { ascending: true })
@@ -45,7 +49,7 @@ async function claimDueScheduledPostsFallback(service: any, limit: number) {
       .update({ status: "publishing", error: null })
       .eq("id", row.id)
       .eq("status", "queued")
-      .select("id, message, scheduled_for, status")
+      .select("id, platform, message, media_url, link_url, publish_as, scheduled_for, status")
       .maybeSingle();
     if (lock.error) continue;
     if (lock.data) claimed.push(lock.data as ScheduledPost);
@@ -115,7 +119,13 @@ export async function POST(request: NextRequest) {
         const message = String(row.message ?? "").trim();
         if (!message) throw new Error("Mensaje vacío para publicar.");
 
-        const publish = await publishScheduledPostToFacebook({ message });
+        const publish = await publishScheduledPost({
+          platform: row.platform,
+          message,
+          mediaUrl: row.media_url,
+          linkUrl: row.link_url,
+          publishAs: row.publish_as ?? "feed"
+        });
         const postedAt = new Date().toISOString();
 
         await service
@@ -123,7 +133,7 @@ export async function POST(request: NextRequest) {
           .update({
             status: "posted",
             posted_at: postedAt,
-            remote_id: publish.postId || null,
+            remote_id: publish.remoteId || null,
             error: null
           })
           .eq("id", row.id)
@@ -131,22 +141,22 @@ export async function POST(request: NextRequest) {
 
         await service.from("external_posts").upsert(
           {
-            platform: "Facebook",
-            external_id: publish.postId || `scheduled-${row.id}`,
+            platform: publish.platform,
+            external_id: publish.remoteId || `scheduled-${row.id}`,
             title: "Auto Post",
             caption: message,
-            media_url: null,
+            media_url: row.media_url ?? null,
             metrics: null,
             posted_at: postedAt,
-            source_url: null
+            source_url: publish.link ?? row.link_url ?? null
           },
           { onConflict: "platform,external_id", ignoreDuplicates: true }
         );
 
         posted += 1;
-        results.push({ id: row.id, status: "posted", remoteId: publish.postId || null });
+        results.push({ id: row.id, status: "posted", remoteId: publish.remoteId || null });
       } catch (e: any) {
-        const errorMessage = String(e?.message ?? "Error publicando en Facebook");
+        const errorMessage = String(e?.message ?? "Error publicando auto-post");
         await service
           .from("scheduled_posts")
           .update({ status: "failed", error: errorMessage })

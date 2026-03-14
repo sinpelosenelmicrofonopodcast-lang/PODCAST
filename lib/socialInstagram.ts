@@ -207,6 +207,51 @@ async function publishInstagramImage(input: {
   return mediaId;
 }
 
+export async function postGenericImageToInstagram(input: {
+  imageUrl: string;
+  caption?: string | null;
+  publishAs?: "feed" | "story";
+}) {
+  const config = getConfig();
+  const { graphVersion } = config;
+  const imageUrl = String(input.imageUrl ?? "").trim();
+  if (!imageUrl) {
+    throw new Error("Instagram requiere una imagen publica.");
+  }
+
+  const caption = normalizeCaption(String(input.caption ?? "").trim());
+  const publishAs = normalizePublishTarget(input.publishAs);
+
+  const publishOnce = async (forceRefresh = false) => {
+    const tokenState = await resolveInstagramAccessToken({ forceRefresh });
+    const igUserId = await resolveIgUserId(config, tokenState.accessToken);
+    return publishInstagramImage({
+      igUserId,
+      igAccessToken: tokenState.accessToken,
+      graphVersion,
+      coverUrl: imageUrl,
+      caption,
+      publishAs
+    });
+  };
+
+  let mediaId = "";
+  try {
+    mediaId = await publishOnce(false);
+  } catch (error: any) {
+    if (!isMetaAuthError(error)) {
+      throw error instanceof Error ? error : new Error(String(error ?? "Meta API error"));
+    }
+    mediaId = await publishOnce(true);
+  }
+
+  return {
+    ok: true as const,
+    mediaId,
+    publishAs
+  };
+}
+
 export async function postNewsToInstagram(input: InstagramPostNewsInput) {
   const config = getConfig();
   const { graphVersion, baseUrl } = config;

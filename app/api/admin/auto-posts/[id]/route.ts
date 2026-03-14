@@ -7,8 +7,13 @@ const EDITABLE_STATUS = new Set(["queued", "cancelled"]);
 
 type PatchPayload = {
   message?: string;
+  mediaUrl?: string | null;
+  linkUrl?: string | null;
+  scheduledFor?: string;
   status?: "queued" | "cancelled";
 };
+
+const CHICAGO_LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -32,6 +37,32 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       patch.message = message;
     }
 
+    if (payload.mediaUrl !== undefined) {
+      patch.media_url = String(payload.mediaUrl ?? "").trim() || null;
+    }
+
+    if (payload.linkUrl !== undefined) {
+      patch.link_url = String(payload.linkUrl ?? "").trim() || null;
+    }
+
+    if (payload.scheduledFor !== undefined) {
+      const raw = String(payload.scheduledFor ?? "").trim();
+      if (!raw) {
+        return NextResponse.json({ ok: false, error: "scheduledFor inválido." }, { status: 400 });
+      }
+      if (CHICAGO_LOCAL_DATE_TIME.test(raw)) {
+        const [datePart, timePart] = raw.split("T");
+        const { chicagoLocalToUtcIso } = await import("@/lib/autoPosts");
+        patch.scheduled_for = chicagoLocalToUtcIso(datePart, timePart);
+      } else {
+        const parsed = new Date(raw);
+        if (!Number.isFinite(parsed.getTime())) {
+          return NextResponse.json({ ok: false, error: "Fecha inválida para schedule." }, { status: 400 });
+        }
+        patch.scheduled_for = parsed.toISOString();
+      }
+    }
+
     if (payload.status !== undefined) {
       const status = String(payload.status ?? "").trim().toLowerCase();
       if (!EDITABLE_STATUS.has(status)) {
@@ -50,7 +81,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       .update(patch)
       .eq("id", id)
       .in("status", ["queued", "failed", "cancelled"])
-      .select("id, platform, message, media_url, scheduled_for, status, posted_at, remote_id, error, created_by, created_at, updated_at")
+      .select(
+        "id, platform, message, media_url, link_url, campaign_key, campaign_label, publish_as, scheduled_for, status, posted_at, remote_id, error, created_by, created_at, updated_at"
+      )
       .maybeSingle();
 
     if (error) return NextResponse.json({ ok: false, error: withScheduledPostsMigrationHint(error) }, { status: 400 });

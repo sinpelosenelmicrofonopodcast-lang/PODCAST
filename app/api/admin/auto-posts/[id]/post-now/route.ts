@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/adminAuth";
-import { publishScheduledPostToFacebook } from "@/lib/autoPosts";
+import { publishScheduledPost } from "@/lib/autoPosts";
 import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 import { withScheduledPostsMigrationHint } from "@/lib/supabaseErrorHints";
 
 type ScheduledPostRow = {
   id: string;
+  platform: "facebook_page" | "instagram_feed" | "instagram_story";
   message: string;
+  media_url: string | null;
+  link_url: string | null;
+  publish_as: "feed" | "story" | null;
   status: string;
   scheduled_for: string;
 };
@@ -29,7 +33,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       .update({ status: "publishing", error: null })
       .eq("id", id)
       .in("status", ["queued", "failed"])
-      .select("id, message, status, scheduled_for")
+      .select("id, platform, message, media_url, link_url, publish_as, status, scheduled_for")
       .maybeSingle();
 
     if (claimResp.error) {
@@ -50,7 +54,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const row = claimResp.data as ScheduledPostRow;
 
     try {
-      const posted = await publishScheduledPostToFacebook({ message: row.message });
+      const posted = await publishScheduledPost({
+        platform: row.platform,
+        message: row.message,
+        mediaUrl: row.media_url,
+        linkUrl: row.link_url,
+        publishAs: row.publish_as ?? "feed"
+      });
 
       const postedAt = new Date().toISOString();
       await auth.service
@@ -58,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         .update({
           status: "posted",
           posted_at: postedAt,
-          remote_id: posted.postId || null,
+          remote_id: posted.remoteId || null,
           error: null
         })
         .eq("id", row.id)
@@ -66,14 +76,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
       await auth.service.from("external_posts").upsert(
         {
-          platform: "Facebook",
-          external_id: posted.postId || `scheduled-${row.id}`,
+          platform: posted.platform,
+          external_id: posted.remoteId || `scheduled-${row.id}`,
           title: "Auto Post",
           caption: row.message,
-          media_url: null,
+          media_url: row.media_url,
           metrics: null,
           posted_at: postedAt,
-          source_url: null
+          source_url: posted.link ?? row.link_url ?? null
         },
         { onConflict: "platform,external_id", ignoreDuplicates: true }
       );
@@ -83,11 +93,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         action: "admin.auto_posts.post_now",
         targetTable: "scheduled_posts",
         targetId: row.id,
-        meta: { remote_id: posted.postId || null },
+        meta: { remote_id: posted.remoteId || null, platform: row.platform },
         ...reqMeta
       });
 
-      return NextResponse.json({ ok: true, id: row.id, remoteId: posted.postId || null, postedAt });
+      return NextResponse.json({ ok: true, id: row.id, remoteId: posted.remoteId || null, postedAt });
     } catch (e: any) {
       const errorMessage = String(e?.message ?? "Error publicando en Facebook");
       await auth.service

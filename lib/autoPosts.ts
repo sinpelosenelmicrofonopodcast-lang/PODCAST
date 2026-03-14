@@ -1,4 +1,5 @@
-import { postToFacebookPageFeed } from "@/lib/socialFacebook";
+import { postToFacebookPageFeed, postToFacebookPagePhoto } from "@/lib/socialFacebook";
+import { postGenericImageToInstagram } from "@/lib/socialInstagram";
 
 export const SPM_AUTOPOST_TIMEZONE = "America/Chicago";
 
@@ -14,6 +15,8 @@ export type AutoPostDraft = {
   localDate: string;
   localTime: string;
 };
+
+export type ScheduledPostPlatform = "facebook_page" | "instagram_feed" | "instagram_story";
 
 type SlotMessage = {
   localTime: string;
@@ -454,4 +457,67 @@ export async function publishScheduledPostToFacebook(input: { message: string })
     ok: true as const,
     postId: posted.postId
   };
+}
+
+export async function publishScheduledPost(input: {
+  platform: ScheduledPostPlatform;
+  message: string;
+  mediaUrl?: string | null;
+  linkUrl?: string | null;
+  publishAs?: "feed" | "story";
+}) {
+  const platform = String(input.platform ?? "").trim() as ScheduledPostPlatform;
+  const mediaUrl = String(input.mediaUrl ?? "").trim();
+  const linkUrl = String(input.linkUrl ?? "").trim();
+  const message = normalizeMessage(String(input.message ?? ""), 1800);
+  if (!message) throw new Error("Mensaje vacio para publicar.");
+
+  if (platform === "facebook_page") {
+    if (mediaUrl) {
+      const caption = normalizeMessage(linkUrl ? `${message}\n\n${linkUrl}` : message, 1800);
+      const posted = await postToFacebookPagePhoto({ imageUrl: mediaUrl, caption });
+      return {
+        ok: true as const,
+        platform: "Facebook",
+        postId: posted.postId,
+        link: linkUrl || null,
+        remoteId: posted.postId
+      };
+    }
+
+    const posted = await postToFacebookPageFeed({
+      message,
+      link: linkUrl || undefined
+    });
+    return {
+      ok: true as const,
+      platform: "Facebook",
+      postId: posted.postId,
+      link: linkUrl || null,
+      remoteId: posted.postId
+    };
+  }
+
+  if (platform === "instagram_feed" || platform === "instagram_story") {
+    if (!mediaUrl) {
+      throw new Error("Instagram requiere media_url publica.");
+    }
+
+    const caption = platform === "instagram_story" ? "" : linkUrl ? `${message}\n\n${linkUrl}` : message;
+    const posted = await postGenericImageToInstagram({
+      imageUrl: mediaUrl,
+      caption,
+      publishAs: platform === "instagram_story" ? "story" : input.publishAs ?? "feed"
+    });
+
+    return {
+      ok: true as const,
+      platform: "Instagram",
+      mediaId: posted.mediaId,
+      link: linkUrl || null,
+      remoteId: posted.mediaId
+    };
+  }
+
+  throw new Error(`Platform no soportada: ${platform}`);
 }

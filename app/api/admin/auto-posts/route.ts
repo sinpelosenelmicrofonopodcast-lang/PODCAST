@@ -5,11 +5,17 @@ import { getRequestAuditMeta, logAdminAudit } from "@/lib/adminAudit";
 import { withScheduledPostsMigrationHint } from "@/lib/supabaseErrorHints";
 
 const ALLOWED_STATUS = new Set(["queued", "publishing", "posted", "failed", "cancelled", "all"]);
+const ALLOWED_PLATFORM = new Set(["facebook_page", "instagram_feed", "instagram_story", "all"]);
 const CHICAGO_LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
 type CreatePayload = {
+  platform?: "facebook_page" | "instagram_feed" | "instagram_story";
   message?: string;
   mediaUrl?: string | null;
+  linkUrl?: string | null;
+  campaignKey?: string | null;
+  campaignLabel?: string | null;
+  publishAs?: "feed" | "story";
   scheduledFor?: string;
 };
 
@@ -20,21 +26,27 @@ export async function GET(request: NextRequest) {
 
     const date = String(request.nextUrl.searchParams.get("date") ?? chicagoDateInputFromNow()).trim();
     const status = String(request.nextUrl.searchParams.get("status") ?? "all").trim().toLowerCase();
+    const platform = String(request.nextUrl.searchParams.get("platform") ?? "all").trim().toLowerCase();
     if (!ALLOWED_STATUS.has(status)) {
       return NextResponse.json({ ok: false, error: "Filtro status inválido." }, { status: 400 });
+    }
+    if (!ALLOWED_PLATFORM.has(platform)) {
+      return NextResponse.json({ ok: false, error: "Filtro platform inválido." }, { status: 400 });
     }
 
     const { startUtc, endUtcExclusive } = chicagoDayBoundsUtc(date);
 
     let query = auth.service
       .from("scheduled_posts")
-      .select("id, platform, message, media_url, scheduled_for, status, posted_at, remote_id, error, created_by, created_at, updated_at")
-      .eq("platform", "facebook_page")
+      .select(
+        "id, platform, message, media_url, link_url, campaign_key, campaign_label, publish_as, scheduled_for, status, posted_at, remote_id, error, created_by, created_at, updated_at"
+      )
       .gte("scheduled_for", startUtc)
       .lt("scheduled_for", endUtcExclusive)
       .order("scheduled_for", { ascending: true });
 
     if (status !== "all") query = query.eq("status", status);
+    if (platform !== "all") query = query.eq("platform", platform);
 
     const { data, error } = await query;
     if (error) return NextResponse.json({ ok: false, error: withScheduledPostsMigrationHint(error) }, { status: 400 });
@@ -55,6 +67,7 @@ export async function GET(request: NextRequest) {
       date,
       timezone: "America/Chicago",
       window: { startUtc, endUtcExclusive },
+      platform,
       summary,
       items
     });
@@ -70,11 +83,22 @@ export async function POST(request: NextRequest) {
     const reqMeta = getRequestAuditMeta(request);
 
     const body = (await request.json().catch(() => ({}))) as CreatePayload;
+    const platform = String(body?.platform ?? "facebook_page").trim().toLowerCase();
     const message = String(body?.message ?? "").trim();
     const mediaUrl = String(body?.mediaUrl ?? "").trim();
+    const linkUrl = String(body?.linkUrl ?? "").trim();
+    const campaignKey = String(body?.campaignKey ?? "").trim();
+    const campaignLabel = String(body?.campaignLabel ?? "").trim();
+    const publishAs = String(body?.publishAs ?? "").trim().toLowerCase() === "story" ? "story" : "feed";
     const scheduledForRaw = String(body?.scheduledFor ?? "").trim();
 
     if (!message) return NextResponse.json({ ok: false, error: "Mensaje requerido." }, { status: 400 });
+    if (!ALLOWED_PLATFORM.has(platform) || platform === "all") {
+      return NextResponse.json({ ok: false, error: "Platform inválida." }, { status: 400 });
+    }
+    if ((platform === "instagram_feed" || platform === "instagram_story") && !mediaUrl) {
+      return NextResponse.json({ ok: false, error: "Instagram requiere image URL pública." }, { status: 400 });
+    }
     if (!scheduledForRaw) {
       return NextResponse.json({ ok: false, error: "scheduledFor requerido." }, { status: 400 });
     }
@@ -98,14 +122,20 @@ export async function POST(request: NextRequest) {
     const insert = await auth.service
       .from("scheduled_posts")
       .insert({
-        platform: "facebook_page",
+        platform,
         message,
         media_url: mediaUrl || null,
+        link_url: linkUrl || null,
+        campaign_key: campaignKey || null,
+        campaign_label: campaignLabel || null,
+        publish_as: platform === "instagram_story" ? "story" : publishAs,
         scheduled_for: scheduledForUtc,
         status: "queued",
         created_by: auth.userId
       })
-      .select("id, platform, message, media_url, scheduled_for, status, posted_at, remote_id, error, created_by, created_at, updated_at")
+      .select(
+        "id, platform, message, media_url, link_url, campaign_key, campaign_label, publish_as, scheduled_for, status, posted_at, remote_id, error, created_by, created_at, updated_at"
+      )
       .limit(1)
       .maybeSingle();
 
@@ -121,7 +151,7 @@ export async function POST(request: NextRequest) {
       action: "admin.auto_posts.create",
       targetTable: "scheduled_posts",
       targetId: insert.data.id,
-      meta: { scheduled_for: scheduledForUtc },
+      meta: { scheduled_for: scheduledForUtc, platform, campaign_key: campaignKey || null },
       ...reqMeta
     });
 

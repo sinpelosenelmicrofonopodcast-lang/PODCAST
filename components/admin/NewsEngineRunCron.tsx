@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { authJsonFetch } from "@/lib/clientApi";
 
 export function NewsEngineRunCron() {
   const [busy, setBusy] = useState<string | null>(null);
@@ -10,20 +10,12 @@ export function NewsEngineRunCron() {
   const run = async (task: string, label: string) => {
     setBusy(task);
     setStatus(null);
-    const session = await supabase.auth.getSession();
-    const token = session.data.session?.access_token ?? "";
-
-    const res = await fetch("/api/admin/news-engine/run", {
+    const { response, json } = await authJsonFetch("/api/admin/news-engine/run", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ task })
+      jsonBody: { task }
     });
-    const json = await res.json().catch(() => ({}));
     setBusy(null);
-    if (!res.ok) {
+    if (!response.ok) {
       setStatus(json?.error ?? `No se pudo ejecutar ${label}.`);
       return;
     }

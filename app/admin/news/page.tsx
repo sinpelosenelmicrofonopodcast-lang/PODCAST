@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
+import { authApiRequest } from "@/lib/clientApi";
+import { enqueueSeoPost, publishEditorialToFacebook, publishEditorialToInstagram, sendEditorialPush } from "@/lib/editorialAdminClient";
 import { cleanNewsCategories, newsCategories } from "@/lib/newsCategories";
 import { toast } from "@/lib/toast";
 import { newsHref } from "@/lib/newsRoute";
@@ -121,26 +123,15 @@ export default function AdminNewsPage() {
     setScheduleFacebookAt("");
   };
 
-  const pushNewsNotification = async (token: string, item: { id: string; slug?: string | null; title?: string | null; summary?: string | null; cover_url?: string | null }) => {
+  const pushNewsNotification = async (item: { id: string; slug?: string | null; title?: string | null; summary?: string | null; cover_url?: string | null }) => {
     const url = `/noticias/${encodeURIComponent(item.slug ?? item.id)}`;
-    const res = await fetch("/api/admin/notifications/onesignal", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        title: item.title ?? "Última hora",
-        message: item.summary ?? "Nueva noticia publicada en Sin Pelos en el Micrófono.",
-        url,
-        imageUrl: item.cover_url ?? null,
-        category: "noticias"
-      })
-    }).catch(() => null);
-    const json = (res ? await res.json().catch(() => ({})) : {}) as { ok?: boolean; error?: string };
-    if (!res || !res.ok || !json?.ok) {
-      throw new Error(json?.error ?? "No se pudo enviar push.");
-    }
+    await sendEditorialPush({
+      title: item.title ?? "Última hora",
+      message: item.summary ?? "Nueva noticia publicada en Sin Pelos en el Micrófono.",
+      url,
+      imageUrl: item.cover_url ?? null,
+      category: "noticias"
+    });
   };
 
   const handleUpload = async (file: File) => {
@@ -307,117 +298,76 @@ export default function AdminNewsPage() {
       toast.success("Noticia publicada.");
 
       if (publishNow) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token;
-        if (token) {
-          const canonicalPath = `/noticias/${encodeURIComponent(inserted.slug ?? inserted.id)}`;
-          await fetch("/api/seo/enqueue", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({ url: canonicalPath, type: "post" })
-          }).catch(() => null);
-          if (pushOnPublish) {
-            await pushNewsNotification(token, {
-              id: inserted.id,
-              slug: inserted.slug ?? null,
-              title,
-              summary,
-              cover_url: normalizedCoverUrl ?? null
-            }).catch((e: any) => {
-              toast.error(`Push falló: ${e?.message ?? "error"}`);
-            });
-          }
+        const canonicalPath = `/noticias/${encodeURIComponent(inserted.slug ?? inserted.id)}`;
+        await enqueueSeoPost(canonicalPath).catch(() => null);
+        if (pushOnPublish) {
+          await pushNewsNotification({
+            id: inserted.id,
+            slug: inserted.slug ?? null,
+            title,
+            summary,
+            cover_url: normalizedCoverUrl ?? null
+          }).catch((e: any) => {
+            toast.error(`Push falló: ${e?.message ?? "error"}`);
+          });
         }
       }
 
       if (publishNow && (postToFacebook || postToInstagram || postToInstagramStory)) {
         const done: string[] = [];
         const failed: string[] = [];
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token;
-
-        if (!token) {
-          if (postToFacebook) failed.push("Facebook: sesión inválida");
-          if (postToInstagram) failed.push("Instagram feed: sesión inválida");
-          if (postToInstagramStory) failed.push("Instagram story: sesión inválida");
-        } else {
-          if (postToFacebook) {
-            let scheduleIso: string | null = null;
-            const scheduleRaw = scheduleFacebookAt.trim();
-            let scheduleInvalid = false;
-            if (scheduleRaw) {
-              const parsed = new Date(scheduleRaw);
-              if (!Number.isFinite(parsed.getTime())) {
-                failed.push("Facebook: fecha de programación inválida");
-                scheduleInvalid = true;
-              } else {
-                scheduleIso = parsed.toISOString();
-              }
-            }
-            if (!scheduleInvalid) {
-              const fbRes = await fetch("/api/social/meta/facebook/post-news", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                  newsId: inserted.id,
-                  newsSlug: inserted.slug ?? null,
-                  title,
-                  summary,
-                  scheduleFor: scheduleIso
-                })
-              });
-              const fbJson = await fbRes.json().catch(() => ({}));
-              if (!fbRes.ok) failed.push(`Facebook: ${fbJson?.error ?? "error"}`);
-              else done.push(fbJson?.queued ? "Facebook (programado)" : "Facebook");
+        if (postToFacebook) {
+          let scheduleIso: string | null = null;
+          const scheduleRaw = scheduleFacebookAt.trim();
+          let scheduleInvalid = false;
+          if (scheduleRaw) {
+            const parsed = new Date(scheduleRaw);
+            if (!Number.isFinite(parsed.getTime())) {
+              failed.push("Facebook: fecha de programación inválida");
+              scheduleInvalid = true;
+            } else {
+              scheduleIso = parsed.toISOString();
             }
           }
-
-          if (postToInstagram) {
-            const igRes = await fetch("/api/social/meta/instagram/post-news", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                  newsId: inserted.id,
-                  newsSlug: inserted.slug ?? null,
-                  title,
-                  summary,
-                  coverUrl: normalizedCoverUrl ?? null
-                })
-              });
-            const igJson = await igRes.json().catch(() => ({}));
-            if (!igRes.ok) failed.push(`Instagram feed: ${igJson?.error ?? "error"}`);
-            else done.push("Instagram feed");
-          }
-
-          if (postToInstagramStory) {
-            const igStoryRes = await fetch("/api/social/meta/instagram/post-news", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                newsId: inserted.id,
-                newsSlug: inserted.slug ?? null,
-                title,
-                summary,
-                coverUrl: normalizedCoverUrl ?? null,
-                story: true
-              })
+          if (!scheduleInvalid) {
+            const fbResult = await publishEditorialToFacebook({
+              kind: "news",
+              id: inserted.id,
+              slug: inserted.slug ?? null,
+              title,
+              text: summary,
+              scheduleFor: scheduleIso
             });
-            const igStoryJson = await igStoryRes.json().catch(() => ({}));
-            if (!igStoryRes.ok) failed.push(`Instagram story: ${igStoryJson?.error ?? "error"}`);
-            else done.push("Instagram story");
+            if (!fbResult.ok) failed.push(`Facebook: ${fbResult.json?.error ?? "error"}`);
+            else done.push(fbResult.json?.queued ? "Facebook (programado)" : "Facebook");
           }
+        }
+
+        if (postToInstagram) {
+          const igResult = await publishEditorialToInstagram({
+            kind: "news",
+            id: inserted.id,
+            slug: inserted.slug ?? null,
+            title,
+            text: summary,
+            coverUrl: normalizedCoverUrl ?? null
+          });
+          if (!igResult.ok) failed.push(`Instagram feed: ${igResult.json?.error ?? "error"}`);
+          else done.push("Instagram feed");
+        }
+
+        if (postToInstagramStory) {
+          const igStoryResult = await publishEditorialToInstagram({
+            kind: "news",
+            id: inserted.id,
+            slug: inserted.slug ?? null,
+            title,
+            text: summary,
+            coverUrl: normalizedCoverUrl ?? null,
+            story: true
+          });
+          if (!igStoryResult.ok) failed.push(`Instagram story: ${igStoryResult.json?.error ?? "error"}`);
+          else done.push("Instagram story");
         }
 
         if (done.length > 0 && failed.length === 0) {
@@ -469,29 +419,18 @@ export default function AdminNewsPage() {
     }
     toast.success(next === "published" ? "Noticia publicada." : "Noticia pasada a borrador.");
     if (next === "published") {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (token) {
-        const canonicalPath = `/noticias/${encodeURIComponent(item.slug ?? item.id)}`;
-        await fetch("/api/seo/enqueue", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ url: canonicalPath, type: "post" })
-        }).catch(() => null);
-        if (pushOnPublish) {
-          await pushNewsNotification(token, {
-            id: item.id,
-            slug: item.slug ?? null,
-            title: item.title,
-            summary: item.summary ?? null,
-            cover_url: normalizeImageUrl(item.cover_url) ?? null
-          }).catch((e: any) => {
-            toast.error(`Push falló: ${e?.message ?? "error"}`);
-          });
-        }
+      const canonicalPath = `/noticias/${encodeURIComponent(item.slug ?? item.id)}`;
+      await enqueueSeoPost(canonicalPath).catch(() => null);
+      if (pushOnPublish) {
+        await pushNewsNotification({
+          id: item.id,
+          slug: item.slug ?? null,
+          title: item.title,
+          summary: item.summary ?? null,
+          cover_url: normalizeImageUrl(item.cover_url) ?? null
+        }).catch((e: any) => {
+          toast.error(`Push falló: ${e?.message ?? "error"}`);
+        });
       }
     }
     await loadItems();
@@ -507,33 +446,16 @@ export default function AdminNewsPage() {
 
     setPostingFacebookId(item.id);
     setStatus(null);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-    if (!token) {
-      const msg = "Sesión inválida. Inicia sesión de nuevo.";
-      setStatus(msg);
-      toast.error(msg);
-      setPostingFacebookId(null);
-      return;
-    }
-
-    const res = await fetch("/api/social/meta/facebook/post-news", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        newsId: item.id,
-        newsSlug: item.slug ?? null,
-        title: item.title,
-        summary: item.summary ?? ""
-      })
+    const result = await publishEditorialToFacebook({
+      kind: "news",
+      id: item.id,
+      slug: item.slug ?? null,
+      title: item.title,
+      text: item.summary ?? ""
     });
-    const json = await res.json().catch(() => ({}));
     setPostingFacebookId(null);
-    if (!res.ok) {
-      const msg = `Facebook falló: ${json?.error ?? "error"}`;
+    if (!result.ok) {
+      const msg = `Facebook falló: ${result.json?.error ?? "error"}`;
       setStatus(msg);
       toast.error(msg);
       return;
@@ -569,40 +491,23 @@ export default function AdminNewsPage() {
 
     setSchedulingFacebookId(item.id);
     setStatus(null);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-    if (!token) {
-      const msg = "Sesión inválida. Inicia sesión de nuevo.";
-      setStatus(msg);
-      toast.error(msg);
-      setSchedulingFacebookId(null);
-      return;
-    }
-
-    const res = await fetch("/api/social/meta/facebook/post-news", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        newsId: item.id,
-        newsSlug: item.slug ?? null,
-        title: item.title,
-        summary: item.summary ?? "",
-        scheduleFor: parsed.toISOString()
-      })
+    const result = await publishEditorialToFacebook({
+      kind: "news",
+      id: item.id,
+      slug: item.slug ?? null,
+      title: item.title,
+      text: item.summary ?? "",
+      scheduleFor: parsed.toISOString()
     });
-    const json = await res.json().catch(() => ({}));
     setSchedulingFacebookId(null);
-    if (!res.ok || !json?.ok) {
-      const msg = `Schedule Facebook falló: ${json?.error ?? "error"}`;
+    if (!result.ok) {
+      const msg = `Schedule Facebook falló: ${result.json?.error ?? "error"}`;
       setStatus(msg);
       toast.error(msg);
       return;
     }
 
-    const scheduled = json?.scheduledFor ? new Date(json.scheduledFor).toLocaleString("es-PR") : localValue;
+    const scheduled = result.json?.scheduledFor ? new Date(result.json.scheduledFor).toLocaleString("es-PR") : localValue;
     const msg = `Noticia programada en Facebook para ${scheduled}.`;
     setStatus(msg);
     toast.success(msg);
@@ -626,37 +531,19 @@ export default function AdminNewsPage() {
     if (story) setPostingInstagramStoryId(item.id);
     else setPostingInstagramId(item.id);
     setStatus(null);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-    if (!token) {
-      const msg = "Sesión inválida. Inicia sesión de nuevo.";
-      setStatus(msg);
-      toast.error(msg);
-      if (story) setPostingInstagramStoryId(null);
-      else setPostingInstagramId(null);
-      return;
-    }
-
-    const res = await fetch("/api/social/meta/instagram/post-news", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        newsId: item.id,
-        newsSlug: item.slug ?? null,
-        title: item.title,
-        summary: item.summary ?? "",
-        coverUrl: normalizedCover,
-        story
-      })
+    const result = await publishEditorialToInstagram({
+      kind: "news",
+      id: item.id,
+      slug: item.slug ?? null,
+      title: item.title,
+      text: item.summary ?? "",
+      coverUrl: normalizedCover,
+      story
     });
-    const json = await res.json().catch(() => ({}));
     if (story) setPostingInstagramStoryId(null);
     else setPostingInstagramId(null);
-    if (!res.ok) {
-      const msg = `Instagram ${story ? "story" : "feed"} falló: ${json?.error ?? "error"}`;
+    if (!result.ok) {
+      const msg = `Instagram ${story ? "story" : "feed"} falló: ${result.json?.error ?? "error"}`;
       setStatus(msg);
       toast.error(msg);
       return;
@@ -669,38 +556,23 @@ export default function AdminNewsPage() {
   const handleRewriteWithAI = async (item: NewsItem) => {
     setRewritingId(item.id);
     setStatus(null);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-    if (!token) {
-      const msg = "Sesión inválida. Inicia sesión de nuevo.";
-      setStatus(msg);
-      toast.error(msg);
-      setRewritingId(null);
-      return;
-    }
-
-    const res = await fetch("/api/admin/news/rewrite", {
+    const result = await authApiRequest("/api/admin/news/rewrite", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
+      jsonBody: {
         newsId: item.id,
         shouldPublish: (item.publication_state ?? "draft") === "published",
         autoPostFacebook: false,
         runNow: true
-      })
+      }
     });
-    const json = await res.json().catch(() => ({}));
     setRewritingId(null);
-    if (!res.ok || !json?.ok) {
-      const msg = json?.error ?? "No se pudo encolar reescritura IA.";
+    if (!result.ok) {
+      const msg = result.json?.error ?? "No se pudo encolar reescritura IA.";
       setStatus(msg);
       toast.error(msg);
       return;
     }
-    const msg = json?.alreadyQueued ? "Esta noticia ya tiene reescritura en cola." : "Reescritura IA encolada.";
+    const msg = result.json?.alreadyQueued ? "Esta noticia ya tiene reescritura en cola." : "Reescritura IA encolada.";
     setStatus(msg);
     toast.success(msg);
     await loadItems();

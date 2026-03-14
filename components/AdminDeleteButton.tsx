@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { authJsonFetch, getClientAccessToken } from "@/lib/clientApi";
 import { hasAnyPermission, type StaffPermission } from "@/lib/staffPermissions";
 import { toast } from "@/lib/toast";
 
@@ -28,13 +28,12 @@ export function AdminDeleteButton({ table, id, label = "Eliminar" }: { table: st
     let mounted = true;
     const run = async () => {
       setCanShow(false);
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
+      const token = await getClientAccessToken();
       if (!token) return;
-      const res = await fetch("/api/admin/me", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+      const res = await authJsonFetch("/api/admin/me").catch(() => null);
       if (!mounted) return;
-      if (!res?.ok) return;
-      const json = await res.json().catch(() => ({}));
+      if (!res?.response.ok) return;
+      const json = res.json;
       const isAdmin = Boolean(json?.isAdmin);
       const permissions = Array.isArray(json?.permissions) ? (json.permissions as StaffPermission[]) : [];
       const required = TABLE_PERMISSIONS[table];
@@ -50,26 +49,24 @@ export function AdminDeleteButton({ table, id, label = "Eliminar" }: { table: st
     if (!confirm("¿Eliminar este contenido?")) return;
     setLoading(true);
     setError(null);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
+    const token = await getClientAccessToken();
     if (!token) return setError("No hay sesión activa. Inicia sesión como admin."), void setLoading(false);
 
-    const res = await fetch("/api/admin/delete", {
+    const res = await authJsonFetch("/api/admin/delete", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ table, id })
+      jsonBody: { table, id }
     }).catch(() => null);
 
-    const json = await res?.json().catch(() => ({}));
-    if (!res?.ok || !json?.ok) {
-      const msg = json?.error ?? `No se pudo eliminar (HTTP ${res?.status ?? "?"}).`;
+    const json = res?.json;
+    if (!res?.response.ok || !json?.ok) {
+      const msg = json?.error ?? `No se pudo eliminar (HTTP ${res?.response.status ?? "?"}).`;
       setError(msg);
       toast.error(msg);
       setLoading(false);
       return;
     }
 
-    if (res?.ok) {
+    if (res?.response.ok) {
       toast.success("Eliminado.");
       router.refresh();
     }

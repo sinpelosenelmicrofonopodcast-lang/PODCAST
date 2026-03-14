@@ -10,6 +10,10 @@ create table if not exists public.scheduled_posts (
   platform text not null default 'facebook_page',
   message text not null,
   media_url text,
+  link_url text,
+  campaign_key text,
+  campaign_label text,
+  publish_as text not null default 'feed',
   scheduled_for timestamptz not null,
   status text not null default 'queued',
   posted_at timestamptz,
@@ -18,7 +22,9 @@ create table if not exists public.scheduled_posts (
   created_by uuid references public.users(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint scheduled_posts_status_check check (status in ('queued', 'publishing', 'posted', 'failed', 'cancelled'))
+  constraint scheduled_posts_status_check check (status in ('queued', 'publishing', 'posted', 'failed', 'cancelled')),
+  constraint scheduled_posts_platform_check check (platform in ('facebook_page', 'instagram_feed', 'instagram_story')),
+  constraint scheduled_posts_publish_as_check check (publish_as in ('feed', 'story'))
 );
 
 create index if not exists scheduled_posts_status_scheduled_for_idx
@@ -85,7 +91,6 @@ begin
     select sp.id
     from public.scheduled_posts sp
     where sp.status = 'queued'
-      and sp.platform = 'facebook_page'
       and sp.scheduled_for <= now()
     order by sp.scheduled_for asc
     for update skip locked

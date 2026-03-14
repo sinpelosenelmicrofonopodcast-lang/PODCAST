@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { authJsonFetch } from "@/lib/clientApi";
 
 export function SocialQueueRunner() {
   const [status, setStatus] = useState<string | null>(null);
@@ -10,22 +10,13 @@ export function SocialQueueRunner() {
   const run = async () => {
     setBusy(true);
     setStatus(null);
-    const session = await supabase.auth.getSession();
-    const token = session.data.session?.access_token ?? "";
-
-    const res = await fetch("/api/social/publish", {
+    const { response, json } = await authJsonFetch("/api/social/publish", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ limit: 25 })
+      jsonBody: { limit: 25 }
     });
-
-    const json = await res.json().catch(() => ({}));
     setBusy(false);
 
-    if (!res.ok || !json?.ok) {
+    if (!response.ok || !json?.ok) {
       setStatus(json?.error ?? "No se pudo procesar cola social.");
       return;
     }
