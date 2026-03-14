@@ -7,8 +7,17 @@ import { buildSpmCoverTemplate } from "@/lib/images/spm-cover-template";
 import { buildMemeTemplate } from "@/lib/images/meme-template";
 import { buildQuoteCard } from "@/lib/images/quote-card";
 import { buildThumbnail } from "@/lib/images/thumbnail";
-import { asString, asStringArray, isUuid, parseDate } from "@/lib/validations/common";
+import { asOptionalString, asString, asStringArray, isUuid, parseDate, requireNonEmpty } from "@/lib/validations/common";
 import { cleanNewsCategories } from "@/lib/newsCategories";
+
+export const SUPPORTED_SOCIAL_PLATFORMS = ["facebook", "instagram", "x", "tiktok"] as const;
+export type SupportedSocialPlatform = (typeof SUPPORTED_SOCIAL_PLATFORMS)[number];
+
+type ArticleSocialDraftInput = {
+  platform: string;
+  message: unknown;
+  publishAs?: unknown;
+};
 
 export type ArticleEditorRow = {
   id: string;
@@ -58,6 +67,47 @@ export async function scheduleArticle(service: SupabaseClient, articleId: string
 
   if (error) throw new Error(error.message);
   return { articleId, publishAt: iso };
+}
+
+export async function updateArticleEditorial(
+  service: SupabaseClient,
+  articleId: string,
+  actorId: string | null,
+  input: {
+    title: unknown;
+    summary?: unknown;
+    category?: unknown;
+    region?: unknown;
+  }
+) {
+  const article = await getArticleEditorRow(service, articleId);
+  const title = requireNonEmpty(input.title, "title", 180);
+  const summary = asOptionalString(input.summary, 1400);
+  const category = asOptionalString(input.category, 120);
+  const region = asOptionalString(input.region, 120);
+
+  const updatePayload: Record<string, unknown> = {
+    title,
+    summary,
+    category,
+    region,
+    updated_by: actorId
+  };
+
+  if (!article.excerpt || article.excerpt === article.summary) {
+    updatePayload.excerpt = summary;
+  }
+
+  const { error } = await service.from("news_articles").update(updatePayload).eq("id", articleId);
+  if (error) throw new Error(error.message);
+
+  return {
+    articleId,
+    title,
+    summary,
+    category,
+    region
+  };
 }
 
 async function upsertLegacyNewsItem(service: SupabaseClient, article: ArticleEditorRow) {
@@ -292,6 +342,123 @@ export async function queueArticleSocial(service: SupabaseClient, articleId: str
   return {
     articleId,
     queued: payloads.length
+  };
+}
+
+export async function saveArticleSocialDrafts(
+  service: SupabaseClient,
+  articleId: string,
+  drafts: ArticleSocialDraftInput[]
+) {
+  const article = await getArticleEditorRow(service, articleId);
+  const normalizedDrafts = drafts
+    .map((draft) => {
+      const platform = asString(draft.platform, 20).toLowerCase() as SupportedSocialPlatform;
+      const message = asString(draft.message, 600);
+      const publishAs = asString(draft.publishAs, 16).toLowerCase();
+
+      if (!SUPPORTED_SOCIAL_PLATFORMS.includes(platform)) return null;
+      if (!message) return null;
+
+      return {
+        platform,
+        message,
+        publishAs: platform === "instagram" && publishAs === "story" ? "story" : "feed"
+      };
+    })
+    .filter(Boolean) as Array<{ platform: SupportedSocialPlatform; message: string; publishAs: "feed" | "story" }>;
+
+  const deduped = new Map<SupportedSocialPlatform, { platform: SupportedSocialPlatform; message: string; publishAs: "feed" | "story" }>();
+  for (const draft of normalizedDrafts) deduped.set(draft.platform, draft);
+
+  const finalDrafts = Array.from(deduped.values());
+  if (!finalDrafts.length) throw new Error("No hay drafts sociales válidos.");
+
+  const { data: existing, error: existingError } = await service
+    .from("social_publications")
+    .select("id, platform, status, payload, created_at")
+    .eq("article_id", articleId)
+    .in("platform", finalDrafts.map((draft) => draft.platform))
+    .order("created_at", { ascending: false });
+
+  if (existingError) throw new Error(existingError.message);
+
+  const reusableByPlatform = new Map<SupportedSocialPlatform, { id: string; payload: Record<string, unknown> | null }>();
+  for (const row of existing ?? []) {
+    const platform = asString((row as any).platform, 20).toLowerCase() as SupportedSocialPlatform;
+    if (!SUPPORTED_SOCIAL_PLATFORMS.includes(platform)) continue;
+    if (String((row as any).status ?? "") === "published") continue;
+    if (!reusableByPlatform.has(platform)) {
+      reusableByPlatform.set(platform, {
+        id: String((row as any).id ?? ""),
+        payload: typeof (row as any).payload === "object" && (row as any).payload ? ((row as any).payload as Record<string, unknown>) : null
+      });
+    }
+  }
+
+  const publicationIds: string[] = [];
+
+  for (const draft of finalDrafts) {
+    const reusable = reusableByPlatform.get(draft.platform);
+    const payload = {
+      ...(reusable?.payload ?? {}),
+      link: `/noticias/${article.slug}`,
+      message: draft.message,
+      ...(draft.platform === "instagram" ? { publishAs: draft.publishAs } : {})
+    };
+
+    if (reusable?.id) {
+      const { error } = await service
+        .from("social_publications")
+        .update({
+          status: "queued",
+          external_id: null,
+          payload,
+          response: {},
+          published_at: null
+        })
+        .eq("id", reusable.id);
+      if (error) throw new Error(error.message);
+      publicationIds.push(reusable.id);
+      continue;
+    }
+
+    const { data, error } = await service
+      .from("social_publications")
+      .insert({
+        article_id: articleId,
+        platform: draft.platform,
+        status: "queued",
+        payload
+      })
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (data?.id) publicationIds.push(String(data.id));
+  }
+
+  const { data: publications, error: publicationsError } = await service
+    .from("social_publications")
+    .select("id, platform, status, external_id, payload, published_at, created_at")
+    .in("id", publicationIds)
+    .order("created_at", { ascending: false });
+
+  if (publicationsError) throw new Error(publicationsError.message);
+
+  return {
+    articleId,
+    publicationIds,
+    publications: (publications ?? []).map((row: any) => ({
+      id: String(row.id),
+      platform: asString(row.platform, 20).toLowerCase(),
+      status: asString(row.status, 20).toLowerCase(),
+      externalId: asOptionalString(row.external_id, 180),
+      message: asString(row.payload?.message, 600),
+      publishAs: asString(row.payload?.publishAs, 16).toLowerCase() === "story" ? "story" : "feed",
+      publishedAt: asOptionalString(row.published_at, 60)
+    }))
   };
 }
 

@@ -3,28 +3,28 @@ import { publishFacebookLink } from "@/lib/social/facebook";
 import { publishInstagramImage } from "@/lib/social/instagram";
 import { publishXPost } from "@/lib/social/x";
 import { publishTikTokPost } from "@/lib/social/tiktok";
+import { asStringArray, isUuid } from "@/lib/validations/common";
 
-export async function publishFromSocialQueue(service: SupabaseClient, limit = 20) {
-  const { data, error } = await service
-    .from("social_publications")
-    .select("id, article_id, platform, status, payload")
-    .eq("status", "queued")
-    .order("created_at", { ascending: true })
-    .limit(limit);
+type SocialPublicationRow = {
+  id: string;
+  article_id: string;
+  platform: string;
+  status: string;
+  payload: Record<string, unknown> | null;
+};
 
-  if (error) throw new Error(error.message);
-
+async function publishSocialRows(service: SupabaseClient, rows: SocialPublicationRow[]) {
   let done = 0;
   let failed = 0;
 
-  for (const row of data ?? []) {
-    const payload = (row as any).payload ?? {};
+  for (const row of rows) {
+    const payload = row.payload ?? {};
 
     try {
       const articleRes = await service
         .from("news_articles")
         .select("id, slug, title, summary, cover_image_url, reel_video_url, status")
-        .eq("id", (row as any).article_id)
+        .eq("id", row.article_id)
         .limit(1)
         .maybeSingle();
 
@@ -49,7 +49,7 @@ export async function publishFromSocialQueue(service: SupabaseClient, limit = 20
       const link = String(payload.link ?? `/noticias/${article.slug}`);
 
       let result: any;
-      const platform = String((row as any).platform ?? "").toLowerCase();
+      const platform = String(row.platform ?? "").toLowerCase();
       if (platform === "facebook") {
         result = await publishFacebookLink({
           articleId: article.id,
@@ -84,7 +84,7 @@ export async function publishFromSocialQueue(service: SupabaseClient, limit = 20
             response: result,
             published_at: new Date().toISOString()
           })
-          .eq("id", (row as any).id);
+          .eq("id", row.id);
         done += 1;
       } else {
         await service
@@ -94,7 +94,7 @@ export async function publishFromSocialQueue(service: SupabaseClient, limit = 20
             response: result,
             published_at: null
           })
-          .eq("id", (row as any).id);
+          .eq("id", row.id);
         failed += 1;
       }
     } catch (error: any) {
@@ -104,14 +104,34 @@ export async function publishFromSocialQueue(service: SupabaseClient, limit = 20
           status: "failed",
           response: { error: error?.message ?? "error" }
         })
-        .eq("id", (row as any).id);
+        .eq("id", row.id);
       failed += 1;
     }
   }
 
   return {
-    queued: (data ?? []).length,
+    queued: rows.length,
     done,
     failed
   };
+}
+
+export async function publishFromSocialQueue(service: SupabaseClient, limit = 20, ids: string[] = []) {
+  const publicationIds = asStringArray(ids, 25, 80).filter((value) => isUuid(value));
+  let query = service
+    .from("social_publications")
+    .select("id, article_id, platform, status, payload")
+    .eq("status", "queued")
+    .order("created_at", { ascending: true });
+
+  if (publicationIds.length) {
+    query = query.in("id", publicationIds).limit(publicationIds.length);
+  } else {
+    query = query.limit(limit);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return publishSocialRows(service, (data ?? []) as SocialPublicationRow[]);
 }
