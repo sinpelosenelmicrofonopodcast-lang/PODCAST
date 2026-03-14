@@ -436,8 +436,8 @@ function facebookConfig() {
 
 export async function publishScheduledPostToFacebook(input: { message: string }) {
   const cfg = facebookConfig();
-  if (!cfg.pageId || !cfg.accessToken) {
-    throw new Error("Faltan FACEBOOK_PAGE_ID/FACEBOOK_PAGE_ACCESS_TOKEN (o META_PAGE_ID/META_PAGE_ACCESS_TOKEN).");
+  if (!cfg.pageId) {
+    throw new Error("Falta FACEBOOK_PAGE_ID o META_PAGE_ID.");
   }
 
   const message = normalizeMessage(String(input.message ?? ""), 500);
@@ -445,7 +445,7 @@ export async function publishScheduledPostToFacebook(input: { message: string })
 
   const posted = await postToFacebookPageFeed({
     pageId: cfg.pageId,
-    pageAccessToken: cfg.accessToken,
+    pageAccessToken: cfg.accessToken || undefined,
     graphVersion: cfg.graphVersion,
     message
   });
