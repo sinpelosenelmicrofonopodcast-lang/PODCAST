@@ -1,3 +1,5 @@
+import { isMetaAuthError, metaFetchJson, resolveInstagramAccessToken, resolvePageAccessToken } from "@/lib/metaTokens";
+
 type ExternalPostRow = {
   id: string;
   platform: string | null;
@@ -65,30 +67,41 @@ function asNumber(value: unknown) {
 
 function getConfig() {
   return {
-    graphVersion: String(process.env.META_GRAPH_VERSION ?? "v24.0").trim(),
-    token: String(process.env.IG_ACCESS_TOKEN ?? process.env.META_PAGE_ACCESS_TOKEN ?? "").trim()
+    graphVersion: String(process.env.FACEBOOK_GRAPH_VERSION ?? process.env.META_GRAPH_VERSION ?? "v24.0").trim()
   };
 }
 
-async function graphGet(path: string, params: Record<string, string> = {}) {
-  const { graphVersion, token } = getConfig();
-  if (!token) throw new Error("Falta META_PAGE_ACCESS_TOKEN / IG_ACCESS_TOKEN en servidor.");
+async function resolveTokenForPlatform(platform: "facebook" | "instagram", forceRefresh = false) {
+  if (platform === "facebook") {
+    const resolved = await resolvePageAccessToken({ forceRefresh });
+    return resolved.accessToken;
+  }
+  const resolved = await resolveInstagramAccessToken({ forceRefresh });
+  return resolved.accessToken;
+}
+
+async function graphGet(platform: "facebook" | "instagram", path: string, params: Record<string, string> = {}, forceRefresh = false) {
+  const { graphVersion } = getConfig();
+  const token = await resolveTokenForPlatform(platform, forceRefresh);
 
   const url = new URL(`https://graph.facebook.com/${graphVersion}${path}`);
   url.searchParams.set("access_token", token);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
-  const json = await res.json().catch(() => ({} as any));
-  if (!res.ok) {
-    throw new Error(String(json?.error?.message ?? `Meta API HTTP ${res.status}`));
+  try {
+    const { json } = await metaFetchJson(url.toString(), { method: "GET" });
+    return json as any;
+  } catch (error: any) {
+    if (!forceRefresh && isMetaAuthError(error)) {
+      return graphGet(platform, path, params, true);
+    }
+    throw error instanceof Error ? error : new Error(String(error ?? "Meta API error"));
   }
-  return json as any;
 }
 
-async function graphGetSafe(path: string, params: Record<string, string> = {}) {
+async function graphGetSafe(platform: "facebook" | "instagram", path: string, params: Record<string, string> = {}) {
   try {
-    const data = await graphGet(path, params);
+    const data = await graphGet(platform, path, params);
     return { ok: true as const, data };
   } catch (e: any) {
     return { ok: false as const, error: String(e?.message ?? "Meta API error") };
@@ -104,7 +117,7 @@ function parseInsightMetric(insights: any, key: string) {
 }
 
 async function fetchFacebookMetrics(postId: string): Promise<MetricPayload> {
-  const json = await graphGet(`/${encodeURIComponent(postId)}`, {
+  const json = await graphGet("facebook", `/${encodeURIComponent(postId)}`, {
     fields: "id,shares,comments.summary(true),reactions.summary(true)"
   });
 
@@ -115,7 +128,7 @@ async function fetchFacebookMetrics(postId: string): Promise<MetricPayload> {
   ];
   let insightsData: any = null;
   for (const metric of metricSets) {
-    const res = await graphGetSafe(`/${encodeURIComponent(postId)}/insights`, { metric });
+    const res = await graphGetSafe("facebook", `/${encodeURIComponent(postId)}/insights`, { metric });
     if (res.ok) {
       insightsData = res.data;
       break;
@@ -139,7 +152,7 @@ async function fetchFacebookMetrics(postId: string): Promise<MetricPayload> {
 
 async function fetchInstagramInsights(mediaId: string) {
   try {
-    return await graphGet(`/${encodeURIComponent(mediaId)}/insights`, {
+    return await graphGet("instagram", `/${encodeURIComponent(mediaId)}/insights`, {
       metric: "impressions,reach,saved,shares,engagement,plays,total_interactions,likes,comments"
     });
   } catch {
@@ -148,7 +161,7 @@ async function fetchInstagramInsights(mediaId: string) {
 }
 
 async function fetchInstagramMetrics(mediaId: string): Promise<MetricPayload> {
-  const media = await graphGet(`/${encodeURIComponent(mediaId)}`, {
+  const media = await graphGet("instagram", `/${encodeURIComponent(mediaId)}`, {
     fields: "id,like_count,comments_count,media_type,media_product_type,permalink,timestamp"
   });
 

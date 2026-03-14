@@ -1,3 +1,5 @@
+import { buildMetaError, isMetaAuthError, metaFetchJson, resolvePageAccessToken } from "@/lib/metaTokens";
+
 export type FacebookPostNewsInput = {
   newsId: string;
   newsSlug?: string | null;
@@ -30,57 +32,16 @@ type MetaErrorPayload = {
 
 function getConfig() {
   return {
-    pageId: process.env.META_PAGE_ID ?? "",
-    pageAccessToken: process.env.META_PAGE_ACCESS_TOKEN ?? "",
-    graphVersion: process.env.META_GRAPH_VERSION ?? "v24.0",
     baseUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
   };
 }
 
 function isPermissionLikeError(error?: MetaErrorPayload | null) {
-  const message = String(error?.message ?? "").toLowerCase();
-  return (
-    Number(error?.code ?? 0) === 200 ||
-    message.includes("page access token is required") ||
-    message.includes("requires both pages_read_engagement and pages_manage_posts")
-  );
-}
-
-function buildMetaError(error?: MetaErrorPayload | null, status?: number) {
-  const base = String(error?.message ?? `Meta API HTTP ${status ?? 500}`);
-  const code = Number(error?.code ?? 0);
-  const subcode = Number(error?.error_subcode ?? 0);
-  const trace = String(error?.fbtrace_id ?? "").trim();
-  const suffix = [
-    code ? `code ${code}` : "",
-    subcode ? `subcode ${subcode}` : "",
-    trace ? `trace ${trace}` : ""
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  const withMeta = suffix ? `${base} (${suffix})` : base;
-  if (!isPermissionLikeError(error)) return withMeta;
-  return `${withMeta} | Verifica que el token final sea Page Access Token con pages_read_engagement + pages_manage_posts y rol admin en la página.`;
-}
-
-async function fetchJson(url: string, init?: RequestInit) {
-  const res = await fetch(url, { cache: "no-store", ...(init ?? {}) });
-  const json = await res.json().catch(() => ({} as any));
-  return { res, json };
-}
-
-async function resolvePageTokenFromUserToken(input: { userToken: string; pageId: string; graphVersion: string }) {
-  const { userToken, pageId, graphVersion } = input;
-  const url = new URL(`https://graph.facebook.com/${graphVersion}/me/accounts`);
-  url.searchParams.set("access_token", userToken);
-  url.searchParams.set("fields", "id,access_token,name");
-
-  const { res, json } = await fetchJson(url.toString(), { method: "GET" });
-  if (!res.ok) return null;
-  const rows = Array.isArray(json?.data) ? json.data : [];
-  const match = rows.find((row: any) => String(row?.id ?? "") === pageId);
-  const token = String(match?.access_token ?? "").trim();
-  return token || null;
+  return isMetaAuthError({
+    code: Number(error?.code ?? 0),
+    subcode: Number(error?.error_subcode ?? 0),
+    message: String(error?.message ?? "")
+  });
 }
 
 export async function postToFacebookPageFeed(input: {
@@ -90,55 +51,60 @@ export async function postToFacebookPageFeed(input: {
   pageAccessToken?: string | null;
   graphVersion?: string | null;
 }) {
-  const cfg = getConfig();
-  const pageId = String(input.pageId ?? cfg.pageId).trim();
-  const pageAccessToken = String(input.pageAccessToken ?? cfg.pageAccessToken).trim();
-  const graphVersion = String(input.graphVersion ?? cfg.graphVersion).trim() || "v24.0";
   const message = String(input.message ?? "").trim();
   const link = String(input.link ?? "").trim();
-
-  if (!pageId || !pageAccessToken) {
-    throw new Error("Faltan META_PAGE_ID o META_PAGE_ACCESS_TOKEN.");
-  }
   if (!message) throw new Error("Mensaje vacío para Facebook.");
 
-  const publishWithToken = async (token: string) => {
+  const publishWithToken = async (token: string, pageId: string, graphVersion: string) => {
     const form = new URLSearchParams();
     form.set("message", message);
     if (link) form.set("link", link);
     form.set("access_token", token);
 
-    return fetchJson(`https://graph.facebook.com/${graphVersion}/${encodeURIComponent(pageId)}/feed`, {
+    return metaFetchJson<{ id?: string; error?: MetaErrorPayload }>(`https://graph.facebook.com/${graphVersion}/${encodeURIComponent(pageId)}/feed`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: form.toString()
     });
   };
 
-  let publish = await publishWithToken(pageAccessToken);
-  if (!publish.res.ok) {
-    const metaError = (publish.json?.error ?? null) as MetaErrorPayload | null;
-    if (isPermissionLikeError(metaError)) {
-      const resolvedToken = await resolvePageTokenFromUserToken({
-        userToken: pageAccessToken,
-        pageId,
-        graphVersion
-      });
-      if (resolvedToken && resolvedToken !== pageAccessToken) {
-        publish = await publishWithToken(resolvedToken);
+  const resolved = await resolvePageAccessToken();
+  let pageId = String(input.pageId ?? resolved.pageId).trim();
+  let graphVersion = String(input.graphVersion ?? resolved.graphVersion).trim() || resolved.graphVersion;
+  let pageAccessToken = String(input.pageAccessToken ?? resolved.accessToken).trim();
+  if (!pageId || !pageAccessToken) {
+    throw new Error("Faltan FACEBOOK_PAGE_ID/META_PAGE_ID o un token Meta válido.");
+  }
+
+  try {
+    const publish = await publishWithToken(pageAccessToken, pageId, graphVersion);
+    return {
+      ok: true as const,
+      postId: String(publish.json?.id ?? "")
+    };
+  } catch (error: any) {
+    if (!isPermissionLikeError(error)) {
+      throw error instanceof Error ? error : new Error(String(error ?? "Meta API error"));
+    }
+
+    const refreshed = await resolvePageAccessToken({ forceRefresh: true });
+    pageId = String(input.pageId ?? refreshed.pageId).trim();
+    graphVersion = String(input.graphVersion ?? refreshed.graphVersion).trim() || refreshed.graphVersion;
+    pageAccessToken = String(input.pageAccessToken ?? refreshed.accessToken).trim();
+
+    try {
+      const publish = await publishWithToken(pageAccessToken, pageId, graphVersion);
+      return {
+        ok: true as const,
+        postId: String(publish.json?.id ?? "")
+      };
+    } catch (retryError: any) {
+      if (retryError instanceof Error) {
+        throw retryError;
       }
+      throw new Error(buildMetaError(retryError as MetaErrorPayload | null));
     }
   }
-
-  if (!publish.res.ok) {
-    const metaError = (publish.json?.error ?? null) as MetaErrorPayload | null;
-    throw new Error(buildMetaError(metaError, publish.res.status));
-  }
-
-  return {
-    ok: true as const,
-    postId: String(publish.json?.id ?? "")
-  };
 }
 
 function shortText(value: string, max = 320) {
@@ -154,7 +120,7 @@ function cleanInlineText(value?: string | null) {
 }
 
 export async function postNewsToFacebook(input: FacebookPostNewsInput) {
-  const { pageId, pageAccessToken, graphVersion, baseUrl } = getConfig();
+  const { baseUrl } = getConfig();
 
   const newsId = String(input.newsId ?? "").trim();
   if (!newsId) throw new Error("newsId requerido.");
@@ -167,9 +133,6 @@ export async function postNewsToFacebook(input: FacebookPostNewsInput) {
   const message = summary ? `${title}\n\n${summary}` : title || "Nueva noticia";
 
   const posted = await postToFacebookPageFeed({
-    pageId,
-    pageAccessToken,
-    graphVersion,
     message,
     link
   });
@@ -182,7 +145,7 @@ export async function postNewsToFacebook(input: FacebookPostNewsInput) {
 }
 
 export async function postBlogToFacebook(input: FacebookPostBlogInput) {
-  const { pageId, pageAccessToken, graphVersion, baseUrl } = getConfig();
+  const { baseUrl } = getConfig();
 
   const blogId = String(input.blogId ?? "").trim();
   if (!blogId) throw new Error("blogId requerido.");
@@ -195,9 +158,6 @@ export async function postBlogToFacebook(input: FacebookPostBlogInput) {
   const message = excerpt ? `${title}\n\n${excerpt}\n\nLee el artículo completo:` : `${title}\n\nLee el artículo completo:`;
 
   const posted = await postToFacebookPageFeed({
-    pageId,
-    pageAccessToken,
-    graphVersion,
     message,
     link
   });
@@ -210,7 +170,7 @@ export async function postBlogToFacebook(input: FacebookPostBlogInput) {
 }
 
 export async function postEpisodeToFacebook(input: FacebookPostEpisodeInput) {
-  const { pageId, pageAccessToken, graphVersion, baseUrl } = getConfig();
+  const { baseUrl } = getConfig();
 
   const episodeId = String(input.episodeId ?? "").trim();
   if (!episodeId) throw new Error("episodeId requerido.");
@@ -238,9 +198,6 @@ export async function postEpisodeToFacebook(input: FacebookPostEpisodeInput) {
   const message = shortText(customText || fallbackMessage, 700);
 
   const posted = await postToFacebookPageFeed({
-    pageId,
-    pageAccessToken,
-    graphVersion,
     message,
     link
   });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/adminAuth";
+import { getRootMetaTokenCandidates, resolvePageAccessToken } from "@/lib/metaTokens";
 
 type GraphOk<T = any> = { ok: true; data: T };
 type GraphFail = { ok: false; error: string; status?: number; code?: number; subcode?: number; fbtrace_id?: string };
@@ -87,12 +88,13 @@ export async function GET(request: NextRequest) {
   const auth = await requireAdminApi(request);
   if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
-  const pageId = String(process.env.META_PAGE_ID ?? "").trim();
-  const pageAccessToken = String(process.env.META_PAGE_ACCESS_TOKEN ?? "").trim();
-  const graphVersion = String(process.env.META_GRAPH_VERSION ?? "v24.0").trim();
+  const pageId = String(process.env.FACEBOOK_PAGE_ID ?? process.env.META_PAGE_ID ?? "").trim();
+  const pageAccessToken = String(process.env.FACEBOOK_PAGE_ACCESS_TOKEN ?? process.env.META_PAGE_ACCESS_TOKEN ?? "").trim();
+  const graphVersion = String(process.env.FACEBOOK_GRAPH_VERSION ?? process.env.META_GRAPH_VERSION ?? "v24.0").trim();
   const appId = String(process.env.META_APP_ID ?? "").trim();
   const appSecret = String(process.env.META_APP_SECRET ?? "").trim();
   const probePost = request.nextUrl.searchParams.get("probePost") === "1";
+  const rootTokens = getRootMetaTokenCandidates();
 
   const response: any = {
     ok: true,
@@ -103,22 +105,48 @@ export async function GET(request: NextRequest) {
       pageId,
       pageTokenMasked: maskToken(pageAccessToken),
       hasAppId: Boolean(appId),
-      hasAppSecret: Boolean(appSecret)
+      hasAppSecret: Boolean(appSecret),
+      hasRootMetaToken: rootTokens.length > 0,
+      rootTokenSources: rootTokens.map((row) => row.label)
     },
     checks: {}
   };
 
-  if (!pageId || !pageAccessToken) {
+  if (!pageId) {
     response.ok = false;
-    response.error = "Faltan META_PAGE_ID o META_PAGE_ACCESS_TOKEN en el servidor.";
+    response.error = "Falta META_PAGE_ID/FACEBOOK_PAGE_ID en el servidor.";
     return NextResponse.json(response, { status: 400 });
   }
 
-  response.checks.pageProfile = await graphGet(`/${encodeURIComponent(pageId)}`, pageAccessToken, graphVersion, {
+  let effectiveToken = pageAccessToken;
+  let resolvedPublishingToken: { ok: true; source: string; tokenMasked: string } | { ok: false; error: string };
+  try {
+    const resolved = await resolvePageAccessToken();
+    effectiveToken = resolved.accessToken;
+    resolvedPublishingToken = {
+      ok: true,
+      source: resolved.source,
+      tokenMasked: maskToken(resolved.accessToken)
+    };
+  } catch (error: any) {
+    resolvedPublishingToken = {
+      ok: false,
+      error: String(error?.message ?? "No se pudo resolver token publicador")
+    };
+  }
+  response.checks.resolvedPublishingToken = resolvedPublishingToken;
+
+  if (!effectiveToken) {
+    response.ok = false;
+    response.error = "No hay un token Meta utilizable para diagnóstico/publicación.";
+    return NextResponse.json(response, { status: 400 });
+  }
+
+  response.checks.pageProfile = await graphGet(`/${encodeURIComponent(pageId)}`, effectiveToken, graphVersion, {
     fields: "id,name,link"
   });
 
-  response.checks.readFeed = await graphGet(`/${encodeURIComponent(pageId)}/feed`, pageAccessToken, graphVersion, {
+  response.checks.readFeed = await graphGet(`/${encodeURIComponent(pageId)}/feed`, effectiveToken, graphVersion, {
     limit: "1",
     fields: "id,created_time"
   });
@@ -126,7 +154,7 @@ export async function GET(request: NextRequest) {
   if (appId && appSecret) {
     const appToken = `${appId}|${appSecret}`;
     response.checks.debugToken = await graphGet("/debug_token", appToken, graphVersion, {
-      input_token: pageAccessToken
+      input_token: effectiveToken
     });
   } else {
     response.checks.debugToken = {
@@ -139,11 +167,11 @@ export async function GET(request: NextRequest) {
     const postBody = new URLSearchParams();
     postBody.set("message", `[DIAG] ${new Date().toISOString()} - prueba permisos pages_manage_posts`);
     postBody.set("published", "false");
-    const created = await graphPost(`/${encodeURIComponent(pageId)}/feed`, pageAccessToken, graphVersion, postBody);
+    const created = await graphPost(`/${encodeURIComponent(pageId)}/feed`, effectiveToken, graphVersion, postBody);
     response.checks.postProbe = created;
 
     if (created.ok && created.data?.id) {
-      response.checks.postProbeCleanup = await graphDelete(`/${encodeURIComponent(String(created.data.id))}`, pageAccessToken, graphVersion);
+      response.checks.postProbeCleanup = await graphDelete(`/${encodeURIComponent(String(created.data.id))}`, effectiveToken, graphVersion);
     }
   } else {
     response.checks.postProbe = {
@@ -154,4 +182,3 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(response);
 }
-

@@ -1,3 +1,5 @@
+import { MetaGraphError, isMetaAuthError, metaFetchJson, resolveInstagramAccessToken } from "@/lib/metaTokens";
+
 export type InstagramPostNewsInput = {
   newsId: string;
   newsSlug?: string | null;
@@ -19,9 +21,8 @@ export type InstagramPostBlogInput = {
 function getConfig() {
   return {
     igUserId: process.env.IG_USER_ID ?? "",
-    pageId: process.env.META_PAGE_ID ?? "",
-    igAccessToken: process.env.IG_ACCESS_TOKEN ?? process.env.META_PAGE_ACCESS_TOKEN ?? "",
-    graphVersion: process.env.META_GRAPH_VERSION ?? "v24.0",
+    pageId: process.env.FACEBOOK_PAGE_ID ?? process.env.META_PAGE_ID ?? "",
+    graphVersion: process.env.FACEBOOK_GRAPH_VERSION ?? process.env.META_GRAPH_VERSION ?? "v24.0",
     baseUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
   };
 }
@@ -56,33 +57,32 @@ function isRetryableMetaError(status: number, message: string, code?: number, su
 }
 
 async function graphPostWithRetry(url: string, form: URLSearchParams, attempts = 3) {
-  let lastError = "Meta API error";
+  let lastError: unknown = new Error("Meta API error");
 
   for (let i = 0; i < attempts; i += 1) {
     try {
-      const res = await fetch(url, {
+      const { json } = await metaFetchJson(url, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: form.toString(),
         cache: "no-store"
       });
-      const json = await res.json().catch(() => ({} as any));
-      if (res.ok) return { ok: true as const, data: json };
-
-      const errorMessage = String(json?.error?.message ?? `Meta API HTTP ${res.status}`);
-      const errorCode = Number(json?.error?.code ?? 0) || undefined;
-      const errorSubcode = Number(json?.error?.error_subcode ?? 0) || undefined;
-      lastError = errorMessage;
-      const isRetryable = isRetryableMetaError(res.status, errorMessage, errorCode, errorSubcode);
-      if (!isRetryable || i === attempts - 1) break;
+      return { ok: true as const, data: json };
     } catch (e: any) {
-      lastError = String(e?.message ?? "Network error");
-      if (i === attempts - 1) break;
+      lastError = e;
+      const isRetryable = isRetryableMetaError(
+        Number(e?.status ?? 0),
+        String(e?.message ?? "Network error"),
+        Number(e?.code ?? 0) || undefined,
+        Number(e?.subcode ?? 0) || undefined
+      );
+      if (!isRetryable || i === attempts - 1) break;
     }
     await sleep(500 * (i + 1));
   }
 
-  throw new Error(lastError);
+  if (lastError instanceof Error) throw lastError;
+  throw new Error(String(lastError ?? "Meta API error"));
 }
 
 async function waitForContainerReady(
@@ -97,59 +97,57 @@ async function waitForContainerReady(
     statusUrl.searchParams.set("fields", "status_code");
     statusUrl.searchParams.set("access_token", accessToken);
 
-    const res = await fetch(statusUrl.toString(), { cache: "no-store" });
-    const json = await res.json().catch(() => ({} as any));
+    try {
+      const { json } = await metaFetchJson<{ status_code?: string }>(statusUrl.toString(), { method: "GET" });
+      const status = String(json?.status_code ?? "")
+        .trim()
+        .toUpperCase();
+      if (!status || status === "FINISHED" || status === "PUBLISHED") return;
 
-    if (!res.ok) {
-      const message = String(json?.error?.message ?? `Meta API HTTP ${res.status}`);
-      const code = Number(json?.error?.code ?? 0) || undefined;
-      const subcode = Number(json?.error?.error_subcode ?? 0) || undefined;
-      if (!isRetryableMetaError(res.status, message, code, subcode) || i === maxAttempts - 1) {
-        throw new Error(`No se pudo validar estado de Instagram media: ${message}`);
+      lastStatus = status;
+      if (status === "ERROR" || status === "EXPIRED" || status === "ERROR_INVALID_MEDIA") {
+        throw new Error(`Instagram no pudo procesar la media (status=${status}).`);
+      }
+
+      if (i < maxAttempts - 1) {
+        await sleep(1500);
+      }
+    } catch (e: any) {
+      const isRetryable = isRetryableMetaError(
+        Number(e?.status ?? 0),
+        String(e?.message ?? "Meta API error"),
+        Number(e?.code ?? 0) || undefined,
+        Number(e?.subcode ?? 0) || undefined
+      );
+      if (!isRetryable || i === maxAttempts - 1) {
+        if (e instanceof MetaGraphError) {
+          throw new Error(`No se pudo validar estado de Instagram media: ${e.message}`);
+        }
+        throw e instanceof Error ? e : new Error(String(e ?? "Meta API error"));
       }
       await sleep(1000 * (i + 1));
-      continue;
-    }
-
-    const status = String(json?.status_code ?? "")
-      .trim()
-      .toUpperCase();
-    if (!status || status === "FINISHED" || status === "PUBLISHED") return;
-
-    lastStatus = status;
-    if (status === "ERROR" || status === "EXPIRED" || status === "ERROR_INVALID_MEDIA") {
-      throw new Error(`Instagram no pudo procesar la media (status=${status}).`);
-    }
-
-    if (i < maxAttempts - 1) {
-      await sleep(1500);
     }
   }
 
   throw new Error(`Instagram aún procesa la media (status=${lastStatus}). Reintenta en 1-2 minutos.`);
 }
 
-async function resolveIgUserId(config: ReturnType<typeof getConfig>) {
+async function resolveIgUserId(config: ReturnType<typeof getConfig>, accessToken: string) {
   const direct = String(config.igUserId ?? "").trim();
   const pageId = String(config.pageId ?? "").trim();
-  const token = String(config.igAccessToken ?? "").trim();
-  if (!token) {
-    throw new Error("Falta IG_ACCESS_TOKEN/META_PAGE_ACCESS_TOKEN.");
-  }
 
   let directError = "";
   if (direct) {
     const directUrl = new URL(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(direct)}`);
     directUrl.searchParams.set("fields", "id,username,account_type");
-    directUrl.searchParams.set("access_token", token);
+    directUrl.searchParams.set("access_token", accessToken);
 
-    const directRes = await fetch(directUrl.toString(), { cache: "no-store" });
-    const directJson = await directRes.json().catch(() => ({} as any));
-    if (directRes.ok) {
-      const directId = String(directJson?.id ?? "").trim();
+    try {
+      const { json } = await metaFetchJson<{ id?: string }>(directUrl.toString(), { method: "GET" });
+      const directId = String(json?.id ?? "").trim();
       if (directId) return directId;
-    } else {
-      directError = String(directJson?.error?.message ?? `Meta API HTTP ${directRes.status}`);
+    } catch (error: any) {
+      directError = String(error?.message ?? "Meta API error");
     }
   }
 
@@ -162,13 +160,9 @@ async function resolveIgUserId(config: ReturnType<typeof getConfig>) {
 
   const url = new URL(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(pageId)}`);
   url.searchParams.set("fields", "connected_instagram_account{id}");
-  url.searchParams.set("access_token", token);
+  url.searchParams.set("access_token", accessToken);
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
-  const json = await res.json().catch(() => ({} as any));
-  if (!res.ok) {
-    throw new Error(String(json?.error?.message ?? `Meta API HTTP ${res.status}`));
-  }
+  const { json } = await metaFetchJson<{ connected_instagram_account?: { id?: string } }>(url.toString(), { method: "GET" });
 
   const connectedId = String(json?.connected_instagram_account?.id ?? "").trim();
   if (!connectedId) {
@@ -182,13 +176,40 @@ async function resolveIgUserId(config: ReturnType<typeof getConfig>) {
   return connectedId;
 }
 
+async function publishInstagramImage(input: {
+  igUserId: string;
+  igAccessToken: string;
+  graphVersion: string;
+  coverUrl: string;
+  caption: string;
+  publishAs: "feed" | "story";
+}) {
+  const createForm = new URLSearchParams();
+  createForm.set("image_url", input.coverUrl);
+  if (input.publishAs === "story") createForm.set("media_type", "STORIES");
+  else createForm.set("caption", input.caption);
+  createForm.set("access_token", input.igAccessToken);
+
+  const createUrl = `https://graph.facebook.com/${input.graphVersion}/${input.igUserId}/media`;
+  const createRes = await graphPostWithRetry(createUrl, createForm);
+  const creationId = String(createRes.data?.id ?? "").trim();
+  if (!creationId) throw new Error("Instagram no devolvió creation_id.");
+  await waitForContainerReady(input.graphVersion, creationId, input.igAccessToken);
+
+  const publishForm = new URLSearchParams();
+  publishForm.set("creation_id", creationId);
+  publishForm.set("access_token", input.igAccessToken);
+
+  const publishUrl = `https://graph.facebook.com/${input.graphVersion}/${input.igUserId}/media_publish`;
+  const publishRes = await graphPostWithRetry(publishUrl, publishForm);
+  const mediaId = String(publishRes.data?.id ?? "").trim();
+  if (!mediaId) throw new Error("Instagram no devolvió media id.");
+  return mediaId;
+}
+
 export async function postNewsToInstagram(input: InstagramPostNewsInput) {
   const config = getConfig();
-  const { igAccessToken, graphVersion, baseUrl } = config;
-  if (!igAccessToken) {
-    throw new Error("Falta IG_ACCESS_TOKEN/META_PAGE_ACCESS_TOKEN.");
-  }
-  const igUserId = await resolveIgUserId(config);
+  const { graphVersion, baseUrl } = config;
 
   const newsId = String(input.newsId ?? "").trim();
   if (!newsId) throw new Error("newsId requerido.");
@@ -206,26 +227,28 @@ export async function postNewsToInstagram(input: InstagramPostNewsInput) {
   const articleUrl = `${baseUrl.replace(/\/$/, "")}/noticias/${encodeURIComponent(linkKey)}`;
   const caption = normalizeCaption(summary ? `${title}\n\n${summary}\n\n${articleUrl}` : `${title}\n\n${articleUrl}`);
 
-  const createForm = new URLSearchParams();
-  createForm.set("image_url", coverUrl);
-  if (publishAs === "story") createForm.set("media_type", "STORIES");
-  else createForm.set("caption", caption);
-  createForm.set("access_token", igAccessToken);
+  const publishOnce = async (forceRefresh = false) => {
+    const tokenState = await resolveInstagramAccessToken({ forceRefresh });
+    const igUserId = await resolveIgUserId(config, tokenState.accessToken);
+    return publishInstagramImage({
+      igUserId,
+      igAccessToken: tokenState.accessToken,
+      graphVersion,
+      coverUrl,
+      caption,
+      publishAs
+    });
+  };
 
-  const createUrl = `https://graph.facebook.com/${graphVersion}/${igUserId}/media`;
-  const createRes = await graphPostWithRetry(createUrl, createForm);
-  const creationId = String(createRes.data?.id ?? "").trim();
-  if (!creationId) throw new Error("Instagram no devolvió creation_id.");
-  await waitForContainerReady(graphVersion, creationId, igAccessToken);
-
-  const publishForm = new URLSearchParams();
-  publishForm.set("creation_id", creationId);
-  publishForm.set("access_token", igAccessToken);
-
-  const publishUrl = `https://graph.facebook.com/${graphVersion}/${igUserId}/media_publish`;
-  const publishRes = await graphPostWithRetry(publishUrl, publishForm);
-  const mediaId = String(publishRes.data?.id ?? "").trim();
-  if (!mediaId) throw new Error("Instagram no devolvió media id.");
+  let mediaId = "";
+  try {
+    mediaId = await publishOnce(false);
+  } catch (error: any) {
+    if (!isMetaAuthError(error)) {
+      throw error instanceof Error ? error : new Error(String(error ?? "Meta API error"));
+    }
+    mediaId = await publishOnce(true);
+  }
 
   return {
     ok: true as const,
@@ -237,11 +260,7 @@ export async function postNewsToInstagram(input: InstagramPostNewsInput) {
 
 export async function postBlogToInstagram(input: InstagramPostBlogInput) {
   const config = getConfig();
-  const { igAccessToken, graphVersion, baseUrl } = config;
-  if (!igAccessToken) {
-    throw new Error("Falta IG_ACCESS_TOKEN/META_PAGE_ACCESS_TOKEN.");
-  }
-  const igUserId = await resolveIgUserId(config);
+  const { graphVersion, baseUrl } = config;
 
   const blogId = String(input.blogId ?? "").trim();
   if (!blogId) throw new Error("blogId requerido.");
@@ -259,26 +278,28 @@ export async function postBlogToInstagram(input: InstagramPostBlogInput) {
   const articleUrl = `${baseUrl.replace(/\/$/, "")}/blog/${encodeURIComponent(linkKey)}`;
   const caption = normalizeCaption(excerpt ? `${title}\n\n${excerpt}\n\nLee completo: ${articleUrl}` : `${title}\n\nLee completo: ${articleUrl}`);
 
-  const createForm = new URLSearchParams();
-  createForm.set("image_url", coverUrl);
-  if (publishAs === "story") createForm.set("media_type", "STORIES");
-  else createForm.set("caption", caption);
-  createForm.set("access_token", igAccessToken);
+  const publishOnce = async (forceRefresh = false) => {
+    const tokenState = await resolveInstagramAccessToken({ forceRefresh });
+    const igUserId = await resolveIgUserId(config, tokenState.accessToken);
+    return publishInstagramImage({
+      igUserId,
+      igAccessToken: tokenState.accessToken,
+      graphVersion,
+      coverUrl,
+      caption,
+      publishAs
+    });
+  };
 
-  const createUrl = `https://graph.facebook.com/${graphVersion}/${igUserId}/media`;
-  const createRes = await graphPostWithRetry(createUrl, createForm);
-  const creationId = String(createRes.data?.id ?? "").trim();
-  if (!creationId) throw new Error("Instagram no devolvió creation_id.");
-  await waitForContainerReady(graphVersion, creationId, igAccessToken);
-
-  const publishForm = new URLSearchParams();
-  publishForm.set("creation_id", creationId);
-  publishForm.set("access_token", igAccessToken);
-
-  const publishUrl = `https://graph.facebook.com/${graphVersion}/${igUserId}/media_publish`;
-  const publishRes = await graphPostWithRetry(publishUrl, publishForm);
-  const mediaId = String(publishRes.data?.id ?? "").trim();
-  if (!mediaId) throw new Error("Instagram no devolvió media id.");
+  let mediaId = "";
+  try {
+    mediaId = await publishOnce(false);
+  } catch (error: any) {
+    if (!isMetaAuthError(error)) {
+      throw error instanceof Error ? error : new Error(String(error ?? "Meta API error"));
+    }
+    mediaId = await publishOnce(true);
+  }
 
   return {
     ok: true as const,
