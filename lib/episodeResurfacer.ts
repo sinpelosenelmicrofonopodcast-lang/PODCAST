@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { SPM_AUTOPOST_TIMEZONE, chicagoDateInputFromNow, chicagoLocalToUtcIso } from "@/lib/autoPosts";
 import { createAutomationJob, logPipelineEvent } from "@/lib/pipelineOps";
 import { getPublishedEpisodes } from "@/lib/seo/content";
-import { getYouTubeVideoId } from "@/lib/youtube";
+import { getYouTubeVideoId, isShorts } from "@/lib/youtube";
 
 const RESURFACER_SOURCE = "facebook_episode_resurface";
 const DAILY_WINDOW_START_MINUTE = 10 * 60;
@@ -119,6 +119,13 @@ function toEpisodeCandidate(row: Awaited<ReturnType<typeof getPublishedEpisodes>
   };
 }
 
+function isEligibleFullEpisode(row: Awaited<ReturnType<typeof getPublishedEpisodes>>[number]) {
+  const sourceUrl = normalizeText(row.youtube_url).toLowerCase();
+  if (sourceUrl.includes("/shorts/")) return false;
+  if (isShorts(row.duration_seconds)) return false;
+  return true;
+}
+
 function safeTimestamp(value?: string | null) {
   const stamp = new Date(String(value ?? "")).getTime();
   return Number.isFinite(stamp) ? stamp : 0;
@@ -174,7 +181,7 @@ export async function scheduleDailyEpisodeResurface(
   service: SupabaseClient,
   now = new Date()
 ): Promise<EpisodeResurfacerResult> {
-  const episodes = (await getPublishedEpisodes(400)).map(toEpisodeCandidate);
+  const episodes = (await getPublishedEpisodes(400)).filter(isEligibleFullEpisode).map(toEpisodeCandidate);
   if (episodes.length === 0) {
     return { ok: true, scheduled: false, reason: "no_candidates" };
   }
