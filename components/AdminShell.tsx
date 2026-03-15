@@ -11,9 +11,11 @@ type AdminShellProps = {
 
 export function AdminShell({ children, access }: AdminShellProps) {
   return (
-    <div className="layout">
+    <div className="admin-shell">
       <Sidebar access={access} />
-      <div style={{ padding: 32 }}>{children}</div>
+      <main className="admin-main">
+        <div className="admin-content">{children}</div>
+      </main>
     </div>
   );
 }

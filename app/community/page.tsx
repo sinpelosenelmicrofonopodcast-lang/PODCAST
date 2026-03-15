@@ -20,6 +20,15 @@ type ThreadRow = {
 
 const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
 
+function formatDate(value: string | null) {
+  if (!value) return "Reciente";
+  return new Date(value).toLocaleDateString("es-PR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
+}
+
 export default function CommunityPage() {
   const { checking, userId } = useProtectedUser();
   const [loading, setLoading] = useState(true);
@@ -73,60 +82,75 @@ export default function CommunityPage() {
     <main>
       <Navbar />
       <section className="section">
-        <div className="container">
-          <h1 className="section-title">Comunidad</h1>
-          <p className="muted">Threads, replies y reacciones con reputación real.</p>
+        <div className="container community-shell">
+          <header className="page-header-card community-header">
+            <div className="page-header-content">
+              <p className="page-kicker">Comunidad privada</p>
+              <h1 className="section-title page-title">Comunidad</h1>
+              <p className="page-lead">Threads, respuestas y conversación directa entre usuarios registrados.</p>
+              <div className="page-meta-list">
+                <span>{threads.length} conversaciones abiertas</span>
+                <span>{replyCountByThread.size} con respuestas</span>
+              </div>
+            </div>
+            <div className="community-header-panel">
+              <strong>Flujo recomendado</strong>
+              <p className="muted">Abre un tema con contexto, revisa respuestas y sigue el hilo sin duplicar conversaciones.</p>
+            </div>
+          </header>
+
           {!checking && userId ? <CommunityComposer /> : null}
 
           {checking || loading ? (
-            <div className="card" style={{ marginTop: 20 }}>
+            <div className="card state-card">
               <p className="muted">Cargando comunidad...</p>
             </div>
           ) : null}
 
           {!checking && !loading && threads.length > 0 ? (
-            <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", marginTop: 20 }}>
+            <div className="thread-grid">
               {threads.map((thread) => {
                 const user = pickUser(thread.users);
                 const repliesCount = replyCountByThread.get(thread.id) ?? 0;
                 return (
-                  <div key={thread.id} className="card" style={{ display: "grid", gap: 12 }}>
-                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                      <img
-                        src={user?.avatar_url ?? "/logo.png"}
-                        alt={user?.nickname ?? "avatar"}
-                        width={36}
-                        height={36}
-                        style={{ borderRadius: "50%", objectFit: "cover" }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 700 }}>{user?.nickname ?? "Anónimo"}</div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          {user?.bio ?? "Sin bio"}
+                  <article key={thread.id} className="card thread-card">
+                    <div className="thread-card-head">
+                      <div className="thread-author">
+                        <img
+                          src={user?.avatar_url ?? "/logo.png"}
+                          alt={user?.nickname ?? "avatar"}
+                          width={40}
+                          height={40}
+                          className="thread-avatar"
+                        />
+                        <div>
+                          <div className="thread-author-name">{user?.nickname ?? "Anónimo"}</div>
+                          <div className="muted thread-author-meta">
+                            {user?.bio ?? "Miembro de la comunidad"} · {formatDate(thread.created_at)}
+                          </div>
                         </div>
                       </div>
+                      <span className="thread-count-chip">{repliesCount} respuestas</span>
                     </div>
-                    <div>
-                      <h3 style={{ marginTop: 0 }}>{thread.title}</h3>
+                    <div className="thread-card-body">
+                      <h3>{thread.title}</h3>
                       <p className="muted">{thread.body ?? ""}</p>
                     </div>
                     <AdminDeleteButton table="threads" id={thread.id} label="Eliminar thread" />
-                    <div>
-                      <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-                        Respuestas: {repliesCount}
-                      </div>
+                    <div className="thread-card-footer">
                       <LazyThreadReplies threadId={thread.id} initialCount={repliesCount} />
                       <ReplyComposer threadId={thread.id} />
                     </div>
-                  </div>
+                  </article>
                 );
               })}
             </div>
           ) : null}
 
           {!checking && !loading && threads.length === 0 ? (
-            <div className="card" style={{ marginTop: 20 }}>
-              <p className="muted">Todavía no hay threads en comunidad. Sé el primero en iniciar.</p>
+            <div className="card state-card">
+              <h2>Comunidad lista para arrancar</h2>
+              <p className="muted">Todavía no hay threads publicados. Abre el primero con una pregunta clara o una postura fuerte.</p>
             </div>
           ) : null}
         </div>

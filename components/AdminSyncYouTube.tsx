@@ -25,13 +25,15 @@ export function AdminSyncYouTube() {
   };
 
   return (
-    <div className="card">
-      <h3>Sync YouTube</h3>
-      <p className="muted">Importa los últimos videos y shorts del canal.</p>
+    <div className="card dashboard-module-card">
+      <div className="dashboard-module-copy">
+        <h3>Sync YouTube</h3>
+        <p className="muted">Importa videos y shorts del canal para mantener feed y episodios siempre actualizados.</p>
+      </div>
       <button className="button" type="button" onClick={handleSync} disabled={loading}>
         {loading ? "Sincronizando..." : "Sincronizar ahora"}
       </button>
-      {status ? <p className="muted">{status}</p> : null}
+      {status ? <p className="status-text">{status}</p> : null}
     </div>
   );
 }

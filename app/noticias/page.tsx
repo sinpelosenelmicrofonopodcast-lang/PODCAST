@@ -339,8 +339,18 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
       <DesktopSideAdSlot section="noticias" />
       <section className="section">
         <div className="container">
-          <h1 className="section-title">Noticias Sin Pelos</h1>
-          <p className="muted">{t.news.subtitle}</p>
+          <header className="page-header-card news-page-header">
+            <div className="page-header-content">
+              <p className="page-kicker">Cobertura editorial</p>
+              <h1 className="section-title page-title">Noticias Sin Pelos</h1>
+              <p className="page-lead">{t.news.subtitle}</p>
+              <div className="page-meta-list">
+                <span>{total} artículos publicados</span>
+                <span>{category ?? "Todas las categorías"}</span>
+                <span>{sort === "comments" ? "Ordenado por conversación" : "Ordenado por actualidad"}</span>
+              </div>
+            </div>
+          </header>
 
           {breakingUnique.length > 0 ? (
             <div className="news-breaking card" aria-label="Breaking">
@@ -364,24 +374,32 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
             </div>
           ) : null}
 
-          <div className="news-tabs">
-            <Link className={tabClass(!category)} href="/noticias">
-              {t.news.all}
-            </Link>
-            {newsCategories.map((cat) => (
-              <Link key={cat} className={tabClass(category === cat)} href={`/noticias?cat=${encodeURIComponent(cat)}&sort=${sort}`}>
-                {cat}
-              </Link>
-            ))}
-          </div>
+          <div className="news-controls">
+            <div className="news-control-group">
+              <span className="news-control-label">Cobertura</span>
+              <div className="news-tabs">
+                <Link className={tabClass(!category)} href="/noticias">
+                  {t.news.all}
+                </Link>
+                {newsCategories.map((cat) => (
+                  <Link key={cat} className={tabClass(category === cat)} href={`/noticias?cat=${encodeURIComponent(cat)}&sort=${sort}`}>
+                    {cat}
+                  </Link>
+                ))}
+              </div>
+            </div>
 
-          <div className="news-tabs" style={{ marginTop: 12 }}>
-            <Link className={tabClass(sort === "all" || sort === "latest")} href={buildNewsHref("latest")}>
-              {t.news.latest}
-            </Link>
-            <Link className={tabClass(sort === "comments")} href={buildNewsHref("comments")}>
-              {t.news.mostCommented}
-            </Link>
+            <div className="news-control-group">
+              <span className="news-control-label">Orden</span>
+              <div className="news-tabs">
+                <Link className={tabClass(sort === "all" || sort === "latest")} href={buildNewsHref("latest")}>
+                  {t.news.latest}
+                </Link>
+                <Link className={tabClass(sort === "comments")} href={buildNewsHref("comments")}>
+                  {t.news.mostCommented}
+                </Link>
+              </div>
+            </div>
           </div>
 
           {pageItems.length > 0 ? (
@@ -395,13 +413,13 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                       </Link>
                     ) : null}
                     <div className="news-mag-lead-body">
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <div className="news-meta-row">
                         {cleanNewsCategories(lead.categories).slice(0, 3).map((cat: string) => (
                           <span key={cat} className="news-badge">
                             {cat}
                           </span>
                         ))}
-                        <span className="muted" style={{ fontSize: 12 }}>
+                        <span className="muted news-meta-date">
                           {new Date(lead.published_at).toLocaleDateString("es-PR")}
                         </span>
                       </div>
@@ -413,7 +431,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                           {lead.summary}
                         </p>
                       ) : null}
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <div className="news-actions">
                         <Link className="button secondary" href={newsHref(lead)}>
                           {t.common.read}
                         </Link>
@@ -424,7 +442,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
 
                   <aside className="news-mag-rail news-mag-rail-sticky">
                     <div className="card news-mag-rail-head">
-                      <h3 style={{ margin: 0 }}>Tendencias</h3>
+                      <h3>Tendencias</h3>
                     </div>
                     {railItems.map((item, idx) => (
                       <div key={item.id} style={{ display: "contents" }}>
@@ -436,16 +454,16 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                           ) : null}
                           <div>
                             <Link href={newsHref(item)}>
-                              <h4 className="news-title-clamp" style={{ margin: 0 }}>
+                              <h4 className="news-title-clamp news-rail-title">
                                 {item.title}
                               </h4>
                             </Link>
-                            <p className="muted" style={{ margin: "6px 0 0", fontSize: 12 }}>
+                            <p className="muted news-meta-date">
                               {new Date(item.published_at).toLocaleDateString("es-PR")}
                             </p>
                             {"comments_count" in item || "views_count" in item || "shares_count" in item ? (
-                              <p className="muted" style={{ margin: "4px 0 0", fontSize: 12 }}>
-                                {Number(item.comments_count ?? 0)} comentarios · {Number(item.views_count ?? 0)} views · {Number(item.shares_count ?? 0)} shares
+                              <p className="muted news-rail-metrics">
+                                {Number(item.comments_count ?? 0)} comentarios · {Number(item.views_count ?? 0)} vistas · {Number(item.shares_count ?? 0)} compartidos
                               </p>
                             ) : null}
                           </div>
@@ -469,20 +487,20 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                           </div>
                         </Link>
                       ) : null}
-                      <div style={{ display: "grid", gap: 8 }}>
+                      <div className="news-card-body">
                         <div>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <div className="news-meta-row">
                             {cleanNewsCategories(item.categories).map((cat: string) => (
                               <span key={cat} className="news-badge">
                                 {cat}
                               </span>
                             ))}
-                            <span className="muted" style={{ fontSize: 12 }}>
+                            <span className="muted news-meta-date">
                               {new Date(item.published_at).toLocaleDateString("es-PR")}
                             </span>
                           </div>
                           <Link href={newsHref(item)}>
-                            <h3 className="news-title-clamp" style={{ margin: "6px 0 0" }}>
+                            <h3 className="news-title-clamp news-card-title">
                               {item.title}
                             </h3>
                           </Link>
@@ -492,7 +510,7 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
                             {item.summary}
                           </p>
                         ) : null}
-                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        <div className="news-actions">
                           <Link className="button secondary" href={newsHref(item)}>
                             {t.common.read}
                           </Link>
@@ -505,17 +523,17 @@ export default async function NoticiasPage({ searchParams }: { searchParams: { c
               </div>
             </div>
           ) : (
-            <div className="card" style={{ marginTop: 20 }}>
+            <div className="card state-card">
               <p className="muted">{t.news.noneYet}</p>
             </div>
           )}
 
           {totalPages > 1 ? (
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", alignItems: "center", marginTop: 18 }}>
+            <div className="news-pagination">
               <Link className="button secondary" href={prevHref} aria-disabled={pageNum <= 1}>
                 Anterior
               </Link>
-              <span className="muted" style={{ fontSize: 13 }}>
+              <span className="muted news-pagination-label">
                 Página {pageNum} de {totalPages}
               </span>
               <Link className="button secondary" href={nextHref} aria-disabled={pageNum >= totalPages}>

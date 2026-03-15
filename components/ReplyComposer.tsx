@@ -42,19 +42,20 @@ export function ReplyComposer({ threadId }: { threadId: string }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "grid", gap: 8, marginTop: 10 }}>
+    <form onSubmit={handleSubmit} className="thread-reply-form">
       <textarea
         className="textarea"
         rows={2}
-        placeholder="Responder..."
+        aria-label="Escribe una respuesta"
+        placeholder="Responder con contexto y claridad..."
         value={body}
         onChange={(e) => setBody(e.target.value)}
         required
       />
-      <button className="button secondary" type="submit" disabled={loading}>
+      <button className="button secondary thread-reply-submit" type="submit" disabled={loading}>
         {loading ? "Publicando..." : "Responder"}
       </button>
-      {status ? <p className="muted">{status}</p> : null}
+      {status ? <p className="status-text">{status}</p> : null}
     </form>
   );
 }

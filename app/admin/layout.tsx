@@ -16,12 +16,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <AdminShell access={{ isAdmin: access.isAdmin, permissions: access.permissions }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+      <header className="admin-layout-header card">
+        <div>
+          <p className="page-kicker">Panel editorial</p>
+          <h1 className="admin-layout-title">Operaciones de Sin Pelos</h1>
+          <p className="muted admin-layout-copy">
+            Administra portada, contenido, comunidad y automatizaciones sin tocar la lógica actual.
+          </p>
+        </div>
         <Link className="button secondary" href="/">
-          Volver al Home
+          Volver al sitio
         </Link>
-        <span className="muted">Panel editorial</span>
-      </div>
+      </header>
       {children}
     </AdminShell>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
@@ -34,7 +35,6 @@ export function Navbar() {
   const [avatarSrc, setAvatarSrc] = useState<string>("/logo.png");
   const [isAdmin, setIsAdmin] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
-  const [adminCheckError, setAdminCheckError] = useState<string | null>(null);
   const [lang, setLang] = useState<AppLang>("es");
   const [menuOpen, setMenuOpen] = useState(false);
   const [communityOpen, setCommunityOpen] = useState(false);
@@ -54,7 +54,6 @@ export function Navbar() {
     window.addEventListener(APP_LANG_EVENT, onLangChange);
 
     const loadProfile = async () => {
-      if (mounted) setAdminCheckError(null);
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) {
@@ -87,26 +86,21 @@ export function Navbar() {
       if (!mounted) return;
       if (!res) {
         setIsAdmin(false);
-        setAdminCheckError("No se pudo verificar permisos (sin conexión).");
         return;
       }
       if (res.ok) {
         const json = await res.json().catch(() => ({}));
         setIsAdmin(Boolean(json?.isAdmin));
         setIsStaff(Boolean(json?.isStaff));
-        setAdminCheckError(null);
         return;
       }
       if (res.status === 403) {
         setIsAdmin(false);
         setIsStaff(false);
-        setAdminCheckError(null);
         return;
       }
-      const json = await res.json().catch(() => ({}));
       setIsAdmin(false);
       setIsStaff(false);
-      setAdminCheckError(json?.error ?? `No se pudo verificar permisos (HTTP ${res.status}).`);
     };
 
     loadProfile();
@@ -157,6 +151,36 @@ export function Navbar() {
   }, []);
 
   const t = navTexts[lang];
+  const isPathActive = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
+  const matchesAny = (hrefs: string[]) => hrefs.some((href) => isPathActive(href));
+  const communityAreaActive = matchesAny(["/community", "/comunidad", "/foro", "/confesionario", "/teorias"]);
+  const discoverAreaActive = matchesAny([
+    "/blog",
+    "/musica",
+    "/emprendimiento",
+    "/eventos",
+    "/rss",
+    "/mic-brawl",
+    "/publicidad",
+    "/quiero-salir",
+    "/terminos"
+  ]);
+  const communityLinks: { href: Route; label: string }[] = [
+    { href: "/foro", label: t.forum },
+    { href: "/confesionario", label: t.confessional },
+    { href: "/teorias", label: t.theories }
+  ];
+  const discoverLinks: { href: Route; label: string }[] = [
+    { href: "/blog", label: t.blog },
+    { href: "/musica", label: t.music },
+    { href: "/emprendimiento", label: t.entrepreneurship },
+    { href: "/eventos", label: t.events },
+    { href: "/rss", label: "RSS (Audio)" },
+    { href: "/mic-brawl", label: "Mic Brawl" },
+    { href: "/publicidad", label: t.ads },
+    { href: "/quiero-salir", label: t.guest },
+    { href: "/terminos", label: "Términos" }
+  ];
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -180,16 +204,25 @@ export function Navbar() {
         </Link>
         <div className="nav-mid">
           <div className={`nav-tabs${isOverlayOpen ? " is-overlay-open" : ""}`} role="navigation" aria-label="Navegación principal">
-            <Link className="nav-link" href="/">{t.home}</Link>
-            <Link className="nav-link" href="/noticias">{t.news}</Link>
-            <Link className="nav-link" href="/podcast">{t.podcast}</Link>
+            <Link className={`nav-link${isPathActive("/") ? " active" : ""}`} href="/">
+              {t.home}
+            </Link>
+            <Link className={`nav-link${isPathActive("/noticias") ? " active" : ""}`} href="/noticias">
+              {t.news}
+            </Link>
+            <Link className={`nav-link${isPathActive("/feed") ? " active" : ""}`} href="/feed">
+              {t.feed}
+            </Link>
+            <Link className={`nav-link${isPathActive("/podcast") ? " active" : ""}`} href="/podcast">
+              {t.podcast}
+            </Link>
 
             <div className="nav-submenu" ref={communityRef}>
-              <Link className="nav-link" href="/community">
+              <Link className={`nav-link${communityAreaActive ? " active" : ""}`} href="/community">
                 {t.community}
               </Link>
               <button
-                className="nav-link nav-submenu-btn"
+                className={`nav-link nav-submenu-btn${communityAreaActive ? " active" : ""}`}
                 type="button"
                 aria-haspopup="menu"
                 aria-expanded={communityOpen}
@@ -203,24 +236,28 @@ export function Navbar() {
               </button>
               {communityOpen ? (
                 <div className="nav-menu-panel nav-menu-panel-left" role="menu" aria-label={`${t.community}: submenú`}>
-                  <Link className="nav-menu-link" role="menuitem" href="/foro" onClick={() => setCommunityOpen(false)}>
-                    {t.forum}
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/confesionario" onClick={() => setCommunityOpen(false)}>
-                    {t.confessional}
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/teorias" onClick={() => setCommunityOpen(false)}>
-                    {t.theories}
-                  </Link>
+                  {communityLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      className={`nav-menu-link${isPathActive(link.href) ? " active" : ""}`}
+                      role="menuitem"
+                      href={link.href}
+                      onClick={() => setCommunityOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
                 </div>
               ) : null}
             </div>
 
-            <Link className="nav-link nav-link-raw" href="/zona-cruda">{t.rawZone}</Link>
+            <Link className={`nav-link nav-link-raw${isPathActive("/zona-cruda") ? " active" : ""}`} href="/zona-cruda">
+              {t.rawZone}
+            </Link>
 
             <div className="nav-menu" ref={menuRef}>
               <button
-                className="nav-link nav-menu-btn"
+                className={`nav-link nav-menu-btn${discoverAreaActive ? " active" : ""}`}
                 type="button"
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
@@ -230,37 +267,26 @@ export function Navbar() {
               </button>
               {menuOpen ? (
                 <div className="nav-menu-panel" role="menu">
-                  <Link className="nav-menu-link" role="menuitem" href="/blog" onClick={() => setMenuOpen(false)}>
-                    {t.blog}
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/musica" onClick={() => setMenuOpen(false)}>
-                    {t.music}
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/emprendimiento" onClick={() => setMenuOpen(false)}>
-                    {t.entrepreneurship}
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/eventos" onClick={() => setMenuOpen(false)}>
-                    {t.events}
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/rss" onClick={() => setMenuOpen(false)}>
-                    RSS (Audio)
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/mic-brawl" onClick={() => setMenuOpen(false)}>
-                    Mic Brawl
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/publicidad" onClick={() => setMenuOpen(false)}>
-                    {t.ads}
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/quiero-salir" onClick={() => setMenuOpen(false)}>
-                    {t.guest}
-                  </Link>
-                  <Link className="nav-menu-link" role="menuitem" href="/terminos" onClick={() => setMenuOpen(false)}>
-                    Términos
-                  </Link>
+                  {discoverLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      className={`nav-menu-link${isPathActive(link.href) ? " active" : ""}`}
+                      role="menuitem"
+                      href={link.href}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
                   {isStaff ? (
                     <>
                       <div className="nav-menu-divider" role="separator" aria-hidden="true" />
-                      <Link className="nav-menu-link" role="menuitem" href="/admin" onClick={() => setMenuOpen(false)}>
+                      <Link
+                        className={`nav-menu-link${isPathActive("/admin") ? " active" : ""}`}
+                        role="menuitem"
+                        href="/admin"
+                        onClick={() => setMenuOpen(false)}
+                      >
                         {t.dashboard}
                       </Link>
                     </>

@@ -46,31 +46,31 @@ export function LazyThreadReplies({ threadId, initialCount = 0 }: { threadId: st
   };
 
   return (
-    <div style={{ display: "grid", gap: 8 }}>
+    <div className="thread-replies">
       <button className="button secondary" type="button" onClick={onToggle}>
         {open ? "Ocultar respuestas" : `Ver respuestas (${initialCount})`}
       </button>
       {open ? (
-        <div style={{ display: "grid", gap: 8 }}>
-          {loading ? <p className="muted" style={{ margin: 0 }}>Cargando respuestas...</p> : null}
-          {error ? <p className="muted" style={{ margin: 0 }}>{error}</p> : null}
-          {!loading && !error && replies.length === 0 ? <p className="muted" style={{ margin: 0 }}>Sin respuestas aún.</p> : null}
+        <div className="thread-replies-body">
+          {loading ? <p className="muted thread-replies-status">Cargando respuestas...</p> : null}
+          {error ? <p className="status-text error">{error}</p> : null}
+          {!loading && !error && replies.length === 0 ? <p className="muted thread-replies-status">Sin respuestas aún.</p> : null}
           {!loading && !error && replies.length > 0 ? (
-            <div style={{ display: "grid", gap: 8 }}>
+            <div className="thread-reply-list">
               {replies.map((reply) => {
                 const user = pickUser(reply.users);
                 return (
-                  <div key={reply.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div key={reply.id} className="thread-reply-item">
                     <img
                       src={user?.avatar_url ?? "/logo.png"}
                       alt={user?.nickname ?? "avatar"}
                       width={24}
                       height={24}
-                      style={{ borderRadius: "50%", objectFit: "cover" }}
+                      className="thread-reply-avatar"
                     />
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.nickname ?? "Anónimo"}</div>
-                      <div className="muted" style={{ fontSize: 13 }}>{reply.body}</div>
+                    <div className="thread-reply-copy">
+                      <div className="thread-reply-author">{user?.nickname ?? "Anónimo"}</div>
+                      <div className="muted">{reply.body}</div>
                     </div>
                   </div>
                 );
@@ -82,4 +82,3 @@ export function LazyThreadReplies({ threadId, initialCount = 0 }: { threadId: st
     </div>
   );
 }
-

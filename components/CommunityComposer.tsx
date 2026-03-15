@@ -47,12 +47,16 @@ export function CommunityComposer() {
   };
 
   return (
-    <div className="card" style={{ marginTop: 18 }}>
-      <h3 style={{ marginTop: 0 }}>Crear nuevo thread</h3>
-      <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+    <section className="card thread-composer">
+      <div className="thread-composer-head">
+        <h2>Abrir conversación</h2>
+        <p className="muted">Crea un thread claro para que otros puedan responder rápido y sin duplicar temas.</p>
+      </div>
+      <form onSubmit={handleSubmit} className="thread-composer-form">
         <input
           className="input"
-          placeholder="Título"
+          aria-label="Título del thread"
+          placeholder="Título de la conversación"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
@@ -60,16 +64,17 @@ export function CommunityComposer() {
         <textarea
           className="textarea"
           rows={4}
-          placeholder="Comparte tu idea sin miedo..."
+          aria-label="Contenido del thread"
+          placeholder="Expón tu punto con contexto para que la conversación arranque mejor..."
           value={body}
           onChange={(e) => setBody(e.target.value)}
           required
         />
-        <button className="button" type="submit" disabled={loading}>
+        <button className="button thread-composer-submit" type="submit" disabled={loading}>
           {loading ? "Publicando..." : "Publicar"}
         </button>
-        {status ? <p className="muted">{status}</p> : null}
+        {status ? <p className="status-text">{status}</p> : null}
       </form>
-    </div>
+    </section>
   );
 }

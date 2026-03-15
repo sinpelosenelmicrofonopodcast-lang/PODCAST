@@ -189,10 +189,12 @@ function FeedCard({ post, label }: { post: ExternalPost; label?: string }) {
 
         <div className="feed-v4-meta muted">
           <span>{formatDate(post.posted_at)}</span>
-          <span>·</span>
-          <span>👁 {formatNumber(metrics.views)}</span>
-          <span>♥ {formatNumber(metrics.likes)}</span>
-          <span>💬 {formatNumber(metrics.comments)}</span>
+          <span className="feed-v4-meta-separator" aria-hidden="true">
+            ·
+          </span>
+          <span className="feed-v4-metric">Vistas {formatNumber(metrics.views)}</span>
+          <span className="feed-v4-metric">Likes {formatNumber(metrics.likes)}</span>
+          <span className="feed-v4-metric">Comentarios {formatNumber(metrics.comments)}</span>
         </div>
 
         <div className="feed-v4-actions">
@@ -243,17 +245,27 @@ export default async function FeedPage({
     description: "Feed de episodios, clips y contenido de podcast.",
     image: allPosts[0]?.media_url ?? null
   });
+  const viewTitle =
+    view === "episodes" ? "Capítulos" : view === "shorts" ? "Shorts" : view === "audio" ? "Podcast en audio" : "Feed";
+  const viewDescription =
+    view === "episodes"
+      ? "Todos los episodios completos disponibles para ver o compartir."
+      : view === "shorts"
+        ? "Clips cortos para descubrir momentos virales y highlights."
+        : view === "audio"
+          ? "Escucha el podcast en formato audio desde el mismo hub."
+          : "Un solo lugar para episodios, clips y audio del programa.";
 
   return (
     <main>
       <Navbar />
       <section className="section feed-v4">
         <div className="container">
-          <header className="feed-v4-header">
-            <div>
-              <h1 className="section-title" style={{ margin: 0 }}>
-                Feed
-              </h1>
+          <header className="page-header-card feed-v4-intro">
+            <div className="page-header-content">
+              <p className="page-kicker">Podcast hub</p>
+              <h1 className="section-title page-title">{viewTitle}</h1>
+              <p className="page-lead">{viewDescription}</p>
             </div>
             <div className="feed-v4-quick-stats muted">
               <span>{episodes.length} capítulos</span>
@@ -278,8 +290,8 @@ export default async function FeedPage({
           </nav>
 
           {((view === "episodes" ? episodesPage?.items.length ?? 0 : allPosts.length) === 0) ? (
-            <div className="card" style={{ marginTop: 16 }}>
-              <p className="muted" style={{ margin: 0 }}>
+            <div className="card state-card compact">
+              <p className="muted">
                 Aún no hay contenido sincronizado. Verifica YouTube Sync en admin.
               </p>
             </div>
