@@ -39,43 +39,64 @@ export function isShorts(durationSeconds?: number | null): boolean {
 export async function fetchYouTubeVideos(limit = 25, options?: FetchYouTubeVideosOptions): Promise<YouTubeVideo[]> {
   const apiKey = requireEnv("YOUTUBE_API_KEY");
   const channelId = requireEnv("YOUTUBE_CHANNEL_ID");
-  const maxResults = Math.min(Math.max(1, limit), 50);
-
-  // 1) Search newest uploads from the channel
-  const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
-  searchUrl.searchParams.set("key", apiKey);
-  searchUrl.searchParams.set("channelId", channelId);
-  searchUrl.searchParams.set("part", "snippet");
-  searchUrl.searchParams.set("order", "date");
-  searchUrl.searchParams.set("type", "video");
-  searchUrl.searchParams.set("maxResults", String(maxResults));
+  const maxResults = Math.min(Math.max(1, limit), 250);
 
   const fetchOptions = options?.noStore
     ? ({ cache: "no-store" } as const)
     : ({ next: { revalidate: Math.max(30, Number(options?.revalidateSeconds ?? 300)) } } as const);
 
-  const searchRes = await fetch(searchUrl.toString(), fetchOptions);
-  if (!searchRes.ok) throw new Error(`YouTube search failed (${searchRes.status}).`);
-  const searchJson = await searchRes.json();
+  // Search paginated uploads until the requested limit is satisfied.
+  const ids: string[] = [];
+  let nextPageToken = "";
+  while (ids.length < maxResults) {
+    const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+    searchUrl.searchParams.set("key", apiKey);
+    searchUrl.searchParams.set("channelId", channelId);
+    searchUrl.searchParams.set("part", "snippet");
+    searchUrl.searchParams.set("order", "date");
+    searchUrl.searchParams.set("type", "video");
+    searchUrl.searchParams.set("maxResults", String(Math.min(50, maxResults - ids.length)));
+    if (nextPageToken) searchUrl.searchParams.set("pageToken", nextPageToken);
 
-  const items = Array.isArray(searchJson.items) ? searchJson.items : [];
-  const ids = items
-    .map((it: any) => it?.id?.videoId)
-    .filter((id: any) => typeof id === "string" && id.length > 0);
+    const searchRes = await fetch(searchUrl.toString(), fetchOptions);
+    if (!searchRes.ok) throw new Error(`YouTube search failed (${searchRes.status}).`);
+    const searchJson = await searchRes.json();
+
+    const items = Array.isArray(searchJson.items) ? searchJson.items : [];
+    const batchIds = items
+      .map((it: any) => it?.id?.videoId)
+      .filter((id: any) => typeof id === "string" && id.length > 0);
+
+    for (const id of batchIds) {
+      if (!ids.includes(id)) ids.push(id);
+      if (ids.length >= maxResults) break;
+    }
+
+    nextPageToken = String(searchJson?.nextPageToken ?? "").trim();
+    if (!nextPageToken || batchIds.length === 0) break;
+  }
 
   if (ids.length === 0) return [];
 
-  // 2) Fetch stats + duration for those IDs
-  const videosUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
-  videosUrl.searchParams.set("key", apiKey);
-  videosUrl.searchParams.set("id", ids.join(","));
-  videosUrl.searchParams.set("part", "snippet,contentDetails,statistics");
-  const vidsRes = await fetch(videosUrl.toString(), fetchOptions);
-  if (!vidsRes.ok) throw new Error(`YouTube videos failed (${vidsRes.status}).`);
-  const vidsJson = await vidsRes.json();
-  const vids = Array.isArray(vidsJson.items) ? vidsJson.items : [];
+  // 2) Fetch stats + duration in chunks and restore the original chronological order.
+  const detailById = new Map<string, any>();
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const videosUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+    videosUrl.searchParams.set("key", apiKey);
+    videosUrl.searchParams.set("id", chunk.join(","));
+    videosUrl.searchParams.set("part", "snippet,contentDetails,statistics");
+    const vidsRes = await fetch(videosUrl.toString(), fetchOptions);
+    if (!vidsRes.ok) throw new Error(`YouTube videos failed (${vidsRes.status}).`);
+    const vidsJson = await vidsRes.json();
+    const vids = Array.isArray(vidsJson.items) ? vidsJson.items : [];
+    vids.forEach((video: any) => {
+      const id = String(video?.id ?? "").trim();
+      if (id) detailById.set(id, video);
+    });
+  }
 
-  return vids.map((v: any) => {
+  return ids.map((id) => detailById.get(id)).filter(Boolean).map((v: any) => {
     const id = String(v?.id ?? "");
     const snippet = v?.snippet ?? {};
     const stats = v?.statistics ?? {};

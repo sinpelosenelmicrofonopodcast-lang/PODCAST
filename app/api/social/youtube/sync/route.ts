@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       actorId: auth.userId
     });
 
-    const sync = await syncYouTubeToExternalPosts(auth.service, { limit: 50 });
+    const sync = await syncYouTubeToExternalPosts(auth.service, { limit: 200 });
 
     await logPipelineEvent(auth.service, {
       jobId,

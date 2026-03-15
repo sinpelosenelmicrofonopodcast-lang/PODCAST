@@ -12,7 +12,7 @@ type SyncResult = {
 };
 
 export async function syncYouTubeToExternalPosts(service: SupabaseClient, options?: SyncOptions): Promise<SyncResult> {
-  const limit = Math.min(Math.max(Number(options?.limit ?? 50), 1), 50);
+  const limit = Math.min(Math.max(Number(options?.limit ?? 200), 1), 250);
   const videos = await fetchYouTubeVideos(limit, { noStore: true });
   const ids = videos.map((video) => video.id);
 

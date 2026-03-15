@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       message: "Inicio de cron YouTube Sync"
     });
 
-    const sync = await syncYouTubeToExternalPosts(service, { limit: 50 });
+    const sync = await syncYouTubeToExternalPosts(service, { limit: 200 });
 
     await logPipelineEvent(service, {
       jobId,

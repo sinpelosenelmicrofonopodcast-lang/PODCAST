@@ -50,7 +50,7 @@ function safeDateToTs(value?: string | null) {
 
 export default async function PodcastPage() {
   const supabase = supabaseServer();
-  const episodes = dedupeEpisodes(await getPublishedEpisodes(180));
+  const episodes = dedupeEpisodes(await getPublishedEpisodes(400));
 
   const { data: metricsRows } = await supabase
     .from("external_posts")

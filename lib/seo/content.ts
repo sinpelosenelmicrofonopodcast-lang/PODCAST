@@ -99,6 +99,55 @@ function isShortLikeSource(sourceUrl?: string | null, metrics?: { durationSecond
   return url.includes("/shorts/");
 }
 
+function mergeEpisodeKeys(episode: Pick<SeoEpisode, "id" | "slug" | "youtube_url">) {
+  const keys: string[] = [];
+  const youtubeId = getYouTubeVideoId(episode.youtube_url);
+  if (youtubeId) keys.push(`yt:${youtubeId}`);
+  const slug = String(episode.slug ?? "").trim();
+  if (slug) keys.push(`slug:${slug}`);
+  const id = String(episode.id ?? "").trim();
+  if (id) keys.push(`id:${id}`);
+  return keys;
+}
+
+async function getExternalPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> {
+  const supabase = supabaseServer();
+  const desiredLimit = Math.max(1, Math.floor(Number(limit) || 100));
+  const fallback = await supabase
+    .from("external_posts")
+    .select("id, title, caption, source_url, media_url, posted_at, metrics")
+    .order("posted_at", { ascending: false })
+    .limit(Math.max(desiredLimit * 3, 200));
+
+  const seen = new Set<string>();
+  const out: SeoEpisode[] = [];
+  for (const row of (fallback.data ?? []) as any[]) {
+    const sourceUrl = String(row.source_url ?? "");
+    if (!sourceUrl || (!sourceUrl.includes("youtube.com") && !sourceUrl.includes("youtu.be"))) continue;
+    const duration = Number(row?.metrics?.durationSeconds ?? 0);
+    const isShort = row?.metrics?.isShort === true || (duration > 0 && duration <= 180) || sourceUrl.includes("/shorts/");
+    if (isShort) continue;
+    const slug = maybeSlugFromSource(sourceUrl, String(row.id));
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+    out.push({
+      id: String(row.id),
+      slug,
+      title: String(row.title ?? "Episodio"),
+      description: row.caption ?? null,
+      youtube_url: sourceUrl,
+      audio_url: null,
+      thumbnail_url: row.media_url ?? null,
+      duration_seconds: Number.isFinite(duration) && duration > 0 ? duration : null,
+      is_published: true,
+      published_at: row.posted_at ?? null,
+      updated_at: row.posted_at ?? null
+    });
+    if (out.length >= desiredLimit) break;
+  }
+  return out;
+}
+
 export async function getPublishedPosts(limit = 100): Promise<SeoPost[]> {
   const supabase = supabaseServer();
   const primary = await supabase
@@ -205,7 +254,10 @@ export async function getPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> {
     .eq("is_published", true)
     .order("published_at", { ascending: false })
     .limit(preloadLimit);
-  if (!primary.error && (primary.data ?? []).length > 0) {
+  const primaryRows = !primary.error && Array.isArray(primary.data) ? (primary.data as SeoEpisode[]) : [];
+  let primaryEpisodes: SeoEpisode[] = [];
+
+  if (primaryRows.length > 0) {
     const rows = (primary.data ?? []) as SeoEpisode[];
     const orderLookupLimit = Math.max(desiredLimit, Math.min(5000, Math.max(desiredLimit * 6, 500)));
     const orderRows = await supabase
@@ -230,7 +282,7 @@ export async function getPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> {
       postedAtByVideoId.set(videoId, postedAt);
     }
 
-    const sorted = rows
+    primaryEpisodes = rows
       .map((episode) => {
         const byYoutubeId =
           getYouTubeVideoId(episode.youtube_url) ??
@@ -247,49 +299,31 @@ export async function getPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> {
         if (byPublished !== 0) return byPublished;
         return safeTimestamp(b.updated_at) - safeTimestamp(a.updated_at);
       });
-
-    return sorted.slice(0, desiredLimit);
   }
 
-  const fallback = await supabase
-    .from("external_posts")
-    .select("id, title, caption, source_url, media_url, posted_at, metrics")
-    .order("posted_at", { ascending: false })
-    .limit(Math.max(desiredLimit * 3, 200));
+  const merged = [...primaryEpisodes];
+  const seenKeys = new Set(primaryEpisodes.flatMap((episode) => mergeEpisodeKeys(episode)));
+  const externalEpisodes = await getExternalPublishedEpisodes(Math.max(desiredLimit * 2, 240));
+  externalEpisodes.forEach((episode) => {
+    const keys = mergeEpisodeKeys(episode);
+    if (keys.some((key) => seenKeys.has(key))) return;
+    keys.forEach((key) => seenKeys.add(key));
+    merged.push(episode);
+  });
 
-  const seen = new Set<string>();
-  const out: SeoEpisode[] = [];
-  for (const row of (fallback.data ?? []) as any[]) {
-    const sourceUrl = String(row.source_url ?? "");
-    if (!sourceUrl || (!sourceUrl.includes("youtube.com") && !sourceUrl.includes("youtu.be"))) continue;
-    const duration = Number(row?.metrics?.durationSeconds ?? 0);
-    const isShort = row?.metrics?.isShort === true || (duration > 0 && duration <= 180) || sourceUrl.includes("/shorts/");
-    if (isShort) continue;
-    const slug = maybeSlugFromSource(sourceUrl, String(row.id));
-    if (seen.has(slug)) continue;
-    seen.add(slug);
-    out.push({
-      id: String(row.id),
-      slug,
-      title: String(row.title ?? "Episodio"),
-      description: row.caption ?? null,
-      youtube_url: sourceUrl,
-      audio_url: null,
-      thumbnail_url: row.media_url ?? null,
-      duration_seconds: Number.isFinite(duration) && duration > 0 ? duration : null,
-      is_published: true,
-      published_at: row.posted_at ?? null,
-      updated_at: row.posted_at ?? null
-    });
-    if (out.length >= desiredLimit) break;
-  }
-  return out;
+  return merged
+    .sort((a, b) => {
+      const byPublished = safeTimestamp(b.published_at) - safeTimestamp(a.published_at);
+      if (byPublished !== 0) return byPublished;
+      return safeTimestamp(b.updated_at) - safeTimestamp(a.updated_at);
+    })
+    .slice(0, desiredLimit);
 }
 
 export async function getEpisodeBySlug(slug: string): Promise<SeoEpisode | null> {
   const cleanSlug = String(slug || "").trim();
   if (!cleanSlug) return null;
-  const episodes = await getPublishedEpisodes(400);
+  const episodes = await getPublishedEpisodes(1200);
   return episodes.find((row) => row.slug === cleanSlug || row.id === cleanSlug) ?? null;
 }
 
