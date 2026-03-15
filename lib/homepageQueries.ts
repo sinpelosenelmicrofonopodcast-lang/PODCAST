@@ -284,7 +284,10 @@ function isShortPost(row: ExternalPostRow) {
 
 function isEpisodePost(row: ExternalPostRow) {
   if (isShortPost(row)) return false;
+  const videoId = getYouTubeVideoId(row.source_url);
+  if (!videoId) return false;
   const duration = safeNum(row.metrics?.durationSeconds);
+  if (duration <= 0) return false;
   if (duration >= 20 * 60) return true;
   const text = `${row.title ?? ""} ${row.caption ?? ""}`.toLowerCase();
   const hasEpisodeSignal = /(episodio|episode|podcast|capitulo|capítulo|entrevista|full episode|sin pelos)/i.test(text);

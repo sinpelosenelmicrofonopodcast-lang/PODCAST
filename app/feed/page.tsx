@@ -156,9 +156,16 @@ function isShortPost(post: ExternalPost) {
 }
 
 function isPodcastSource(post: ExternalPost) {
+  const sourceUrl = String(post.source_url ?? "").trim();
+  const videoId = getYouTubeVideoId(sourceUrl);
+  if (!videoId) return false;
+
+  const duration = Number(post.metrics?.durationSeconds ?? 0);
+  if (!Number.isFinite(duration) || duration <= 0) return false;
+
   const platform = String(post.platform ?? "").toLowerCase();
   if (platform.includes("youtube")) return true;
-  const url = String(post.source_url ?? "").toLowerCase();
+  const url = sourceUrl.toLowerCase();
   return url.includes("youtube.com") || url.includes("youtu.be");
 }
 

@@ -1,3 +1,5 @@
+import { getYouTubeVideoId } from "@/lib/youtube";
+
 export type ExternalPodcastPost = {
   id: string;
   platform: string;
@@ -52,10 +54,18 @@ export function uniqueExternalPodcastPosts(items: ExternalPodcastPost[]) {
 }
 
 export function isPodcastSource(post: ExternalPodcastPost) {
+  const sourceUrl = cleanText(post.source_url);
+  const videoId = getYouTubeVideoId(sourceUrl);
+  if (!videoId) return false;
+
+  const duration = safeNum(post.metrics?.durationSeconds);
+  if (duration <= 0) return false;
+
   const platform = cleanText(post.platform).toLowerCase();
   if (platform.includes("youtube")) return true;
-  const url = cleanText(post.source_url).toLowerCase();
-  return url.includes("youtube.com") || url.includes("youtu.be");
+
+  // Fallback for older rows synced before platform normalization.
+  return sourceUrl.toLowerCase().includes("youtube.com") || sourceUrl.toLowerCase().includes("youtu.be");
 }
 
 export function isShortPodcastPost(post: ExternalPodcastPost) {
