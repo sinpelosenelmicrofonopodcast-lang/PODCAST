@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 type MetaConfig = {
   pageId: string;
   pageAccessToken: string;
+  pageAccessTokenRef: string;
   graphVersion: string;
   appId: string;
   appSecret: string;
@@ -94,10 +95,14 @@ type OverviewInput = {
 };
 
 function getMetaConfig(): MetaConfig {
+  const facebookPageAccessToken = String(process.env.FACEBOOK_PAGE_ACCESS_TOKEN ?? "").trim();
+  const metaPageAccessToken = String(process.env.META_PAGE_ACCESS_TOKEN ?? "").trim();
+
   return {
-    pageId: String(process.env.META_PAGE_ID ?? "").trim(),
-    pageAccessToken: String(process.env.META_PAGE_ACCESS_TOKEN ?? "").trim(),
-    graphVersion: String(process.env.META_GRAPH_VERSION ?? "v24.0").trim() || "v24.0",
+    pageId: String(process.env.FACEBOOK_PAGE_ID ?? process.env.META_PAGE_ID ?? "").trim(),
+    pageAccessToken: facebookPageAccessToken || metaPageAccessToken,
+    pageAccessTokenRef: facebookPageAccessToken ? "env:FACEBOOK_PAGE_ACCESS_TOKEN" : "env:META_PAGE_ACCESS_TOKEN",
+    graphVersion: String(process.env.FACEBOOK_GRAPH_VERSION ?? process.env.META_GRAPH_VERSION ?? "v24.0").trim() || "v24.0",
     appId: String(process.env.META_APP_ID ?? "").trim(),
     appSecret: String(process.env.META_APP_SECRET ?? "").trim()
   };
@@ -105,7 +110,7 @@ function getMetaConfig(): MetaConfig {
 
 function assertMetaConfig(config: MetaConfig) {
   if (!config.pageId || !config.pageAccessToken) {
-    throw new Error("Faltan META_PAGE_ID o META_PAGE_ACCESS_TOKEN en el servidor.");
+    throw new Error("Faltan FACEBOOK_PAGE_ID/META_PAGE_ID o FACEBOOK_PAGE_ACCESS_TOKEN/META_PAGE_ACCESS_TOKEN en el servidor.");
   }
 }
 
@@ -464,7 +469,7 @@ export async function connectFacebookPage(service: SupabaseClient) {
   const accountRow = {
     page_id: String(profile.id ?? config.pageId),
     // NOTE: no guardamos token real en DB; solo referencia segura al origen.
-    access_token: "env:META_PAGE_ACCESS_TOKEN",
+    access_token: config.pageAccessTokenRef,
     token_expires_at: null,
     permissions: scopes,
     updated_at: nowIso
