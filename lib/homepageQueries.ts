@@ -199,6 +199,10 @@ const FEED_DEFAULT_LIMIT = 8;
 const MAX_FEED_LIMIT = 24;
 let cachedServiceClient: ReturnType<typeof createClient> | null = null;
 
+function hasImage(url?: string | null) {
+  return Boolean(normalizeImageUrl(url));
+}
+
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -286,6 +290,29 @@ function isEpisodePost(row: ExternalPostRow) {
   const hasEpisodeSignal = /(episodio|episode|podcast|capitulo|capítulo|entrevista|full episode|sin pelos)/i.test(text);
   if (!hasEpisodeSignal) return false;
   return !/(clip|highlights?|resumen|noticia|breaking|reel|short|tiktok)/i.test(text);
+}
+
+function chicagoDateKey(date = new Date()) {
+  const parts: Record<string, string> = {};
+  for (const part of new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date)) {
+    if (part.type !== "literal") parts[part.type] = part.value;
+  }
+  return `${parts.year ?? "0000"}-${parts.month ?? "01"}-${parts.day ?? "01"}`;
+}
+
+function seededIndex(seed: string, length: number) {
+  if (length <= 1) return 0;
+  let hash = 2166136261;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % length;
 }
 
 function newsCategory(row: HomeNewsItem) {
@@ -715,11 +742,17 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
     fetchPromotions(supabase, 10)
   ]);
 
-  const heroLead = newsRows.find(isPriorityNews) ?? newsRows[0] ?? null;
-  const heroTrending = newsRows.filter((row) => row.id !== heroLead?.id).slice(0, 3);
+  const newsVisualRows = newsRows.filter((row) => hasImage(row.cover_url));
+  const blogVisualRows = blogRows.filter((row) => hasImage(row.cover_url));
+  const eventVisualRows = eventsRows.filter((row) => hasImage(row.flyer_url));
+  const sponsorVisualRows = promoRows.filter((row) => hasImage(row.image_url));
+  const podcastVisualRows = podcastSourceRows.filter((row) => hasImage(postThumb(row)));
+
+  const heroLead = newsVisualRows.find(isPriorityNews) ?? newsVisualRows[0] ?? null;
+  const heroTrending = newsVisualRows.filter((row) => row.id !== heroLead?.id).slice(0, 3);
 
   const usedHero = new Set<string>([heroLead?.id ?? "", ...heroTrending.map((row) => row.id)].filter(Boolean));
-  const regionPool = newsRows.filter((row) => !usedHero.has(row.id));
+  const regionPool = newsVisualRows.filter((row) => !usedHero.has(row.id));
   const regionRemaining = new Set(regionPool.map((row) => row.id));
 
   const pickRegion = (keys: string[]) => {
@@ -742,11 +775,14 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
     return selected;
   };
 
-  const podcastRows = podcastSourceRows;
-  const featuredEpisode = podcastRows.find((row) => !isShortPost(row)) ?? podcastRows.find((row) => isEpisodePost(row)) ?? null;
+  const podcastRows = podcastVisualRows;
+  const featuredCandidates = podcastRows.filter((row) => isEpisodePost(row));
+  const featuredPoolBase = featuredCandidates.length > 0 ? featuredCandidates : podcastRows.filter((row) => !isShortPost(row));
+  const featuredPool = featuredPoolBase.slice(0, Math.min(18, featuredPoolBase.length));
+  const featuredEpisode = featuredPool.length > 0 ? featuredPool[seededIndex(`featured-podcast:${chicagoDateKey()}`, featuredPool.length)] : null;
 
   const editorialStories: HomeEditorialStory[] = [];
-  for (const post of blogRows) {
+  for (const post of blogVisualRows) {
     editorialStories.push({
       id: `blog-${post.id}`,
       href: blogHref(post),
@@ -759,7 +795,7 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
   }
 
   if (editorialStories.length < 3) {
-    for (const news of newsRows) {
+    for (const news of newsVisualRows) {
       editorialStories.push({
         id: `news-${news.id}`,
         href: newsHref(news),
@@ -775,7 +811,7 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
   const communityThreads = threadRows.filter((row) => row.space === "community").slice(0, 6);
   const fallbackTopics = newsRows.slice(0, 6).map((row) => row.title);
 
-  const sponsors = promoRows.filter(sponsorCandidate).slice(0, 3).map((row) => ({
+  const sponsors = sponsorVisualRows.filter(sponsorCandidate).slice(0, 3).map((row) => ({
     id: row.id,
     title: row.title,
     description: row.description,
@@ -818,7 +854,7 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
       threads: communityThreads,
       fallbackTopics
     },
-    events: eventsRows.slice(0, 4),
+    events: eventVisualRows.slice(0, 4),
     sponsors: {
       mid: sponsors[0] ?? null,
       footer: sponsors[1] ?? sponsors[0] ?? null
@@ -1034,6 +1070,7 @@ async function queryHomepageFeedPageInternal(
   const seenHeadlines = new Set<string>();
   const deduped = uniqById(feedItems)
     .filter((item) => !exclude.has(item.id))
+    .filter((item) => hasImage(item.thumbnailUrl))
     .filter((item) => {
       const key = normalizeHeadline(item.title);
       if (!key) return true;

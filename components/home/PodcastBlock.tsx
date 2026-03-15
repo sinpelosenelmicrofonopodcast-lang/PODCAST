@@ -27,11 +27,11 @@ export function PodcastBlock({
           <SafeImage src={featured?.media_url} alt={featured?.title ?? "Podcast destacado"} loading="lazy" />
         </div>
         <div className="home-podcast-body">
-          <span className="home-urgency-badge">EN VIVO</span>
+          <span className="home-urgency-badge">DESTACADO HOY</span>
           <h3 className="clamp-2">{featured?.title ?? "No hay episodio sincronizado"}</h3>
           <p className="clamp-2">
             {featured?.caption ??
-              "Activa la sincronizacion de YouTube para mostrar automaticamente el episodio mas reciente."}
+              "Activa la sincronizacion de YouTube para mostrar automaticamente episodios completos del repertorio."}
           </p>
           <div className="home-podcast-metrics">
             <span>{compact(featured?.metrics?.views)} views</span>
