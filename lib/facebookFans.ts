@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolvePageAccessToken } from "@/lib/metaTokens";
 
 type MetaConfig = {
   pageId: string;
@@ -94,15 +95,15 @@ type OverviewInput = {
   postId?: string | null;
 };
 
-function getMetaConfig(): MetaConfig {
-  const facebookPageAccessToken = String(process.env.FACEBOOK_PAGE_ACCESS_TOKEN ?? "").trim();
-  const metaPageAccessToken = String(process.env.META_PAGE_ACCESS_TOKEN ?? "").trim();
+async function getMetaConfig(): Promise<MetaConfig> {
+  const resolved = await resolvePageAccessToken();
+  const tokenRef = resolved.source.includes(":") ? `resolved:${resolved.source}` : `env:${resolved.source}`;
 
   return {
-    pageId: String(process.env.FACEBOOK_PAGE_ID ?? process.env.META_PAGE_ID ?? "").trim(),
-    pageAccessToken: facebookPageAccessToken || metaPageAccessToken,
-    pageAccessTokenRef: facebookPageAccessToken ? "env:FACEBOOK_PAGE_ACCESS_TOKEN" : "env:META_PAGE_ACCESS_TOKEN",
-    graphVersion: String(process.env.FACEBOOK_GRAPH_VERSION ?? process.env.META_GRAPH_VERSION ?? "v24.0").trim() || "v24.0",
+    pageId: resolved.pageId,
+    pageAccessToken: resolved.accessToken,
+    pageAccessTokenRef: tokenRef,
+    graphVersion: resolved.graphVersion,
     appId: String(process.env.META_APP_ID ?? "").trim(),
     appSecret: String(process.env.META_APP_SECRET ?? "").trim()
   };
@@ -183,9 +184,7 @@ async function graphFetchJson<T = any>(url: string): Promise<T> {
   return json as T;
 }
 
-function buildGraphUrl(path: string, params: Record<string, string>) {
-  const config = getMetaConfig();
-  assertMetaConfig(config);
+function buildGraphUrl(config: MetaConfig, path: string, params: Record<string, string>) {
   const url = new URL(`https://graph.facebook.com/${config.graphVersion}/${path.replace(/^\//, "")}`);
   url.searchParams.set("access_token", config.pageAccessToken);
   for (const [k, v] of Object.entries(params)) {
@@ -226,7 +225,7 @@ async function graphGetDebugScopes(config: MetaConfig): Promise<string[]> {
 }
 
 async function fetchPageProfile(config: MetaConfig) {
-  const url = buildGraphUrl(config.pageId, { fields: "id,name,link" });
+  const url = buildGraphUrl(config, config.pageId, { fields: "id,name,link" });
   return graphFetchJson<{ id: string; name?: string; link?: string }>(url);
 }
 
@@ -241,7 +240,7 @@ async function fetchPostsForSync(config: MetaConfig, sinceIso: string, untilIso:
     "reactions.summary(true).limit(0)"
   ].join(",");
 
-  const url = buildGraphUrl(`${config.pageId}/posts`, {
+  const url = buildGraphUrl(config, `${config.pageId}/posts`, {
     fields,
     limit: "25",
     since: sinceIso,
@@ -252,7 +251,7 @@ async function fetchPostsForSync(config: MetaConfig, sinceIso: string, untilIso:
 }
 
 async function fetchCommentsForPost(config: MetaConfig, postId: string) {
-  const url = buildGraphUrl(`${postId}/comments`, {
+  const url = buildGraphUrl(config, `${postId}/comments`, {
     fields: "id,message,from,created_time",
     filter: "stream",
     limit: "100"
@@ -261,7 +260,7 @@ async function fetchCommentsForPost(config: MetaConfig, postId: string) {
 }
 
 async function fetchReactionsForPost(config: MetaConfig, postId: string) {
-  const url = buildGraphUrl(`${postId}/reactions`, {
+  const url = buildGraphUrl(config, `${postId}/reactions`, {
     fields: "id,name,type,created_time",
     limit: "100"
   });
@@ -451,7 +450,7 @@ async function recalculateFansTable(service: SupabaseClient) {
 }
 
 export async function connectFacebookPage(service: SupabaseClient) {
-  const config = getMetaConfig();
+  const config = await getMetaConfig();
   assertMetaConfig(config);
 
   // TODO(meta-app-review): migrar a OAuth server-to-server con token rotatorio por página
@@ -489,7 +488,7 @@ export async function connectFacebookPage(service: SupabaseClient) {
 }
 
 export async function syncFacebookFans(service: SupabaseClient, input: SyncInput = {}): Promise<SyncSummary> {
-  const config = getMetaConfig();
+  const config = await getMetaConfig();
   assertMetaConfig(config);
 
   const maxPosts = Math.max(5, Math.min(100, Number(input.maxPosts ?? 40)));
