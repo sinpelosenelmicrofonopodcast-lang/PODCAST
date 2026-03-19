@@ -26,9 +26,12 @@ export function NewsEngineRunCron() {
   return (
     <div className="card" style={{ display: "grid", gap: 10 }}>
       <h3 style={{ margin: 0 }}>Acciones rápidas</h3>
+      <p className="muted" style={{ margin: 0 }}>
+        El motor SPM corre cada 30 minutos, pero desde aquí puedes forzarlo manualmente.
+      </p>
       <div className="admin-item-actions">
-        <button className="button secondary" disabled={Boolean(busy)} onClick={() => run("ingest", "News ingest")}>
-          Ingestar ahora
+        <button className="button secondary" disabled={Boolean(busy)} onClick={() => run("ingest", "SPM News Engine")}>
+          Correr SPM Engine
         </button>
         <button className="button secondary" disabled={Boolean(busy)} onClick={() => run("trends", "Trends")}>
           Detectar trends

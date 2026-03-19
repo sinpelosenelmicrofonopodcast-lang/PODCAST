@@ -3,12 +3,12 @@ import { rewriteSinPelos } from "@/lib/ai/rewrite-sin-pelos";
 import { generatePollFromArticle } from "@/lib/ai/generate-poll";
 import { generateSocialCopy } from "@/lib/ai/generate-social-copy";
 import { generateReelScript } from "@/lib/ai/generate-reel-script";
-import { buildSpmCoverTemplate } from "@/lib/images/spm-cover-template";
 import { buildMemeTemplate } from "@/lib/images/meme-template";
 import { buildQuoteCard } from "@/lib/images/quote-card";
 import { buildThumbnail } from "@/lib/images/thumbnail";
 import { asOptionalString, asString, asStringArray, isUuid, parseDate, requireNonEmpty } from "@/lib/validations/common";
 import { cleanNewsCategories } from "@/lib/newsCategories";
+import { generateSpmNewsImage } from "@/services/newsImageGenerator";
 
 export const SUPPORTED_SOCIAL_PLATFORMS = ["facebook", "instagram", "x", "tiktok"] as const;
 export type SupportedSocialPlatform = (typeof SUPPORTED_SOCIAL_PLATFORMS)[number];
@@ -24,12 +24,16 @@ export type ArticleEditorRow = {
   slug: string;
   title: string;
   summary: string | null;
+  analysis: string | null;
   excerpt: string | null;
   original_content: string | null;
+  source_name: string | null;
   cover_image_url: string | null;
+  featured_image_url: string | null;
   category: string | null;
   region: string | null;
   tags: string[] | null;
+  hashtags: string[] | null;
   status: string;
   published_at: string | null;
   source_url: string | null;
@@ -41,7 +45,7 @@ export async function getArticleEditorRow(service: SupabaseClient, articleId: st
   const { data, error } = await service
     .from("news_articles")
     .select(
-      "id, slug, title, summary, excerpt, original_content, cover_image_url, category, region, tags, status, published_at, source_url"
+      "id, slug, title, summary, analysis, excerpt, original_content, source_name, cover_image_url, featured_image_url, category, region, tags, hashtags, status, published_at, source_url"
     )
     .eq("id", articleId)
     .limit(1)
@@ -76,21 +80,33 @@ export async function updateArticleEditorial(
   input: {
     title: unknown;
     summary?: unknown;
+    analysis?: unknown;
     category?: unknown;
     region?: unknown;
+    tags?: unknown;
+    hashtags?: unknown;
+    coverImageUrl?: unknown;
   }
 ) {
   const article = await getArticleEditorRow(service, articleId);
   const title = requireNonEmpty(input.title, "title", 180);
   const summary = asOptionalString(input.summary, 1400);
+  const analysis = asOptionalString(input.analysis, 6000);
   const category = asOptionalString(input.category, 120);
   const region = asOptionalString(input.region, 120);
+  const tags = asStringArray(input.tags, 12, 32);
+  const hashtags = asStringArray(input.hashtags, 10, 32).map((item) => (item.startsWith("#") ? item : `#${item}`));
+  const coverImageUrl = asOptionalString(input.coverImageUrl, 2000);
 
   const updatePayload: Record<string, unknown> = {
     title,
     summary,
+    analysis,
     category,
     region,
+    tags,
+    hashtags,
+    cover_image_url: coverImageUrl,
     updated_by: actorId
   };
 
@@ -105,8 +121,12 @@ export async function updateArticleEditorial(
     articleId,
     title,
     summary,
+    analysis,
     category,
-    region
+    region,
+    tags,
+    hashtags,
+    coverImageUrl
   };
 }
 
@@ -115,10 +135,12 @@ async function upsertLegacyNewsItem(service: SupabaseClient, article: ArticleEdi
   const payload = {
     title: article.title,
     summary: article.summary,
-    analysis: article.original_content ?? article.summary ?? article.title,
+    analysis: article.analysis ?? article.original_content ?? article.summary ?? article.title,
     source_url: article.source_url,
     categories: categories.length > 0 ? categories : ["Mundo"],
-    tags: article.tags ?? [],
+    tags: Array.from(
+      new Set([...(article.tags ?? []), ...((article.hashtags ?? []).map((item) => item.replace(/^#/, "").toLowerCase()))])
+    ),
     cover_url: article.cover_image_url,
     publication_state: "published",
     published_at: new Date().toISOString()
@@ -181,8 +203,8 @@ export async function rewriteArticle(service: SupabaseClient, articleId: string,
   const rewrite = await rewriteSinPelos({
     title: article.title,
     summary: article.summary ?? article.excerpt ?? "",
-    body: article.original_content ?? article.summary ?? article.title,
-    sourceName: "Sin Pelos",
+    body: article.original_content ?? article.analysis ?? article.summary ?? article.title,
+    sourceName: article.source_name ?? "Sin Pelos",
     sourceUrl: article.source_url ?? ""
   });
 
@@ -194,12 +216,14 @@ export async function rewriteArticle(service: SupabaseClient, articleId: string,
   const updatePayload = {
     title: rewrite.discoverTitle || rewrite.seoTitle,
     summary: rewrite.summary,
+    analysis: rewrite.analysis,
     excerpt: rewrite.excerpt,
     rewritten_content: rewrite.rewrittenBody,
     reel_script: `${reel.hook}\n- ${reel.bullets.join("\n- ")}\n${reel.close}`,
     category: rewrite.category,
     region: rewrite.region,
     tags: rewrite.tags,
+    hashtags: [],
     seo: {
       title: rewrite.seoTitle,
       description: rewrite.summary
@@ -226,13 +250,17 @@ export async function rewriteArticle(service: SupabaseClient, articleId: string,
 export async function generateArticleAssets(service: SupabaseClient, articleId: string, actorId: string | null) {
   const article = await getArticleEditorRow(service, articleId);
 
-  const cover = buildSpmCoverTemplate({ title: article.title });
+  const cover = generateSpmNewsImage({
+    title: article.title,
+    subtitle: article.summary ?? article.category ?? "SPM Noticias",
+    originalImageUrl: article.featured_image_url ?? article.cover_image_url
+  });
   const meme = buildMemeTemplate({ top: article.title.slice(0, 60), bottom: article.summary ?? "Sin filtro" });
   const quote = buildQuoteCard({ quote: article.summary ?? article.title, author: "SPM News" });
   const thumb = buildThumbnail({ title: article.title, subtitle: article.summary ?? "SPM" });
 
   const assets = [
-    { type: "cover", url: cover.dataUrl, meta: { format: "svg", width: cover.width, height: cover.height } },
+    { type: "cover", url: cover.imageUrl, meta: { format: "svg", width: cover.width, height: cover.height, prompt: cover.prompt } },
     { type: "meme", url: meme.dataUrl, meta: { format: "svg", width: meme.width, height: meme.height } },
     { type: "quote_card", url: quote.dataUrl, meta: { format: "svg", width: quote.width, height: quote.height } },
     { type: "reel_thumbnail", url: thumb.dataUrl, meta: { format: "svg", width: thumb.width, height: thumb.height } }
@@ -256,7 +284,7 @@ export async function generateArticleAssets(service: SupabaseClient, articleId: 
   const { error: articleError } = await service
     .from("news_articles")
     .update({
-      cover_image_url: cover.dataUrl,
+      cover_image_url: cover.imageUrl,
       meme_image_url: meme.dataUrl,
       quote_card_url: quote.dataUrl,
       updated_by: actorId
@@ -269,6 +297,32 @@ export async function generateArticleAssets(service: SupabaseClient, articleId: 
     articleId,
     assets
   };
+}
+
+export async function deleteArticle(service: SupabaseClient, articleId: string) {
+  const article = await service
+    .from("news_articles")
+    .select("id, legacy_news_item_id")
+    .eq("id", articleId)
+    .limit(1)
+    .maybeSingle();
+
+  if (article.error) throw new Error(article.error.message);
+  if (!article.data?.id) throw new Error("Artículo no encontrado.");
+
+  const legacyId = String((article.data as any).legacy_news_item_id ?? "").trim();
+  const del = await service.from("news_articles").delete().eq("id", articleId);
+  if (del.error) throw new Error(del.error.message);
+
+  if (legacyId) {
+    try {
+      await service.from("news_items").delete().eq("id", legacyId);
+    } catch {
+      // no-op
+    }
+  }
+
+  return { articleId, legacyId: legacyId || null };
 }
 
 export async function generateArticlePoll(service: SupabaseClient, articleId: string) {

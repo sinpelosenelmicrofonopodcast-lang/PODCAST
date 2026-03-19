@@ -1,4 +1,4 @@
-export type NewsSourceType = "rss" | "api" | "trend" | "manual";
+export type NewsSourceType = "rss" | "api" | "trend" | "manual" | "google_news" | "reddit";
 
 export type NewsArticleStatus =
   | "draft"
@@ -26,24 +26,29 @@ export type NewsSourceRow = {
   max_items_per_run?: number | null;
   trust_score?: number | null;
   last_checked_at?: string | null;
+  last_scanned_at?: string | null;
+  scan_every_min?: number | null;
 };
 
 export type NewsArticleRow = {
   id: string;
   source_id: string | null;
   legacy_news_item_id?: string | null;
+  source_name?: string | null;
   title: string;
   slug: string;
   source_url: string | null;
   original_title: string | null;
   original_content: string | null;
   rewritten_content: string | null;
+  analysis?: string | null;
   summary: string | null;
   excerpt: string | null;
   author_name: string | null;
   category: string | null;
   region: string | null;
   tags: string[] | null;
+  hashtags?: string[] | null;
   featured_image_url: string | null;
   cover_image_url: string | null;
   meme_image_url: string | null;
@@ -57,6 +62,7 @@ export type NewsArticleRow = {
   discover_score: number;
   controversy_score: number;
   engagement_score: number;
+  impact_score?: number;
   ai_metadata: Record<string, unknown> | null;
   seo: Record<string, unknown> | null;
   social: Record<string, unknown> | null;
@@ -81,6 +87,16 @@ export type IngestedCandidate = {
   trustScore: number;
   priority: number;
   hash: string;
+  sourceType?: NewsSourceType;
+  categories?: string[];
+  hashtags?: string[];
+  analysis?: string | null;
+  impactScore?: number;
+  viralScore?: number;
+  estimatedEngagement?: number;
+  trendMatches?: string[];
+  impactReasons?: string[];
+  sourceMeta?: Record<string, unknown>;
 };
 
 export type TrendSnapshot = {
@@ -89,6 +105,16 @@ export type TrendSnapshot = {
   region: string | null;
   score: number;
   meta?: Record<string, unknown>;
+};
+
+export type IngestSummary = {
+  sources: number;
+  scanned: number;
+  created: number;
+  skipped: number;
+  failed: number;
+  mirroredToLegacy: number;
+  errors: Array<{ source: string; message: string }>;
 };
 
 export type SocialPlatform = "facebook" | "instagram" | "x" | "tiktok";

@@ -21,15 +21,22 @@ export type NewsEngineArticleCard = {
   title: string;
   slug: string;
   status: string;
+  sourceName: string | null;
+  sourceUrl: string | null;
   category: string | null;
   region: string | null;
   summary: string | null;
+  analysis: string | null;
   excerpt: string | null;
+  tags: string[];
+  hashtags: string[];
   coverImageUrl: string | null;
   publishAt: string | null;
   publishedAt: string | null;
+  createdAt: string | null;
   trendingScore: number;
   discoverScore: number;
+  impactScore: number;
   qualityScore: number;
   qualityReasons: string[];
   socialDrafts: SocialDraft[];
@@ -87,6 +94,17 @@ function createInitialSocialState(article: NewsEngineArticleCard): SocialEditorS
   };
 }
 
+function toCsv(values: string[]) {
+  return values.join(", ");
+}
+
+function fromCsv(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function NewsEngineArticleActions({ article }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -96,8 +114,12 @@ export function NewsEngineArticleActions({ article }: Props) {
   const [editor, setEditor] = useState({
     title: article.title,
     summary: article.summary ?? "",
+    analysis: article.analysis ?? "",
     category: article.category ?? "",
-    region: article.region ?? ""
+    region: article.region ?? "",
+    tags: toCsv(article.tags),
+    hashtags: toCsv(article.hashtags),
+    coverImageUrl: article.coverImageUrl ?? ""
   });
   const [social, setSocial] = useState<SocialEditorState>(() => createInitialSocialState(article));
 
@@ -128,11 +150,23 @@ export function NewsEngineArticleActions({ article }: Props) {
   const saveArticle = async () => {
     const json = await request(`/api/admin/articles/${article.id}`, {
       method: "PATCH",
-      body: editor
+      body: {
+        ...editor,
+        tags: fromCsv(editor.tags),
+        hashtags: fromCsv(editor.hashtags)
+      }
     });
 
     if (!json) return;
     setStatus("Cambios editoriales guardados.");
+    refreshPage();
+  };
+
+  const deleteArticle = async () => {
+    if (!window.confirm(`Eliminar el draft "${article.title}"?`)) return;
+    const json = await request(`/api/admin/articles/${article.id}`, { method: "DELETE" });
+    if (!json) return;
+    setStatus("Draft eliminado.");
     refreshPage();
   };
 
@@ -192,50 +226,92 @@ export function NewsEngineArticleActions({ article }: Props) {
 
   const socialDraftByPlatform = new Map(article.socialDrafts.map((item) => [item.platform, item]));
   const metaPills = [
+    article.status,
+    article.sourceName || "Sin fuente",
     article.category || "Sin categoría",
     article.region || "Sin región",
-    `Trend ${article.trendingScore.toFixed(2)}`,
-    `Discover ${article.discoverScore.toFixed(2)}`,
-    article.coverImageUrl ? "Imagen OK" : "Sin imagen",
+    `Impacto ${article.impactScore.toFixed(1)}`,
+    `Trend ${article.trendingScore.toFixed(1)}`,
+    `Discover ${article.discoverScore.toFixed(1)}`,
     `Calidad ${article.qualityScore.toFixed(0)}`
   ];
 
   return (
     <article className="card news-engine-article-card">
-      <div className="news-engine-article-head">
-        <div style={{ display: "grid", gap: 6 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <strong className="news-engine-article-title">{article.title}</strong>
-            <span className="news-badge">{article.status}</span>
+      <div className="news-engine-preview-grid">
+        {article.coverImageUrl ? (
+          <div className="news-engine-preview-media">
+            <img src={article.coverImageUrl} alt={article.title} className="news-engine-preview-image" />
           </div>
-          <p className="muted" style={{ margin: 0 }}>
-            /noticias/{article.slug}
-          </p>
-        </div>
-        <div className="news-engine-article-meta">
-          {metaPills.map((pill) => (
-            <span key={pill} className="news-engine-pill">
-              {pill}
-            </span>
-          ))}
+        ) : null}
+
+        <div className="news-engine-preview-copy">
+          <div className="news-engine-article-head">
+            <div style={{ display: "grid", gap: 6 }}>
+              <strong className="news-engine-article-title">{article.title}</strong>
+              <p className="muted" style={{ margin: 0 }}>
+                /noticias/{article.slug}
+              </p>
+              <p className="muted" style={{ margin: 0 }}>
+                Creado: {fmtDate(article.createdAt)} · Publicación: {fmtDate(article.publishedAt)} · Programado: {fmtDate(article.publishAt)}
+              </p>
+            </div>
+            <div className="news-engine-article-meta">
+              {metaPills.map((pill) => (
+                <span key={pill} className="news-engine-pill">
+                  {pill}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="news-engine-preview-block">
+            <h3 style={{ margin: 0 }}>Resumen</h3>
+            <p className="muted" style={{ margin: 0 }}>
+              {article.summary || "Sin resumen."}
+            </p>
+          </div>
+
+          <div className="news-engine-preview-block">
+            <h3 style={{ margin: 0 }}>Análisis</h3>
+            <p className="muted news-engine-analysis" style={{ margin: 0 }}>
+              {article.analysis || article.excerpt || "Sin análisis todavía."}
+            </p>
+          </div>
+
+          <div className="news-engine-tag-row">
+            {article.tags.map((tag) => (
+              <span key={`tag-${tag}`} className="news-engine-pill">
+                {tag}
+              </span>
+            ))}
+            {article.hashtags.map((tag) => (
+              <span key={`hash-${tag}`} className="news-engine-pill">
+                {tag}
+              </span>
+            ))}
+          </div>
+
+          {article.sourceUrl ? (
+            <a className="muted" href={article.sourceUrl} target="_blank" rel="noreferrer">
+              Ver fuente original
+            </a>
+          ) : null}
         </div>
       </div>
 
-      <p className="muted" style={{ margin: 0 }}>
-        {String(article.summary ?? article.excerpt ?? "").trim() || "Sin resumen útil todavía."}
-      </p>
-
-      <p className="muted" style={{ margin: 0 }}>
-        Publicación: {fmtDate(article.publishedAt)} · Programado: {fmtDate(article.publishAt)}
-        {article.qualityReasons.length ? ` · Revisión: ${article.qualityReasons.join(", ")}` : ""}
-      </p>
+      {article.qualityReasons.length ? (
+        <p className="muted" style={{ margin: 0 }}>
+          Revisión sugerida: {article.qualityReasons.join(", ")}
+        </p>
+      ) : null}
 
       <div className="admin-item-actions">
         <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => setEditorOpen((value) => !value)}>
-          {editorOpen ? "Cerrar editor" : "Editar noticia"}
+          {editorOpen ? "Cerrar editor" : "Editar draft"}
         </button>
         <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => setSocialOpen((value) => !value)}>
-          {socialOpen ? "Cerrar redes" : "Editar/postear redes"}
+          {socialOpen ? "Cerrar redes" : "Redes"}
         </button>
         <button
           className="button secondary"
@@ -243,23 +319,15 @@ export function NewsEngineArticleActions({ article }: Props) {
           disabled={Boolean(busy)}
           onClick={() => runQuickAction(`/api/admin/articles/${article.id}/rewrite`, undefined, "Reescritura IA completada.")}
         >
-          Reescribir IA
+          Regenerar copy IA
         </button>
         <button
           className="button secondary"
           type="button"
           disabled={Boolean(busy)}
-          onClick={() => runQuickAction(`/api/admin/articles/${article.id}/generate-assets`, undefined, "Assets generados.")}
+          onClick={() => runQuickAction(`/api/admin/articles/${article.id}/generate-assets`, undefined, "Portada y assets regenerados.")}
         >
-          Assets
-        </button>
-        <button
-          className="button secondary"
-          type="button"
-          disabled={Boolean(busy)}
-          onClick={() => runQuickAction(`/api/admin/articles/${article.id}/generate-poll`, undefined, "Encuesta generada.")}
-        >
-          Encuesta
+          Regenerar portada
         </button>
         <button
           className="button"
@@ -267,14 +335,17 @@ export function NewsEngineArticleActions({ article }: Props) {
           disabled={Boolean(busy)}
           onClick={() => runQuickAction(`/api/admin/articles/${article.id}/publish`, { pushNow: true }, "Noticia publicada.")}
         >
-          Publicar
+          Publish
+        </button>
+        <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={deleteArticle}>
+          Delete
         </button>
       </div>
 
       {editorOpen ? (
         <section className="news-engine-editor-grid">
           <div className="news-engine-panel">
-            <h3 style={{ marginTop: 0 }}>Editorial</h3>
+            <h3 style={{ marginTop: 0 }}>Editor inline</h3>
             <label>
               Título
               <input
@@ -287,9 +358,18 @@ export function NewsEngineArticleActions({ article }: Props) {
               Resumen
               <textarea
                 className="textarea"
-                rows={4}
+                rows={3}
                 value={editor.summary}
                 onChange={(event) => setEditor((current) => ({ ...current, summary: event.target.value }))}
+              />
+            </label>
+            <label>
+              Análisis
+              <textarea
+                className="textarea"
+                rows={8}
+                value={editor.analysis}
+                onChange={(event) => setEditor((current) => ({ ...current, analysis: event.target.value }))}
               />
             </label>
             <div className="news-engine-inline-fields">
@@ -310,9 +390,37 @@ export function NewsEngineArticleActions({ article }: Props) {
                 />
               </label>
             </div>
+            <div className="news-engine-inline-fields">
+              <label>
+                Tags
+                <input
+                  className="input"
+                  value={editor.tags}
+                  onChange={(event) => setEditor((current) => ({ ...current, tags: event.target.value }))}
+                  placeholder="crimen, usa, puerto rico"
+                />
+              </label>
+              <label>
+                Hashtags
+                <input
+                  className="input"
+                  value={editor.hashtags}
+                  onChange={(event) => setEditor((current) => ({ ...current, hashtags: event.target.value }))}
+                  placeholder="#SPMNoticias, #PuertoRico"
+                />
+              </label>
+            </div>
+            <label>
+              URL portada
+              <input
+                className="input"
+                value={editor.coverImageUrl}
+                onChange={(event) => setEditor((current) => ({ ...current, coverImageUrl: event.target.value }))}
+              />
+            </label>
             <div className="admin-item-actions">
               <button className="button" type="button" disabled={Boolean(busy)} onClick={saveArticle}>
-                Guardar noticia
+                Guardar draft
               </button>
             </div>
           </div>
@@ -326,7 +434,7 @@ export function NewsEngineArticleActions({ article }: Props) {
               <div>
                 <h3 style={{ margin: 0 }}>Redes</h3>
                 <p className="muted" style={{ margin: "4px 0 0" }}>
-                  Guarda el copy por red y publícalo aquí mismo.
+                  Guarda el copy por red y publícalo desde aquí.
                 </p>
               </div>
               <span className="news-engine-pill">{article.status === "published" ? "Listo para social" : "Pendiente de publicar"}</span>

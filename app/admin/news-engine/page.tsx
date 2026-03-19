@@ -13,22 +13,28 @@ export default async function AdminNewsEnginePage() {
     service.from("social_publications").select("id", { count: "exact", head: true }).eq("status", "queued")
   ]);
 
+  const draftsRes = await service
+    .from("news_articles")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["draft", "pending_review"]);
+
   const kpis = (kpisRes.data as any) ?? null;
 
   return (
     <main>
       <h1 className="section-title">News Engine Viral OS</h1>
-      <p className="muted">Operación editorial automatizada: ingestión, trends, publicación, social y analytics.</p>
+      <p className="muted">SPM News Engine: ingesta automática, scoring de impacto, drafts premium y publicación editorial.</p>
 
       <div className="admin-grid" style={{ marginTop: 18 }}>
         <article className="card"><h3>Total artículos</h3><p className="section-title">{kpis?.total_articles ?? articlesRes.count ?? 0}</p></article>
+        <article className="card"><h3>Drafts SPM</h3><p className="section-title">{draftsRes.count ?? 0}</p></article>
         <article className="card"><h3>Publicados</h3><p className="section-title">{kpis?.published_articles ?? 0}</p></article>
         <article className="card"><h3>En cola social</h3><p className="section-title">{kpis?.social_queued ?? socialRes.count ?? 0}</p></article>
         <article className="card"><h3>Trends 24h</h3><p className="section-title">{kpis?.trends_24h ?? 0}</p></article>
       </div>
 
       <div className="grid" style={{ marginTop: 20, gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))" }}>
-        <Link className="card" href="/admin/news-engine/articles"><h3>Artículos</h3><p className="muted">Borrador, rewrite IA, assets, publicar y social queue.</p></Link>
+        <Link className="card" href="/admin/news-engine/articles"><h3>SPM News Control Panel</h3><p className="muted">Preview completo, edición inline, filtros, publish y delete.</p></Link>
         <Link className="card" href="/admin/news-sources"><h3>Fuentes</h3><p className="muted">RSS/API/trend, prioridad y estado de ingestión.</p></Link>
         <Link className="card" href="/admin/news-engine/trends"><h3>Tendencias</h3><p className="muted">Keywords calientes por región y proveedor.</p></Link>
         <Link className="card" href="/admin/news-engine/assets"><h3>Assets</h3><p className="muted">Generación y revisión de cover/meme/quote/reel thumbnail.</p></Link>
