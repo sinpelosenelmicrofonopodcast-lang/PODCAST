@@ -292,14 +292,34 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const supabase = supabaseServer();
   const item = await loadItem(supabase, params.id);
   const canonical = item ? newsHref(item) : `/noticias/${encodeURIComponent(params.id)}`;
+  const socialImage = `${canonical}/opengraph-image`;
   const seo = newsSeoTemplate(item?.title ?? "Noticia", item?.summary ?? "Noticias Sin Pelos");
-  return buildSeoMetadata({
+  const metadata = buildSeoMetadata({
     title: seo.title,
     description: seo.description,
     path: canonical,
-    image: normalizeImageUrl(item?.cover_url) ?? DEFAULT_OG_IMAGE,
+    image: socialImage,
     type: "article"
   });
+
+  return {
+    ...metadata,
+    openGraph: {
+      ...metadata.openGraph,
+      images: [
+        {
+          url: socialImage,
+          width: 1200,
+          height: 630,
+          alt: item?.title ?? seo.title
+        }
+      ]
+    },
+    twitter: {
+      ...metadata.twitter,
+      images: [socialImage]
+    }
+  };
 }
 
 export default async function NoticiaDetailPage({ params }: { params: { id: string } }) {
