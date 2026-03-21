@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     let summary = String(body?.summary ?? "").trim();
     let coverUrl = String(body?.coverUrl ?? "").trim();
     const publishAs = body?.story === true ? "story" : "feed";
+    const scheduleForRaw = String(body?.scheduleFor ?? "").trim();
 
     if (!newsId) return NextResponse.json({ ok: false, error: "newsId requerido." }, { status: 400 });
 
@@ -58,6 +59,56 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    let scheduleForIso: string | null = null;
+    if (scheduleForRaw) {
+      const parsed = new Date(scheduleForRaw);
+      if (!Number.isFinite(parsed.getTime())) {
+        return NextResponse.json({ ok: false, error: "scheduleFor inválido." }, { status: 400 });
+      }
+      scheduleForIso = parsed.toISOString();
+      if (parsed.getTime() <= Date.now() + 30_000) {
+        return NextResponse.json({ ok: false, error: "La fecha programada debe ser futura (mínimo 30 segundos)." }, { status: 400 });
+      }
+    }
+
+    if (scheduleForIso) {
+      jobId = await createAutomationJob(auth.service, {
+        jobType: "instagram_post_news",
+        source: "instagram",
+        title: title || (publishAs === "story" ? "Programar historia en Instagram" : "Programar noticia en Instagram"),
+        contentType: "news",
+        contentId: newsId,
+        payload: { newsId, title, summary, newsSlug: newsSlug || null, coverUrl, publishAs },
+        status: "queued",
+        priority: 40,
+        scheduledFor: scheduleForIso,
+        createdBy: auth.userId
+      });
+
+      await logPipelineEvent(auth.service, {
+        jobId,
+        stage: "social",
+        status: "info",
+        contentType: "news",
+        contentId: newsId,
+        platform: "Instagram",
+        message: publishAs === "story" ? "Historia programada para Instagram" : "Post programado para Instagram",
+        meta: { scheduled_for: scheduleForIso, publishAs },
+        actorId: auth.userId
+      });
+
+      await logAdminAudit(auth.service, {
+        actorId: auth.userId,
+        action: "admin.news.instagram_schedule",
+        targetTable: "news_items",
+        targetId: newsId,
+        meta: { scheduled_for: scheduleForIso, publish_as: publishAs },
+        ...reqMeta
+      });
+
+      return NextResponse.json({ ok: true, queued: true, jobId, scheduledFor: scheduleForIso });
     }
 
     jobId = await createAutomationJob(auth.service, {

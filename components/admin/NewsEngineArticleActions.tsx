@@ -108,6 +108,23 @@ function fromCsv(value: string) {
     .filter(Boolean);
 }
 
+function toDatetimeLocal(value?: string | null) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  })
+    .format(parsed)
+    .replace(" ", "T");
+}
+
 export function NewsEngineArticleActions({ article, onChanged }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -115,6 +132,8 @@ export function NewsEngineArticleActions({ article, onChanged }: Props) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [socialOpen, setSocialOpen] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [siteScheduleAt, setSiteScheduleAt] = useState(() => toDatetimeLocal(article.publishAt));
+  const [socialScheduleAt, setSocialScheduleAt] = useState("");
   const [editor, setEditor] = useState({
     title: article.title,
     summary: article.summary ?? "",
@@ -199,6 +218,87 @@ export function NewsEngineArticleActions({ article, onChanged }: Props) {
 
     if (!json) return;
     setStatus("Cambios editoriales guardados.");
+    syncParent();
+    refreshPage();
+  };
+
+  const scheduleSitePublication = async () => {
+    if (article.status === "published") {
+      setStatus("Esta noticia ya está publicada; no la convierto otra vez en scheduled.");
+      return;
+    }
+
+    const parsed = new Date(siteScheduleAt);
+    if (!siteScheduleAt || !Number.isFinite(parsed.getTime())) {
+      setStatus("Selecciona una fecha válida para la página.");
+      return;
+    }
+
+    const json = await request(`/api/admin/articles/${article.id}/schedule`, {
+      body: {
+        publishAt: parsed.toISOString()
+      }
+    });
+
+    if (!json) return;
+    setStatus("Publicación al sitio programada.");
+    syncParent();
+    refreshPage();
+  };
+
+  const scheduleNewsSocial = async (platform: "facebook" | "instagram_feed" | "instagram_story") => {
+    const parsed = new Date(socialScheduleAt);
+    if (!socialScheduleAt || !Number.isFinite(parsed.getTime())) {
+      setStatus("Selecciona una fecha válida para redes.");
+      return;
+    }
+
+    if (article.status !== "published") {
+      const siteParsed = new Date(article.publishAt ?? siteScheduleAt);
+      if (!Number.isFinite(siteParsed.getTime())) {
+        setStatus("Programa primero la publicación al sitio y luego las redes.");
+        return;
+      }
+
+      const minSocialTime = siteParsed.getTime() + 5 * 60 * 1000;
+      if (parsed.getTime() < minSocialTime) {
+        setStatus("Programa redes al menos 5 minutos después de la publicación al sitio.");
+        return;
+      }
+    }
+
+    const isInstagram = platform !== "facebook";
+    const endpoint = isInstagram ? "/api/social/meta/instagram/post-news" : "/api/social/meta/facebook/post-news";
+    const coverUrl = editor.coverImageUrl.trim() || article.coverImageUrl || "";
+    const summary = isInstagram ? social.instagram.message.trim() : social.facebook.message.trim();
+
+    if (!summary) {
+      setStatus("Escribe el copy de esa red antes de programarla.");
+      return;
+    }
+
+    if (isInstagram && !coverUrl) {
+      setStatus("Instagram requiere una portada pública.");
+      return;
+    }
+
+    const json = await request(endpoint, {
+      body: {
+        newsId: article.id,
+        newsSlug: article.slug,
+        title: editor.title.trim() || article.title,
+        summary,
+        ...(isInstagram ? { coverUrl } : {}),
+        ...(platform === "instagram_story" ? { story: true } : {}),
+        scheduleFor: parsed.toISOString()
+      }
+    });
+
+    if (!json) return;
+
+    const label =
+      platform === "facebook" ? "Facebook" : platform === "instagram_story" ? "Instagram Story" : "Instagram Feed";
+    setStatus(`${label} programado correctamente.`);
     syncParent();
     refreshPage();
   };
@@ -481,10 +581,17 @@ export function NewsEngineArticleActions({ article, onChanged }: Props) {
               <button className="button" type="button" disabled={Boolean(busy)} onClick={saveArticle}>
                 Guardar draft
               </button>
+              <button className="button secondary" type="button" disabled={Boolean(busy) || article.status === "published"} onClick={scheduleSitePublication}>
+                Programar en sitio
+              </button>
               <span className="muted" style={{ fontSize: 12 }}>
                 {uploadingCover ? "Subiendo portada..." : "Puedes pegar URL o subir imagen directamente."}
               </span>
             </div>
+            <label>
+              Publicar en la pagina (America/Chicago)
+              <input className="input" type="datetime-local" value={siteScheduleAt} onChange={(event) => setSiteScheduleAt(event.target.value)} />
+            </label>
           </div>
         </section>
       ) : null}
@@ -592,6 +699,24 @@ export function NewsEngineArticleActions({ article, onChanged }: Props) {
                 Postear ahora
               </button>
             </div>
+            <label>
+              Programar redes (America/Chicago)
+              <input className="input" type="datetime-local" value={socialScheduleAt} onChange={(event) => setSocialScheduleAt(event.target.value)} />
+            </label>
+            <div className="admin-item-actions">
+              <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => scheduleNewsSocial("facebook")}>
+                Programar Facebook
+              </button>
+              <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => scheduleNewsSocial("instagram_feed")}>
+                Programar IG Feed
+              </button>
+              <button className="button secondary" type="button" disabled={Boolean(busy)} onClick={() => scheduleNewsSocial("instagram_story")}>
+                Programar IG Story
+              </button>
+            </div>
+            <p className="muted" style={{ margin: 0 }}>
+              Si la noticia todavia no esta publicada, programa redes al menos 5 minutos despues de la salida al sitio.
+            </p>
           </div>
         </section>
       ) : null}
