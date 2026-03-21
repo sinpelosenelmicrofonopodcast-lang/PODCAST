@@ -16,14 +16,10 @@ type ConfessionDetail = {
   category: string | null;
   region: string | null;
   is_anonymous: boolean | null;
+  author_id: string | null;
   created_at: string | null;
   published_at: string | null;
-  users: { nickname?: string | null; avatar_url?: string | null } | { nickname?: string | null; avatar_url?: string | null }[] | null;
 };
-
-function pickUser(users: ConfessionDetail["users"]) {
-  return Array.isArray(users) ? users[0] : users;
-}
 
 function formatDate(value?: string | null) {
   if (!value) return "";
@@ -38,7 +34,7 @@ async function getConfession(id: string) {
   const supabase = supabaseServer();
   const result = await supabase
     .from("confessions")
-    .select("id, title, body, category, region, is_anonymous, created_at, published_at, users(nickname, avatar_url)")
+    .select("id, title, body, category, region, is_anonymous, author_id, created_at, published_at")
     .eq("id", id)
     .eq("level", "public")
     .eq("status", "published")
@@ -86,9 +82,14 @@ export default async function ConfesionDetailPage({ params }: { params: { id: st
   const confession = await getConfession(String(params.id ?? "").trim());
   if (!confession) notFound();
 
-  const author = pickUser(confession.users);
   const bannerUrl = getConfessionBannerUrl();
   const supabase = supabaseServer();
+  let author: { nickname?: string | null; avatar_url?: string | null } | null = null;
+  const authorId = String(confession.author_id ?? "").trim();
+  if (authorId) {
+    const { data: authorRow } = await supabase.from("users").select("nickname, avatar_url").eq("id", authorId).limit(1).maybeSingle();
+    author = (authorRow as { nickname?: string | null; avatar_url?: string | null } | null) ?? null;
+  }
   const { data: comments } = await supabase
     .from("comments")
     .select("id")

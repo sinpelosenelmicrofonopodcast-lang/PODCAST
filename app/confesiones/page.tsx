@@ -18,7 +18,7 @@ type ConfessionRow = {
   created_at: string | null;
   published_at: string | null;
   is_anonymous: boolean | null;
-  users: { nickname?: string | null; avatar_url?: string | null } | { nickname?: string | null; avatar_url?: string | null }[] | null;
+  author_id: string | null;
 };
 
 const confessionsShareImage = getConfessionShareImageUrl();
@@ -66,10 +66,6 @@ function normalizeCategory(input?: string): CategoryKey | "all" {
   return "all";
 }
 
-function pickUser(users: ConfessionRow["users"]) {
-  return Array.isArray(users) ? users[0] : users;
-}
-
 function detectCategory(body: string): CategoryKey {
   const text = body.toLowerCase();
   for (const item of CATEGORY_META) {
@@ -98,13 +94,21 @@ export default async function ConfesionesPage({
 
   const { data: dataRows } = await supabase
     .from("confessions")
-    .select("id, body, created_at, published_at, is_anonymous, users(nickname, avatar_url)")
+    .select("id, body, created_at, published_at, is_anonymous, author_id")
     .eq("level", "public")
     .eq("status", "published")
     .order("created_at", { ascending: false })
     .limit(60);
 
   const rows = (dataRows ?? []) as ConfessionRow[];
+  const authorIds = Array.from(new Set(rows.map((item) => String(item.author_id ?? "").trim()).filter(Boolean)));
+  let authorsById = new Map<string, { nickname?: string | null; avatar_url?: string | null }>();
+  if (authorIds.length > 0) {
+    const { data: authorRows } = await supabase.from("users").select("id, nickname, avatar_url").in("id", authorIds);
+    authorsById = new Map(
+      ((authorRows ?? []) as Array<any>).map((row) => [String(row.id ?? ""), { nickname: row.nickname ?? null, avatar_url: row.avatar_url ?? null }])
+    );
+  }
   const withCategory = rows.map((item) => ({
     ...item,
     topic: detectCategory(item.body)
@@ -218,7 +222,7 @@ export default async function ConfesionesPage({
 
               <div className="grid conf-grid" style={{ marginTop: 20 }}>
                 {filtered.map((item) => {
-                  const author = pickUser(item.users);
+                  const author = authorsById.get(String(item.author_id ?? "").trim()) ?? null;
                   const repliesCount = commentsCountByContent.get(item.id) ?? 0;
                   const topicLabel = CATEGORY_META.find((c) => c.key === item.topic)?.label ?? "Sociedad";
                   return (
