@@ -1,16 +1,1 @@
-{
-  "crons": [
-    { "path": "/api/cron/youtube-sync", "schedule": "15 3 * * *" },
-    { "path": "/api/cron/news-ingest", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/trends", "schedule": "35 3 * * *" },
-    { "path": "/api/cron/process-jobs", "schedule": "50 * * * *" },
-    { "path": "/api/cron/publish-scheduled", "schedule": "45 3 * * *" },
-    { "path": "/api/cron/rescore", "schedule": "5 4 * * *" },
-    { "path": "/api/cron/content-resurfacer", "schedule": "15 4 * * *" },
-    { "path": "/api/cron/analytics-aggregation", "schedule": "25 4 * * *" },
-    { "path": "/api/cron/seo", "schedule": "35 4 * * *" },
-    { "path": "/api/cron/seo-daily", "schedule": "45 4 * * *" },
-    { "path": "/api/cron/episode-resurfacer", "schedule": "15 6 * * *" },
-    { "path": "/api/cron/youtube-follow-reminder", "schedule": "25 6 * * *" }
-  ]
-}
+{}
