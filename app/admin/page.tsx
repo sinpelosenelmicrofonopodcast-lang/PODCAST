@@ -85,6 +85,14 @@ export default async function AdminDashboard() {
   }
 
   const editorialModules: ModuleCardProps[] = [];
+  editorialModules.push({
+    title: "Social Hub",
+    description: "Revisa noticias ingeridas, edítalas, súbeles portada, publícalas y maneja la cola social desde un solo lugar.",
+    primaryHref: "/admin/social",
+    primaryLabel: "Abrir Social Hub",
+    secondaryHref: can("view_schedule") ? "/admin/schedule" : undefined,
+    secondaryLabel: can("view_schedule") ? "Ver cola real" : undefined
+  });
   if (can("manage_home")) {
     editorialModules.push({
       title: "Editar homepage",
@@ -99,14 +107,16 @@ export default async function AdminDashboard() {
       description: "Gestiona publicaciones, pipeline editorial, assets y distribución social desde un mismo flujo.",
       primaryHref: "/admin/news",
       primaryLabel: "Gestionar noticias",
-      secondaryHref: "/admin/news-engine",
-      secondaryLabel: "Abrir News Engine"
+      secondaryHref: "/admin/social",
+      secondaryLabel: "Social Hub"
     });
     editorialModules.push({
       title: "Episodios a Facebook",
       description: "Publica episodios nuevos o de catálogo con copy propio o extracto automático.",
       primaryHref: "/admin/episodes",
-      primaryLabel: "Gestionar episodios"
+      primaryLabel: "Gestionar episodios",
+      secondaryHref: "/admin/social",
+      secondaryLabel: "Social Hub"
     });
   }
   if (can("manage_blog")) {
@@ -114,7 +124,9 @@ export default async function AdminDashboard() {
       title: "Blog",
       description: "Administra piezas largas, linking editorial y presencia en buscadores.",
       primaryHref: "/admin/blog",
-      primaryLabel: "Abrir blog"
+      primaryLabel: "Abrir blog",
+      secondaryHref: "/admin/social",
+      secondaryLabel: "Social Hub"
     });
   }
   if (can("manage_events") || can("manage_promotions")) {

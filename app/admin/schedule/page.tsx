@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { authApiRequest } from "@/lib/clientApi";
+import { toast } from "@/lib/toast";
 
 type JobRow = {
   id: string;
@@ -42,6 +44,9 @@ export default function AdminSchedulePage() {
   const [summary, setSummary] = useState<{ total: number; byStatus: Record<string, number> }>({ total: 0, byStatus: {} });
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
+  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingScheduleFor, setEditingScheduleFor] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -78,6 +83,92 @@ export default function AdminSchedulePage() {
   useEffect(() => {
     load();
   }, []);
+
+  const isEpisodeFacebookJob = (row: JobRow) => row.job_type === "facebook_post_episode";
+
+  const startReschedule = (row: JobRow) => {
+    const parsed = new Date(row.scheduled_for);
+    const local = Number.isNaN(parsed.getTime())
+      ? ""
+      : new Intl.DateTimeFormat("sv-SE", {
+          timeZone: "America/Chicago",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false
+        })
+          .format(parsed)
+          .replace(" ", "T");
+    setEditingId(row.id);
+    setEditingScheduleFor(local);
+  };
+
+  const saveReschedule = async (id: string) => {
+    const localValue = editingScheduleFor.trim();
+    if (!localValue) {
+      setStatus("Selecciona fecha y hora para reprogramar.");
+      return;
+    }
+
+    const parsed = new Date(localValue);
+    if (!Number.isFinite(parsed.getTime())) {
+      setStatus("Fecha/hora inválida para reprogramar.");
+      return;
+    }
+
+    setActioningId(id);
+    setStatus(null);
+    const { ok, json } = await authApiRequest(`/api/admin/jobs/${id}`, {
+      method: "PATCH",
+      jsonBody: { scheduledFor: parsed.toISOString() }
+    });
+    setActioningId(null);
+
+    if (!ok) {
+      setStatus(json?.error ?? "No se pudo reprogramar el job.");
+      return;
+    }
+
+    toast.success("Job reprogramado.");
+    setEditingId(null);
+    setEditingScheduleFor("");
+    await load();
+  };
+
+  const cancelJob = async (id: string) => {
+    const confirmed = window.confirm("¿Cancelar este job programado?");
+    if (!confirmed) return;
+
+    setActioningId(id);
+    setStatus(null);
+    const { ok, json } = await authApiRequest(`/api/admin/jobs/${id}`, { method: "DELETE" });
+    setActioningId(null);
+
+    if (!ok) {
+      setStatus(json?.error ?? "No se pudo cancelar el job.");
+      return;
+    }
+
+    toast.success("Job cancelado.");
+    await load();
+  };
+
+  const postNow = async (id: string) => {
+    setActioningId(id);
+    setStatus(null);
+    const { ok, json } = await authApiRequest(`/api/admin/jobs/${id}/post-now`, { method: "POST" });
+    setActioningId(null);
+
+    if (!ok) {
+      setStatus(json?.error ?? "No se pudo publicar ahora.");
+      return;
+    }
+
+    toast.success("Episodio publicado en Facebook.");
+    await load();
+  };
 
   const grouped = useMemo(() => {
     const map = new Map<string, JobRow[]>();
@@ -131,6 +222,7 @@ export default function AdminSchedulePage() {
                 <th>Inicio / Fin</th>
                 <th>Intentos</th>
                 <th>Error</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -159,6 +251,70 @@ export default function AdminSchedulePage() {
                     </td>
                     <td className="muted" style={{ maxWidth: 360 }}>
                       {r.error ?? "—"}
+                    </td>
+                    <td style={{ minWidth: 260 }}>
+                      {isEpisodeFacebookJob(r) ? (
+                        editingId === r.id ? (
+                          <div style={{ display: "grid", gap: 8 }}>
+                            <input
+                              className="input"
+                              type="datetime-local"
+                              value={editingScheduleFor}
+                              onChange={(e) => setEditingScheduleFor(e.target.value)}
+                            />
+                            <div className="admin-item-actions">
+                              <button
+                                className="button secondary"
+                                type="button"
+                                onClick={() => saveReschedule(r.id)}
+                                disabled={actioningId === r.id}
+                              >
+                                Guardar
+                              </button>
+                              <button
+                                className="button secondary"
+                                type="button"
+                                onClick={() => {
+                                  setEditingId(null);
+                                  setEditingScheduleFor("");
+                                }}
+                                disabled={actioningId === r.id}
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="admin-item-actions">
+                            <button
+                              className="button secondary"
+                              type="button"
+                              onClick={() => postNow(r.id)}
+                              disabled={actioningId === r.id || r.status === "running" || r.status === "done"}
+                            >
+                              Post now
+                            </button>
+                            <button
+                              className="button secondary"
+                              type="button"
+                              onClick={() => startReschedule(r)}
+                              disabled={actioningId === r.id || r.status === "running" || r.status === "done"}
+                            >
+                              Reprogramar
+                            </button>
+                            <button
+                              className="button secondary"
+                              type="button"
+                              onClick={() => cancelJob(r.id)}
+                              disabled={actioningId === r.id || r.status === "running" || r.status === "done" || r.status === "cancelled"}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        )
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
                     </td>
                   </tr>
                 ))

@@ -127,7 +127,6 @@ async function getExternalPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> 
     const videoId = getYouTubeVideoId(sourceUrl);
     if (!videoId) continue;
     const duration = Number(row?.metrics?.durationSeconds ?? 0);
-    if (!Number.isFinite(duration) || duration <= 0) continue;
     const isShort = row?.metrics?.isShort === true || (duration > 0 && duration <= 180) || sourceUrl.includes("/shorts/");
     if (isShort) continue;
     const slug = maybeSlugFromSource(sourceUrl, String(row.id));

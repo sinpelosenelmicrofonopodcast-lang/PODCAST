@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseService } from "@/lib/supabaseService";
 import { isCronAuthorized } from "@/lib/jobs/cronAuth";
 import { runNewsIngestionPipeline } from "@/lib/news/pipeline";
+import { cleanupStaleDraftArticles } from "@/lib/news/editorial";
 import { createAutomationJob, logPipelineEvent, updateAutomationJob } from "@/lib/pipelineOps";
 
 export async function POST(request: NextRequest) {
@@ -20,7 +21,8 @@ export async function POST(request: NextRequest) {
       contentType: "news",
       payload: {
         cadence: "30m",
-        draftOnly: true
+        draftOnly: true,
+        cleanupHours: 48
       },
       status: "running",
       priority: 30
@@ -34,6 +36,29 @@ export async function POST(request: NextRequest) {
       message: "SPM News Engine inició ciclo automático"
     });
 
+    let cleanupError: string | null = null;
+    const cleanup = await cleanupStaleDraftArticles(service, 48).catch((error: any) => {
+      cleanupError = error?.message ?? "No se pudo limpiar drafts viejos.";
+      return {
+        deleted: 0,
+        legacyDeleted: 0,
+        cutoffHours: 48,
+        cutoffIso: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+        titles: []
+      };
+    });
+
+    await logPipelineEvent(service, {
+      jobId,
+      stage: "draft",
+      status: cleanupError ? "error" : "info",
+      contentType: "news",
+      message: cleanupError
+        ? `Limpieza automática falló: ${cleanupError}`
+        : `Limpieza automática: ${cleanup.deleted} drafts y ${cleanup.legacyDeleted} espejos legacy removidos.`,
+      meta: cleanupError ? { ...cleanup, error: cleanupError } : cleanup
+    });
+
     const summary = await runNewsIngestionPipeline(
       {
         sourceLimit: 50,
@@ -44,25 +69,31 @@ export async function POST(request: NextRequest) {
       service
     );
 
+    const finalSummary = {
+      ...summary,
+      cleanupDeleted: cleanup.deleted,
+      cleanupLegacyDeleted: cleanup.legacyDeleted
+    };
+
     await logPipelineEvent(service, {
       jobId,
       stage: "draft",
       status: summary.failed > 0 ? "info" : "ok",
       contentType: "news",
       message: "SPM News Engine completó ciclo automático",
-      meta: summary
+      meta: finalSummary
     });
 
     await updateAutomationJob(service, jobId, {
       status: "done",
       finishedAt: new Date().toISOString(),
-      payload: summary
+      payload: finalSummary
     });
 
     return NextResponse.json({
       ok: true,
       engine: "spm_news_engine",
-      summary
+      summary: finalSummary
     });
   } catch (error: any) {
     if (jobId) {

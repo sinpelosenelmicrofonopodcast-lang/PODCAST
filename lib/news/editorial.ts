@@ -325,6 +325,61 @@ export async function deleteArticle(service: SupabaseClient, articleId: string) 
   return { articleId, legacyId: legacyId || null };
 }
 
+export async function cleanupStaleDraftArticles(service: SupabaseClient, olderThanHours = 48) {
+  const safeHours = Number.isFinite(olderThanHours) ? Math.max(1, Math.min(24 * 14, Math.floor(olderThanHours))) : 48;
+  const cutoffIso = new Date(Date.now() - safeHours * 60 * 60 * 1000).toISOString();
+
+  const staleRes = await service
+    .from("news_articles")
+    .select("id, legacy_news_item_id, title, status, created_at, created_by, source_id, author_name")
+    .in("status", ["draft", "pending_review", "rejected"])
+    .lt("created_at", cutoffIso)
+    .order("created_at", { ascending: true })
+    .limit(200);
+
+  if (staleRes.error) throw new Error(staleRes.error.message);
+
+  const candidates = ((staleRes.data ?? []) as Array<any>).filter((row) => {
+    const createdBy = String(row.created_by ?? "").trim();
+    const sourceId = String(row.source_id ?? "").trim();
+    const authorName = String(row.author_name ?? "").trim();
+    return !createdBy || Boolean(sourceId) || authorName === "SPM News Engine";
+  });
+
+  const articleIds = candidates.map((row) => String(row.id ?? "")).filter(Boolean);
+  const legacyIds = Array.from(
+    new Set(candidates.map((row) => String(row.legacy_news_item_id ?? "")).filter(Boolean))
+  );
+
+  if (!articleIds.length) {
+    return {
+      deleted: 0,
+      legacyDeleted: 0,
+      cutoffHours: safeHours,
+      cutoffIso,
+      titles: [] as string[]
+    };
+  }
+
+  const articleDelete = await service.from("news_articles").delete().in("id", articleIds);
+  if (articleDelete.error) throw new Error(articleDelete.error.message);
+
+  let legacyDeleted = 0;
+  if (legacyIds.length) {
+    const legacyDelete = await service.from("news_items").delete().in("id", legacyIds);
+    if (legacyDelete.error) throw new Error(legacyDelete.error.message);
+    legacyDeleted = legacyIds.length;
+  }
+
+  return {
+    deleted: articleIds.length,
+    legacyDeleted,
+    cutoffHours: safeHours,
+    cutoffIso,
+    titles: candidates.map((row) => String(row.title ?? "").trim()).filter(Boolean)
+  };
+}
+
 export async function generateArticlePoll(service: SupabaseClient, articleId: string) {
   const article = await getArticleEditorRow(service, articleId);
   const poll = await generatePollFromArticle({

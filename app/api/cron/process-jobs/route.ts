@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createAutomationJob, logPipelineEvent, updateAutomationJob } from "@/lib/pipelineOps";
-import { postBlogToFacebook, postEpisodeToFacebook, postNewsToFacebook } from "@/lib/socialFacebook";
+import { postBlogToFacebook, postNewsToFacebook } from "@/lib/socialFacebook";
 import { postNewsToInstagram } from "@/lib/socialInstagram";
 import { rewriteNewsWithAI } from "@/lib/newsRewrite";
-import { getYouTubeVideoId } from "@/lib/youtube";
 import { publishFromSocialQueue } from "@/lib/social/publisher";
 import { cleanNewsCategories } from "@/lib/newsCategories";
+import { publishFacebookEpisodeAutomationJob } from "@/lib/facebookEpisodeJobs";
 
 type QueueJob = {
   id: string;
@@ -241,80 +241,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (job.job_type === "facebook_post_episode") {
-          const episodeId = String(job.payload?.episodeId ?? job.content_id ?? "").trim();
-          let episodeSlug = String(job.payload?.episodeSlug ?? "").trim();
-          let title = String(job.payload?.title ?? "").trim();
-          let description = String(job.payload?.description ?? "").trim();
-          let sourceUrl = String(job.payload?.sourceUrl ?? "").trim();
-          const customText = String(job.payload?.customText ?? "").trim();
-          if (!episodeId) throw new Error("Job inválido: falta episodeId.");
-
-          if (!title || !description || !episodeSlug || !sourceUrl) {
-            const externalRes = await service
-              .from("external_posts")
-              .select("id, title, caption, source_url")
-              .eq("id", episodeId)
-              .limit(1)
-              .maybeSingle();
-            if (externalRes.error) throw new Error(externalRes.error.message);
-            const row = (externalRes.data ?? null) as { id?: string | null; title?: string | null; caption?: string | null; source_url?: string | null } | null;
-            if (row) {
-              if (!title) title = String(row.title ?? "").trim();
-              if (!description) description = String(row.caption ?? "").trim();
-              if (!sourceUrl) sourceUrl = String(row.source_url ?? "").trim();
-              if (!episodeSlug) episodeSlug = getYouTubeVideoId(row.source_url) || String(row.id ?? "").trim();
-            }
-          }
-
-          if (!title) title = "Nuevo episodio";
-          if (!episodeSlug) episodeSlug = getYouTubeVideoId(sourceUrl) || episodeId;
-
-          const posted = await postEpisodeToFacebook({
-            episodeId,
-            episodeSlug,
-            title,
-            description,
-            sourceUrl: sourceUrl || null,
-            customText: customText || null
-          });
-
-          await service.from("external_posts").upsert(
-            {
-              platform: "Facebook",
-              external_id: posted.postId || `episode-${episodeId}`,
-              title: title || null,
-              caption: customText || description || null,
-              media_url: null,
-              metrics: null,
-              posted_at: new Date().toISOString(),
-              source_url: posted.link
-            },
-            { onConflict: "platform,external_id", ignoreDuplicates: true }
-          );
-
-          await logPipelineEvent(service, {
-            jobId: job.id,
-            stage: "social",
-            status: "ok",
-            contentType: "episode",
-            contentId: episodeId,
-            platform: "Facebook",
-            message: "Episodio publicado por worker",
-            meta: { postId: posted.postId, link: posted.link }
-          });
-
-          await updateAutomationJob(service, job.id, {
-            status: "done",
-            finishedAt: new Date().toISOString(),
-            payload: {
-              ...(job.payload ?? {}),
-              title,
-              description,
-              sourceUrl: sourceUrl || null,
-              postId: posted.postId,
-              link: posted.link
-            }
-          });
+          await publishFacebookEpisodeAutomationJob(service, job);
           done += 1;
           continue;
         }

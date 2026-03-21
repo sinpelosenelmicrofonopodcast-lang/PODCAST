@@ -10,6 +10,7 @@ const DAILY_WINDOW_END_MINUTE = 21 * 60;
 const MINIMUM_LEAD_MINUTES = 15;
 const RANDOM_GRANULARITY_MINUTES = 5;
 const CANDIDATE_POOL_SIZE = 12;
+const DAILY_POSTS_PER_DAY = 2;
 
 type EpisodeCandidate = {
   id: string;
@@ -25,16 +26,33 @@ type HistoryRow = {
   scheduled_for: string | null;
 };
 
+type ExternalEpisodeRow = {
+  id: string | null;
+  title: string | null;
+  caption: string | null;
+  source_url: string | null;
+  posted_at: string | null;
+  metrics?: {
+    durationSeconds?: number | null;
+    isShort?: boolean | null;
+  } | null;
+};
+
 export type EpisodeResurfacerResult =
   | {
       ok: true;
       scheduled: true;
-      jobId: string;
-      episodeId: string;
-      episodeTitle: string;
-      scheduledFor: string;
-      localDate: string;
-      localTime: string;
+      created: Array<{
+        jobId: string;
+        episodeId: string;
+        episodeTitle: string;
+        scheduledFor: string;
+        localDate: string;
+        localTime: string;
+      }>;
+      scheduledCount: number;
+      missingToday: number;
+      missingTomorrow: number;
     }
   | {
       ok: true;
@@ -91,12 +109,29 @@ function fromMinutes(value: number) {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
-function pickRandomMinute(localDate: string, minMinute: number, maxMinute: number) {
+function buildAvailableMinuteSlots(localDate: string, minMinute: number, maxMinute: number) {
   const safeMin = Math.max(0, minMinute);
   const safeMax = Math.max(safeMin, maxMinute);
-  const steps = Math.max(0, Math.floor((safeMax - safeMin) / RANDOM_GRANULARITY_MINUTES));
-  const offset = seededInt(`${localDate}:facebook-episode-minute`) % (steps + 1);
-  return safeMin + offset * RANDOM_GRANULARITY_MINUTES;
+  const slots: number[] = [];
+  for (let minute = safeMin; minute <= safeMax; minute += RANDOM_GRANULARITY_MINUTES) {
+    slots.push(minute);
+  }
+  return slots;
+}
+
+function pickRandomMinutes(localDate: string, minMinute: number, maxMinute: number, count: number) {
+  const slots = buildAvailableMinuteSlots(localDate, minMinute, maxMinute);
+  if (slots.length === 0 || count <= 0) return [];
+
+  const remaining = [...slots];
+  const selected: number[] = [];
+  for (let slotIndex = 0; slotIndex < count && remaining.length > 0; slotIndex += 1) {
+    const idx = seededInt(`${localDate}:facebook-episode-minute:${slotIndex}`) % remaining.length;
+    const [minute] = remaining.splice(idx, 1);
+    selected.push(minute);
+  }
+
+  return selected.sort((left, right) => left - right);
 }
 
 function buildResurfaceMessage(candidate: EpisodeCandidate) {
@@ -126,28 +161,97 @@ function isEligibleFullEpisode(row: Awaited<ReturnType<typeof getPublishedEpisod
   return true;
 }
 
+function isEligibleExternalEpisode(row: ExternalEpisodeRow) {
+  const sourceUrl = normalizeText(row.source_url);
+  if (!sourceUrl) return false;
+  const youtubeId = getYouTubeVideoId(sourceUrl);
+  if (!youtubeId) return false;
+  const title = normalizeText(row.title).toLowerCase();
+  if (title === "auto post") return false;
+  const metrics = row.metrics ?? null;
+  if (metrics?.isShort === true) return false;
+  if (isShorts(metrics?.durationSeconds ?? null)) return false;
+  if (sourceUrl.toLowerCase().includes("/shorts/")) return false;
+  return true;
+}
+
+function toExternalEpisodeCandidate(row: ExternalEpisodeRow): EpisodeCandidate {
+  const sourceUrl = normalizeText(row.source_url) || null;
+  const fallbackSlug = getYouTubeVideoId(sourceUrl) || String(row.id ?? "");
+  return {
+    id: String(row.id ?? fallbackSlug),
+    slug: fallbackSlug,
+    title: normalizeText(row.title) || "Episodio",
+    description: normalizeText(row.caption),
+    sourceUrl,
+    publishedAt: row.posted_at ?? null
+  };
+}
+
+async function getExternalEpisodeCandidates(service: SupabaseClient, limit: number): Promise<EpisodeCandidate[]> {
+  const desiredLimit = Math.max(1, Math.floor(Number(limit) || 100));
+  const preloadLimit = Math.max(desiredLimit * 4, 200);
+  const res = await service
+    .from("external_posts")
+    .select("id, title, caption, source_url, posted_at, metrics")
+    .not("source_url", "is", null)
+    .order("posted_at", { ascending: false })
+    .limit(preloadLimit);
+
+  if (res.error) {
+    throw new Error(res.error.message);
+  }
+
+  const seen = new Set<string>();
+  const candidates: EpisodeCandidate[] = [];
+  for (const row of (res.data ?? []) as ExternalEpisodeRow[]) {
+    if (!isEligibleExternalEpisode(row)) continue;
+    const candidate = toExternalEpisodeCandidate(row);
+    if (!candidate.slug || seen.has(candidate.slug)) continue;
+    seen.add(candidate.slug);
+    candidates.push(candidate);
+    if (candidates.length >= desiredLimit) break;
+  }
+
+  return candidates;
+}
+
 function safeTimestamp(value?: string | null) {
   const stamp = new Date(String(value ?? "")).getTime();
   return Number.isFinite(stamp) ? stamp : 0;
 }
 
-function resolveTargetDate(now: Date, scheduledDates: Set<string>) {
+function resolveTargetDates(now: Date, scheduledCounts: Map<string, number>) {
   const today = chicagoDateInputFromNow(now);
   const nowMinute = localMinuteOfDay(now, SPM_AUTOPOST_TIMEZONE);
-  const candidates = [today, addDays(today, 1)];
+  const tomorrow = addDays(today, 1);
+  const candidates = [today, tomorrow];
+  const targets: Array<{ localDate: string; minMinute: number; missingSlots: number }> = [];
 
   for (const localDate of candidates) {
-    if (scheduledDates.has(localDate)) continue;
+    const scheduledCount = scheduledCounts.get(localDate) ?? 0;
+    const missingSlots = Math.max(0, DAILY_POSTS_PER_DAY - scheduledCount);
+    if (missingSlots <= 0) continue;
     const minMinute =
       localDate === today ? Math.max(DAILY_WINDOW_START_MINUTE, nowMinute + MINIMUM_LEAD_MINUTES) : DAILY_WINDOW_START_MINUTE;
     if (minMinute > DAILY_WINDOW_END_MINUTE) continue;
-    return { localDate, minMinute };
+    targets.push({ localDate, minMinute, missingSlots });
   }
 
-  return null;
+  return {
+    today,
+    tomorrow,
+    targets
+  };
 }
 
-function pickEpisodeCandidate(episodes: EpisodeCandidate[], history: HistoryRow[], localDate: string) {
+function pickEpisodeCandidate(
+  episodes: EpisodeCandidate[],
+  history: HistoryRow[],
+  localDate: string,
+  slotIndex: number,
+  excludedEpisodeIds: Set<string>
+) {
   const lastScheduledByEpisode = new Map<string, string>();
   let latestEpisodeId: string | null = null;
 
@@ -168,12 +272,14 @@ function pickEpisodeCandidate(episodes: EpisodeCandidate[], history: HistoryRow[
     return safeTimestamp(left.publishedAt) - safeTimestamp(right.publishedAt);
   });
 
-  const withoutLatest = ranked.filter((candidate) => candidate.id !== latestEpisodeId);
-  const poolBase = withoutLatest.length > 0 ? withoutLatest : ranked;
+  const available = ranked.filter((candidate) => !excludedEpisodeIds.has(candidate.id));
+  const base = available.length > 0 ? available : ranked;
+  const withoutLatest = base.filter((candidate) => candidate.id !== latestEpisodeId);
+  const poolBase = withoutLatest.length > 0 ? withoutLatest : base;
   const pool = poolBase.slice(0, Math.max(1, Math.min(CANDIDATE_POOL_SIZE, poolBase.length)));
   if (pool.length === 0) return null;
 
-  const idx = seededInt(`${localDate}:facebook-episode-candidate`) % pool.length;
+  const idx = seededInt(`${localDate}:facebook-episode-candidate:${slotIndex}`) % pool.length;
   return pool[idx];
 }
 
@@ -181,7 +287,17 @@ export async function scheduleDailyEpisodeResurface(
   service: SupabaseClient,
   now = new Date()
 ): Promise<EpisodeResurfacerResult> {
-  const episodes = (await getPublishedEpisodes(400)).filter(isEligibleFullEpisode).map(toEpisodeCandidate);
+  const mergedEpisodes = [
+    ...(await getPublishedEpisodes(400)).filter(isEligibleFullEpisode).map(toEpisodeCandidate),
+    ...(await getExternalEpisodeCandidates(service, 400))
+  ];
+  const seenEpisodeKeys = new Set<string>();
+  const episodes = mergedEpisodes.filter((episode) => {
+    const key = normalizeText(episode.slug) || normalizeText(episode.sourceUrl) || normalizeText(episode.id);
+    if (!key || seenEpisodeKeys.has(key)) return false;
+    seenEpisodeKeys.add(key);
+    return true;
+  });
   if (episodes.length === 0) {
     return { ok: true, scheduled: false, reason: "no_candidates" };
   }
@@ -200,74 +316,106 @@ export async function scheduleDailyEpisodeResurface(
   }
 
   const history = (historyRes.data ?? []) as HistoryRow[];
-  const scheduledDates = new Set<string>();
+  const scheduledCounts = new Map<string, number>();
   for (const row of history) {
     const iso = normalizeText(row.scheduled_for);
     if (!iso) continue;
     const parsed = new Date(iso);
     if (Number.isNaN(parsed.getTime())) continue;
-    scheduledDates.add(chicagoDateInputFromNow(parsed));
+    const localDate = chicagoDateInputFromNow(parsed);
+    scheduledCounts.set(localDate, (scheduledCounts.get(localDate) ?? 0) + 1);
   }
 
-  const target = resolveTargetDate(now, scheduledDates);
-  if (!target) {
+  const scheduleWindow = resolveTargetDates(now, scheduledCounts);
+  if (scheduleWindow.targets.length === 0) {
     return { ok: true, scheduled: false, reason: "already_scheduled" };
   }
 
-  const picked = pickEpisodeCandidate(episodes, history, target.localDate);
-  if (!picked) {
-    return { ok: true, scheduled: false, reason: "no_candidates" };
+  const created: Array<{
+    jobId: string;
+    episodeId: string;
+    episodeTitle: string;
+    scheduledFor: string;
+    localDate: string;
+    localTime: string;
+  }> = [];
+  const excludedEpisodeIds = new Set<string>();
+
+  for (const target of scheduleWindow.targets) {
+    const minutes = pickRandomMinutes(target.localDate, target.minMinute, DAILY_WINDOW_END_MINUTE, target.missingSlots);
+    for (let slotIndex = 0; slotIndex < minutes.length; slotIndex += 1) {
+      const picked = pickEpisodeCandidate(
+        episodes,
+        history,
+        target.localDate,
+        slotIndex,
+        excludedEpisodeIds
+      );
+      if (!picked) continue;
+
+      const localTime = fromMinutes(minutes[slotIndex]);
+      const scheduledFor = chicagoLocalToUtcIso(target.localDate, localTime);
+      const customText = buildResurfaceMessage(picked);
+
+      const jobId = await createAutomationJob(service, {
+        jobType: "facebook_post_episode",
+        source: RESURFACER_SOURCE,
+        title: `Auto share: ${picked.title}`.slice(0, 120),
+        contentType: "episode",
+        contentId: picked.id,
+        payload: {
+          episodeId: picked.id,
+          episodeSlug: picked.slug,
+          title: picked.title,
+          description: picked.description || null,
+          sourceUrl: picked.sourceUrl,
+          customText,
+          autoResurface: true,
+          localDate: target.localDate,
+          localTime
+        },
+        status: "queued",
+        priority: 55,
+        scheduledFor
+      });
+
+      await logPipelineEvent(service, {
+        jobId,
+        stage: "social",
+        status: "info",
+        contentType: "episode",
+        contentId: picked.id,
+        platform: "Facebook",
+        message: "Episodio programado automaticamente para resurfacerse en Facebook",
+        meta: {
+          local_date: target.localDate,
+          local_time: localTime,
+          auto_resurface: true
+        }
+      });
+
+      excludedEpisodeIds.add(picked.id);
+      created.push({
+        jobId,
+        episodeId: picked.id,
+        episodeTitle: picked.title,
+        scheduledFor,
+        localDate: target.localDate,
+        localTime
+      });
+    }
   }
 
-  const localTime = fromMinutes(pickRandomMinute(target.localDate, target.minMinute, DAILY_WINDOW_END_MINUTE));
-  const scheduledFor = chicagoLocalToUtcIso(target.localDate, localTime);
-  const customText = buildResurfaceMessage(picked);
-
-  const jobId = await createAutomationJob(service, {
-    jobType: "facebook_post_episode",
-    source: RESURFACER_SOURCE,
-    title: `Auto share: ${picked.title}`.slice(0, 120),
-    contentType: "episode",
-    contentId: picked.id,
-    payload: {
-      episodeId: picked.id,
-      episodeSlug: picked.slug,
-      title: picked.title,
-      description: picked.description || null,
-      sourceUrl: picked.sourceUrl,
-      customText,
-      autoResurface: true,
-      localDate: target.localDate,
-      localTime
-    },
-    status: "queued",
-    priority: 55,
-    scheduledFor
-  });
-
-  await logPipelineEvent(service, {
-    jobId,
-    stage: "social",
-    status: "info",
-    contentType: "episode",
-    contentId: picked.id,
-    platform: "Facebook",
-    message: "Episodio programado automaticamente para resurfacerse en Facebook",
-    meta: {
-      local_date: target.localDate,
-      local_time: localTime,
-      auto_resurface: true
-    }
-  });
+  if (created.length === 0) {
+    return { ok: true, scheduled: false, reason: "no_candidates" };
+  }
 
   return {
     ok: true,
     scheduled: true,
-    jobId,
-    episodeId: picked.id,
-    episodeTitle: picked.title,
-    scheduledFor,
-    localDate: target.localDate,
-    localTime
+    created,
+    scheduledCount: created.length,
+    missingToday: Math.max(0, DAILY_POSTS_PER_DAY - (scheduledCounts.get(scheduleWindow.today) ?? 0) - created.filter((item) => item.localDate === scheduleWindow.today).length),
+    missingTomorrow: Math.max(0, DAILY_POSTS_PER_DAY - (scheduledCounts.get(scheduleWindow.tomorrow) ?? 0) - created.filter((item) => item.localDate === scheduleWindow.tomorrow).length)
   };
 }

@@ -126,6 +126,7 @@ pnpm dev
   - process-jobs cada 5 min
   - rescore cada 15 min
   - content-resurfacer cada 6 horas
+  - episode-resurfacer diario
   - analytics-aggregation cada 1 hora
   - SEO y auto-posts mantienen scheduling
 
@@ -149,6 +150,15 @@ pnpm dev
   - Requiere secrets de repo:
     - `CRON_BASE_URL` (ej. `https://tu-dominio.com`)
     - `CRON_SECRET` (mismo valor que en el servidor)
+
+## Episode Resurfacer (Facebook)
+- Endpoint cron: `POST/GET /api/cron/episode-resurfacer`
+- Seguridad: header `Authorization: Bearer ${CRON_SECRET}` (o `x-cron-secret`).
+- Agenda hasta 2 episodios viejos por dia en `America/Chicago`, evitando repetir el episodio mas reciente y priorizando episodios con menos resurfaces previos.
+- Si faltan episodios programados para hoy o manana, el worker rellena los espacios pendientes automaticamente.
+- Scheduler:
+  - GitHub Actions: `/.github/workflows/episode-resurfacer-cron.yml` diario a las `06:15 UTC`.
+  - Vercel cron: `/api/cron/episode-resurfacer`
 
 ## SEO Autopilot (Vercel + Supabase)
 1. Ejecutar migración SEO:

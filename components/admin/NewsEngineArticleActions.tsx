@@ -3,6 +3,8 @@
 import { startTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authJsonFetch } from "@/lib/clientApi";
+import { normalizeImageUrl } from "@/lib/imageUrl";
+import { supabase } from "@/lib/supabaseClient";
 
 type SocialPlatform = "facebook" | "instagram" | "x" | "tiktok";
 
@@ -44,6 +46,7 @@ export type NewsEngineArticleCard = {
 
 type Props = {
   article: NewsEngineArticleCard;
+  onChanged?: () => void | Promise<void>;
 };
 
 type SocialEditorState = Record<
@@ -105,12 +108,13 @@ function fromCsv(value: string) {
     .filter(Boolean);
 }
 
-export function NewsEngineArticleActions({ article }: Props) {
+export function NewsEngineArticleActions({ article, onChanged }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [socialOpen, setSocialOpen] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [editor, setEditor] = useState({
     title: article.title,
     summary: article.summary ?? "",
@@ -127,6 +131,11 @@ export function NewsEngineArticleActions({ article }: Props) {
     startTransition(() => {
       router.refresh();
     });
+  };
+
+  const syncParent = () => {
+    if (!onChanged) return;
+    void onChanged();
   };
 
   const request = async (path: string, options?: { method?: string; body?: Record<string, unknown> }) => {
@@ -147,6 +156,37 @@ export function NewsEngineArticleActions({ article }: Props) {
     return json;
   };
 
+  const uploadCover = async (file: File) => {
+    setUploadingCover(true);
+    setStatus(null);
+
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("Debes iniciar sesión para subir portada.");
+
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const filePath = `news/${userId}-${Date.now()}.${ext}`;
+
+      const upload = await supabase.storage.from("news-covers").upload(filePath, file, {
+        upsert: true,
+        contentType: file.type
+      });
+      if (upload.error) throw new Error(upload.error.message);
+
+      const { data } = supabase.storage.from("news-covers").getPublicUrl(filePath);
+      const publicUrl = normalizeImageUrl(data?.publicUrl) ?? data?.publicUrl ?? "";
+      if (!publicUrl) throw new Error("No se pudo obtener la URL pública de la portada.");
+
+      setEditor((current) => ({ ...current, coverImageUrl: publicUrl }));
+      setStatus("Portada subida. Guarda el draft para aplicarla.");
+    } catch (error: any) {
+      setStatus(error?.message ?? "No se pudo subir la portada.");
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
   const saveArticle = async () => {
     const json = await request(`/api/admin/articles/${article.id}`, {
       method: "PATCH",
@@ -159,6 +199,7 @@ export function NewsEngineArticleActions({ article }: Props) {
 
     if (!json) return;
     setStatus("Cambios editoriales guardados.");
+    syncParent();
     refreshPage();
   };
 
@@ -167,6 +208,7 @@ export function NewsEngineArticleActions({ article }: Props) {
     const json = await request(`/api/admin/articles/${article.id}`, { method: "DELETE" });
     if (!json) return;
     setStatus("Draft eliminado.");
+    syncParent();
     refreshPage();
   };
 
@@ -194,6 +236,7 @@ export function NewsEngineArticleActions({ article }: Props) {
 
     if (!json) return null;
     setStatus("Drafts sociales guardados.");
+    if (shouldRefresh) syncParent();
     if (shouldRefresh) refreshPage();
     return json;
   };
@@ -214,6 +257,7 @@ export function NewsEngineArticleActions({ article }: Props) {
 
     if (!json) return;
     setStatus(`Redes procesadas: ${json.result?.done ?? 0} publicadas, ${json.result?.failed ?? 0} fallidas.`);
+    syncParent();
     refreshPage();
   };
 
@@ -221,6 +265,7 @@ export function NewsEngineArticleActions({ article }: Props) {
     const json = await request(path, { body });
     if (!json) return;
     setStatus(message);
+    syncParent();
     refreshPage();
   };
 
@@ -418,10 +463,27 @@ export function NewsEngineArticleActions({ article }: Props) {
                 onChange={(event) => setEditor((current) => ({ ...current, coverImageUrl: event.target.value }))}
               />
             </label>
+            <label>
+              Subir portada
+              <input
+                className="input"
+                type="file"
+                accept="image/*"
+                disabled={uploadingCover}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void uploadCover(file);
+                  event.currentTarget.value = "";
+                }}
+              />
+            </label>
             <div className="admin-item-actions">
               <button className="button" type="button" disabled={Boolean(busy)} onClick={saveArticle}>
                 Guardar draft
               </button>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {uploadingCover ? "Subiendo portada..." : "Puedes pegar URL o subir imagen directamente."}
+              </span>
             </div>
           </div>
         </section>
