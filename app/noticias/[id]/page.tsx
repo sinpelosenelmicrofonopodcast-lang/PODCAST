@@ -13,7 +13,7 @@ import type { AppLang } from "@/lib/language";
 import { isUuid, newsHref, normalizeNewsKey } from "@/lib/newsRoute";
 import { buildSeoMetadata, newsSeoTemplate } from "@/lib/seo/meta";
 import { buildNewsArticleJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
-import { DEFAULT_OG_IMAGE } from "@/lib/seo/constants";
+import { DEFAULT_OG_IMAGE, canonicalUrl } from "@/lib/seo/constants";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { cleanNewsCategories } from "@/lib/newsCategories";
 
@@ -292,7 +292,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const supabase = supabaseServer();
   const item = await loadItem(supabase, params.id);
   const canonical = item ? newsHref(item) : `/noticias/${encodeURIComponent(params.id)}`;
-  const socialImage = `${canonical}/opengraph-image`;
+  const ogVersion = encodeURIComponent(String(item?.updated_at ?? item?.published_at ?? "20260321"));
+  const socialImage = canonicalUrl(`${canonical}/opengraph-image?v=${ogVersion}`);
   const seo = newsSeoTemplate(item?.title ?? "Noticia", item?.summary ?? "Noticias Sin Pelos");
   const metadata = buildSeoMetadata({
     title: seo.title,
