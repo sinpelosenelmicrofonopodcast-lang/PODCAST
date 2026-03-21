@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
 
 export function ConfesionComposer() {
   const [body, setBody] = useState("");
@@ -15,47 +14,44 @@ export function ConfesionComposer() {
     setStatus(null);
     setLoading(true);
 
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) {
-      setStatus("Debes iniciar sesión para confesar.");
-      setLoading(false);
-      return;
-    }
-
-    const { error } = await supabase.from("confessions").insert({
-      body,
-      author_id: userId,
-      level: "public",
-      status: "published"
+    const response = await fetch("/api/confessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        body,
+        isAnonymous: true
+      })
     });
+    const json = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
 
-    if (error) {
-      setStatus(error.message);
+    if (!response.ok || !json?.ok) {
+      setStatus(json?.error ?? "No se pudo publicar la confesion.");
       setLoading(false);
       return;
     }
 
     setBody("");
-    setStatus("Confesión publicada.");
+    setStatus("Confesion publicada anonimamente.");
     setLoading(false);
     router.refresh();
   };
 
   return (
     <div className="card" style={{ marginTop: 18 }}>
-      <h3 style={{ marginTop: 0 }}>Confesar (público)</h3>
+      <h3 style={{ marginTop: 0 }}>Confesar anonimamente</h3>
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
         <textarea
           className="textarea"
           rows={4}
-          placeholder="Escribe tu confesión..."
+          placeholder="Escribe tu confesion... nadie va a ver tu nombre."
           value={body}
           onChange={(e) => setBody(e.target.value)}
           required
         />
         <button className="button" type="submit" disabled={loading}>
-          {loading ? "Publicando..." : "Publicar"}
+          {loading ? "Publicando..." : "Publicar anonima"}
         </button>
         {status ? <p className="muted">{status}</p> : null}
       </form>

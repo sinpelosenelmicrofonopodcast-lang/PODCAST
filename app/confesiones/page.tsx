@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -6,6 +7,8 @@ import { CommentComposer } from "@/components/CommentComposer";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
 import { LazyContentComments } from "@/components/LazyContentComments";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { canonicalUrl } from "@/lib/seo/constants";
+import { getConfessionBannerUrl, getConfessionShareImageUrl } from "@/lib/confessions";
 
 type CategoryKey = "amor" | "trabajo" | "familia" | "sociedad" | "politica";
 
@@ -13,7 +16,31 @@ type ConfessionRow = {
   id: string;
   body: string;
   created_at: string | null;
+  published_at: string | null;
+  is_anonymous: boolean | null;
   users: { nickname?: string | null; avatar_url?: string | null } | { nickname?: string | null; avatar_url?: string | null }[] | null;
+};
+
+const confessionsShareImage = getConfessionShareImageUrl();
+
+export const metadata: Metadata = {
+  title: "Confesiones Cabronas | Sin Pelos en el Microfono",
+  description: "Lee confesiones anonimas, vacila con la comunidad y publica la tuya completamente anonima en Sin Pelos.",
+  alternates: {
+    canonical: canonicalUrl("/confesiones")
+  },
+  openGraph: {
+    title: "Confesiones Cabronas",
+    description: "Secretos, infidelidades y locuras. Entra a leer y publica la tuya completamente anonima.",
+    url: canonicalUrl("/confesiones"),
+    images: [{ url: confessionsShareImage, width: 1024, height: 1024 }]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Confesiones Cabronas",
+    description: "Lee confesiones anonimas y publica la tuya completamente anonima.",
+    images: [confessionsShareImage]
+  }
 };
 
 const CATEGORY_META: { key: CategoryKey; label: string }[] = [
@@ -67,11 +94,11 @@ export default async function ConfesionesPage({
 }) {
   const supabase = supabaseServer();
   const selectedCategory = normalizeCategory(searchParams?.tema);
-  const bannerUrl = (process.env.NEXT_PUBLIC_CONFESIONARIO_BANNER_URL ?? "").trim();
+  const bannerUrl = getConfessionBannerUrl();
 
   const { data: dataRows } = await supabase
     .from("confessions")
-    .select("id, body, created_at, users(nickname, avatar_url)")
+    .select("id, body, created_at, published_at, is_anonymous, users(nickname, avatar_url)")
     .eq("level", "public")
     .eq("status", "published")
     .order("created_at", { ascending: false })
@@ -126,10 +153,10 @@ export default async function ConfesionesPage({
             <div className="confesionario-overlay">
               <span className="badge">Confesionario</span>
               <h1 className="section-title" style={{ margin: 0 }}>
-                El Confesionario Sin Pelos
+                Confesiones Cabronas
               </h1>
               <p className="muted" style={{ margin: 0 }}>
-                Comparte lo que nadie se atreve a decir. Sin miedo. Sin máscaras. Sin filtros.
+                Secretos, infidelidades y locuras. Lee la que esta corriendo y tira la tuya completamente anonima para vacilar.
               </p>
               <div className="conf-hero-actions">
                 <a href="#enviar" className="button">
@@ -179,11 +206,11 @@ export default async function ConfesionesPage({
                   <h3 style={{ marginTop: 0 }}>Top confesiones de la semana</h3>
                   <div className="conf-popular-list">
                     {popular.map((item) => (
-                      <a key={item.id} href={`#conf-${item.id}`} className="conf-popular-item">
+                      <Link key={item.id} href={`/confesiones/${item.id}`} className="conf-popular-item">
                         <span className="pill">{CATEGORY_META.find((c) => c.key === item.topic)?.label ?? "Tema"}</span>
                         <strong className="clamp-1">{item.body}</strong>
                         <span className="muted">{item.comments} respuestas</span>
-                      </a>
+                      </Link>
                     ))}
                   </div>
                 </div>
@@ -206,8 +233,8 @@ export default async function ConfesionesPage({
                             style={{ borderRadius: "50%", objectFit: "cover" }}
                           />
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: 14 }}>{author?.nickname ?? "Anónimo"}</div>
-                            <div className="muted" style={{ fontSize: 12 }}>{formatDate(item.created_at)}</div>
+                            <div style={{ fontWeight: 700, fontSize: 14 }}>{item.is_anonymous === false ? author?.nickname ?? "Usuario" : "Anonimo"}</div>
+                            <div className="muted" style={{ fontSize: 12 }}>{formatDate(item.published_at ?? item.created_at)}</div>
                           </div>
                         </div>
                         <span className="pill">{topicLabel}</span>
@@ -217,6 +244,7 @@ export default async function ConfesionesPage({
 
                       <div className="conf-card-meta muted">
                         <span>💬 {repliesCount} respuestas</span>
+                        <Link href={`/confesiones/${item.id}`}>Ver completa</Link>
                       </div>
 
                       <AdminDeleteButton table="confessions" id={item.id} label="Eliminar confesión" />

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createAutomationJob, logPipelineEvent, updateAutomationJob } from "@/lib/pipelineOps";
-import { postBlogToFacebook, postNewsToFacebook } from "@/lib/socialFacebook";
+import { postBlogToFacebook, postConfessionToFacebook, postNewsToFacebook } from "@/lib/socialFacebook";
 import { postNewsToInstagram } from "@/lib/socialInstagram";
 import { rewriteNewsWithAI } from "@/lib/newsRewrite";
 import { publishFromSocialQueue } from "@/lib/social/publisher";
@@ -242,6 +242,65 @@ export async function POST(request: NextRequest) {
 
         if (job.job_type === "facebook_post_episode") {
           await publishFacebookEpisodeAutomationJob(service, job);
+          done += 1;
+          continue;
+        }
+
+        if (job.job_type === "facebook_post_confession") {
+          const confessionId = String(job.payload?.confessionId ?? job.content_id ?? "").trim();
+          let title = String(job.payload?.title ?? "").trim();
+          let body = String(job.payload?.body ?? "").trim();
+          if (!confessionId) throw new Error("Job invalido: falta confessionId.");
+
+          if (!title || !body) {
+            const confessionRes = await service
+              .from("confessions")
+              .select("id, title, body, status, level")
+              .eq("id", confessionId)
+              .limit(1)
+              .maybeSingle();
+
+            if (confessionRes.error) throw new Error(confessionRes.error.message);
+            const row = confessionRes.data as { id?: string; title?: string | null; body?: string | null; status?: string | null; level?: string | null } | null;
+            if (!row?.id) throw new Error("No se encontro la confesion para Facebook.");
+            if (String(row.status ?? "") !== "published" || String(row.level ?? "public") !== "public") {
+              throw new Error("Confesion no publica: bloqueada para Facebook.");
+            }
+            if (!title) title = String(row.title ?? "").trim();
+            if (!body) body = String(row.body ?? "").trim();
+          }
+
+          const posted = await postConfessionToFacebook({ confessionId, title, body });
+
+          await service.from("external_posts").upsert(
+            {
+              platform: "Facebook",
+              external_id: posted.postId || `confession-${confessionId}`,
+              title: title || "Confesion anonima",
+              caption: String(job.payload?.teaser ?? "").trim() || null,
+              media_url: null,
+              metrics: null,
+              posted_at: new Date().toISOString(),
+              source_url: posted.link
+            },
+            { onConflict: "platform,external_id", ignoreDuplicates: true }
+          );
+
+          await logPipelineEvent(service, {
+            jobId: job.id,
+            stage: "social",
+            status: "ok",
+            contentType: "confession",
+            contentId: confessionId,
+            platform: "Facebook",
+            message: "Confesion publicada en Facebook por worker",
+            meta: { postId: posted.postId, link: posted.link }
+          });
+          await updateAutomationJob(service, job.id, {
+            status: "done",
+            finishedAt: new Date().toISOString(),
+            payload: { ...(job.payload ?? {}), title, body, postId: posted.postId, link: posted.link }
+          });
           done += 1;
           continue;
         }

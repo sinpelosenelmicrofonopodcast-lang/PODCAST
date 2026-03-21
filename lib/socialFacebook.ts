@@ -1,4 +1,5 @@
 import { buildMetaError, isMetaAuthError, metaFetchJson, resolvePageAccessToken } from "@/lib/metaTokens";
+import { buildConfessionFacebookMessage, getConfessionLink } from "@/lib/confessions";
 
 export type FacebookPostNewsInput = {
   newsId: string;
@@ -21,6 +22,12 @@ export type FacebookPostEpisodeInput = {
   description?: string | null;
   sourceUrl?: string | null;
   customText?: string | null;
+};
+
+export type FacebookPostConfessionInput = {
+  confessionId: string;
+  title?: string | null;
+  body?: string | null;
 };
 
 type MetaErrorPayload = {
@@ -274,6 +281,29 @@ export async function postEpisodeToFacebook(input: FacebookPostEpisodeInput) {
     ? `${title}\n\n${shortText(description, 260)}\n\nEscúchalo aquí:`
     : `${title}\n\nEscúchalo aquí:`;
   const message = shortText(customText || fallbackMessage, 700);
+
+  const posted = await postToFacebookPageFeed({
+    message,
+    link
+  });
+
+  return {
+    ok: true as const,
+    postId: posted.postId,
+    link,
+    message
+  };
+}
+
+export async function postConfessionToFacebook(input: FacebookPostConfessionInput) {
+  const confessionId = String(input.confessionId ?? "").trim();
+  if (!confessionId) throw new Error("confessionId requerido.");
+
+  const link = getConfessionLink(confessionId);
+  const message = buildConfessionFacebookMessage({
+    title: input.title,
+    body: input.body
+  });
 
   const posted = await postToFacebookPageFeed({
     message,
