@@ -185,6 +185,10 @@ function cleanInlineText(value?: string | null) {
     .trim();
 }
 
+function equalsIgnoringCase(left?: string | null, right?: string | null) {
+  return cleanInlineText(left).toLowerCase() === cleanInlineText(right).toLowerCase();
+}
+
 export async function postNewsToFacebook(input: FacebookPostNewsInput) {
   const { baseUrl } = getConfig();
 
@@ -196,7 +200,15 @@ export async function postNewsToFacebook(input: FacebookPostNewsInput) {
   const summary = String(input.summary ?? "").trim();
   const linkKey = newsSlug || newsId;
   const link = `${baseUrl.replace(/\/$/, "")}/noticias/${encodeURIComponent(linkKey)}`;
-  const message = summary ? `${title}\n\n${summary}` : title || "Nueva noticia";
+  const summaryOnly = shortText(summary, 260);
+  const fallbackTitle = shortText(title, 180);
+  const message = summaryOnly
+    ? equalsIgnoringCase(title, summaryOnly)
+      ? `${summaryOnly}\n\nLee la nota:`
+      : `${summaryOnly}\n\nLee la nota:`
+    : fallbackTitle
+      ? `${fallbackTitle}\n\nLee la nota:`
+      : "Nueva noticia en Sin Pelos";
 
   const posted = await postToFacebookPageFeed({
     message,

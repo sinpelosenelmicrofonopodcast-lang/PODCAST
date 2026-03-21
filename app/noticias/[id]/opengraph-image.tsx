@@ -73,53 +73,45 @@ export default async function OgImage({ params }: { params: { id: string } }) {
           background: "#050505"
         }}
       >
-        <img
-          src={coverImage}
-          alt=""
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            opacity: 0.16
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            background:
-              "linear-gradient(135deg, rgba(0,0,0,0.78) 0%, rgba(10,10,10,0.88) 48%, rgba(88,8,8,0.74) 100%)"
-          }}
-        />
-
         {item?.cover_url ? (
-          <div
-            style={{
-              position: "absolute",
-              inset: 24,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 16,
-              borderRadius: 28,
-              border: "1px solid rgba(255,255,255,0.14)",
-              background: "rgba(12,12,12,0.72)"
-            }}
-          >
+          <>
             <img
               src={coverImage}
               alt={title}
               style={{
+                position: "absolute",
+                inset: 0,
                 width: "100%",
                 height: "100%",
-                objectFit: "contain",
-                borderRadius: 20
+                objectFit: "cover"
               }}
             />
-          </div>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                background: "linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.08) 56%, rgba(0,0,0,0.34) 100%)"
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                left: 28,
+                bottom: 28,
+                display: "flex",
+                padding: "12px 18px",
+                borderRadius: 999,
+                background: "rgba(8,8,8,0.72)",
+                color: "#ffffff",
+                fontSize: 24,
+                fontWeight: 700,
+                letterSpacing: 0.2
+              }}
+            >
+              sinpelosenelmicrofono.com
+            </div>
+          </>
         ) : (
           <div
             style={{
@@ -189,24 +181,6 @@ export default async function OgImage({ params }: { params: { id: string } }) {
             </div>
           </div>
         )}
-
-        <div
-          style={{
-            position: "absolute",
-            top: 24,
-            left: 24,
-            display: "flex",
-            padding: "10px 18px",
-            borderRadius: 999,
-            background: "rgba(155,13,16,0.96)",
-            color: "#ffffff",
-            fontSize: 24,
-            fontWeight: 800,
-            letterSpacing: 1
-          }}
-        >
-          SPM NOTICIAS
-        </div>
       </div>
     ),
     size
