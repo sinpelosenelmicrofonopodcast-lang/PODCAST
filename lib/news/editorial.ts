@@ -9,6 +9,7 @@ import { buildThumbnail } from "@/lib/images/thumbnail";
 import { asOptionalString, asString, asStringArray, isUuid, parseDate, requireNonEmpty } from "@/lib/validations/common";
 import { cleanNewsCategories } from "@/lib/newsCategories";
 import { generateSpmNewsImage } from "@/services/newsImageGenerator";
+import { buildSpmCoverPrompt } from "@/lib/news/spmCoverPrompt";
 
 export const SUPPORTED_SOCIAL_PLATFORMS = ["facebook", "instagram", "x", "tiktok"] as const;
 export type SupportedSocialPlatform = (typeof SUPPORTED_SOCIAL_PLATFORMS)[number];
@@ -37,6 +38,7 @@ export type ArticleEditorRow = {
   status: string;
   published_at: string | null;
   source_url: string | null;
+  ai_metadata: Record<string, unknown> | null;
 };
 
 export async function getArticleEditorRow(service: SupabaseClient, articleId: string) {
@@ -45,7 +47,7 @@ export async function getArticleEditorRow(service: SupabaseClient, articleId: st
   const { data, error } = await service
     .from("news_articles")
     .select(
-      "id, slug, title, summary, analysis, excerpt, original_content, source_name, cover_image_url, featured_image_url, category, region, tags, hashtags, status, published_at, source_url"
+      "id, slug, title, summary, analysis, excerpt, original_content, source_name, cover_image_url, featured_image_url, category, region, tags, hashtags, status, published_at, source_url, ai_metadata"
     )
     .eq("id", articleId)
     .limit(1)
@@ -86,6 +88,8 @@ export async function updateArticleEditorial(
     tags?: unknown;
     hashtags?: unknown;
     coverImageUrl?: unknown;
+    coverPrompt?: unknown;
+    coverFileName?: unknown;
   }
 ) {
   const article = await getArticleEditorRow(service, articleId);
@@ -97,6 +101,21 @@ export async function updateArticleEditorial(
   const tags = asStringArray(input.tags, 12, 32);
   const hashtags = asStringArray(input.hashtags, 10, 32).map((item) => (item.startsWith("#") ? item : `#${item}`));
   const coverImageUrl = asOptionalString(input.coverImageUrl, 2000);
+  const generatedCover = buildSpmCoverPrompt({
+    title,
+    summary,
+    category,
+    region,
+    sourceName: article.source_name
+  });
+  const coverPrompt = asOptionalString(input.coverPrompt, 8000) ?? generatedCover.prompt;
+  const coverFileName = asOptionalString(input.coverFileName, 180) ?? generatedCover.fileName;
+  const currentAiMetadata =
+    article.ai_metadata && typeof article.ai_metadata === "object" && !Array.isArray(article.ai_metadata) ? article.ai_metadata : {};
+  const currentCoverMeta =
+    currentAiMetadata.cover && typeof currentAiMetadata.cover === "object" && !Array.isArray(currentAiMetadata.cover)
+      ? (currentAiMetadata.cover as Record<string, unknown>)
+      : {};
 
   const updatePayload: Record<string, unknown> = {
     title,
@@ -107,6 +126,18 @@ export async function updateArticleEditorial(
     tags,
     hashtags,
     cover_image_url: coverImageUrl,
+    ai_metadata: {
+      ...currentAiMetadata,
+      cover: {
+        ...currentCoverMeta,
+        prompt: coverPrompt,
+        file_name: coverFileName,
+        headline: generatedCover.headline,
+        subtitle: generatedCover.subtitle,
+        visual_brief: generatedCover.visualBrief,
+        layout: "spm_news_v1"
+      }
+    },
     updated_by: actorId
   };
 
@@ -126,7 +157,9 @@ export async function updateArticleEditorial(
     region,
     tags,
     hashtags,
-    coverImageUrl
+    coverImageUrl,
+    coverPrompt,
+    coverFileName
   };
 }
 
@@ -252,7 +285,10 @@ export async function generateArticleAssets(service: SupabaseClient, articleId: 
 
   const cover = generateSpmNewsImage({
     title: article.title,
-    subtitle: article.summary ?? article.category ?? "SPM Noticias",
+    summary: article.summary ?? article.category ?? "SPM Noticias",
+    category: article.category,
+    region: article.region,
+    sourceName: article.source_name,
     originalImageUrl: article.featured_image_url ?? article.cover_image_url
   });
   const meme = buildMemeTemplate({ top: article.title.slice(0, 60), bottom: article.summary ?? "Sin filtro" });
@@ -260,7 +296,7 @@ export async function generateArticleAssets(service: SupabaseClient, articleId: 
   const thumb = buildThumbnail({ title: article.title, subtitle: article.summary ?? "SPM" });
 
   const assets = [
-    { type: "cover", url: cover.imageUrl, meta: { format: "svg", width: cover.width, height: cover.height, prompt: cover.prompt } },
+    { type: "cover", url: cover.imageUrl, meta: { format: "svg", width: cover.width, height: cover.height, prompt: cover.prompt, file_name: cover.fileName } },
     { type: "meme", url: meme.dataUrl, meta: { format: "svg", width: meme.width, height: meme.height } },
     { type: "quote_card", url: quote.dataUrl, meta: { format: "svg", width: quote.width, height: quote.height } },
     { type: "reel_thumbnail", url: thumb.dataUrl, meta: { format: "svg", width: thumb.width, height: thumb.height } }
@@ -287,6 +323,19 @@ export async function generateArticleAssets(service: SupabaseClient, articleId: 
       cover_image_url: cover.imageUrl,
       meme_image_url: meme.dataUrl,
       quote_card_url: quote.dataUrl,
+      ai_metadata: {
+        ...(article.ai_metadata ?? {}),
+        cover: {
+          ...((article.ai_metadata as any)?.cover ?? {}),
+          prompt: cover.prompt,
+          file_name: cover.fileName,
+          headline: cover.headline,
+          subtitle: cover.subtitle,
+          visual_brief: cover.visualBrief,
+          layout: "spm_news_v1",
+          used_original_image: cover.usedOriginalImage
+        }
+      },
       updated_by: actorId
     })
     .eq("id", articleId);

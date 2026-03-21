@@ -1,13 +1,15 @@
 import { escapeSvgText, svgToDataUrl } from "@/lib/images/utils";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { asString } from "@/lib/validations/common";
-
-export const SPM_NEWS_IMAGE_PROMPT =
-  "news thumbnail, Puerto Rican news style, dark textured background, red top bar with 'SPM NOTICIAS', bold white headline centered, yellow subtitle, cinematic lighting, high contrast, clean composition, modern news design, 16:9, logo bottom right";
+import { buildSpmCoverPrompt } from "@/lib/news/spmCoverPrompt";
 
 export type GeneratedNewsImage = {
   imageUrl: string;
   prompt: string;
+  fileName: string;
+  headline: string;
+  subtitle: string;
+  visualBrief: string;
   width: number;
   height: number;
   usedOriginalImage: boolean;
@@ -40,11 +42,21 @@ function wrapText(raw: string, maxChars: number, maxLines: number) {
 
 export function generateSpmNewsImage(input: {
   title: string;
-  subtitle?: string | null;
+  summary?: string | null;
+  category?: string | null;
+  region?: string | null;
+  sourceName?: string | null;
   originalImageUrl?: string | null;
 }) {
-  const titleLines = wrapText(input.title, 22, 3);
-  const subtitle = escapeSvgText(asString(input.subtitle ?? "Sin Pelos en el Micrófono", 90));
+  const spec = buildSpmCoverPrompt({
+    title: input.title,
+    summary: input.summary,
+    category: input.category,
+    region: input.region,
+    sourceName: input.sourceName
+  });
+  const titleLines = wrapText(spec.headline, 18, 2);
+  const subtitle = escapeSvgText(asString(spec.subtitle, 90));
   const originalImageUrl = normalizeImageUrl(input.originalImageUrl);
   const useOriginal = Boolean(originalImageUrl);
 
@@ -91,7 +103,11 @@ export function generateSpmNewsImage(input: {
 
   return {
     imageUrl: svgToDataUrl(svg),
-    prompt: SPM_NEWS_IMAGE_PROMPT,
+    prompt: spec.prompt,
+    fileName: spec.fileName,
+    headline: spec.headline,
+    subtitle: spec.subtitle,
+    visualBrief: spec.visualBrief,
     width: 1280,
     height: 720,
     usedOriginalImage: useOriginal

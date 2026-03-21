@@ -41,6 +41,10 @@ export type NewsEngineArticleCard = {
   impactScore: number;
   qualityScore: number;
   qualityReasons: string[];
+  coverPrompt?: string | null;
+  coverFileName?: string | null;
+  coverHeadline?: string | null;
+  coverSubtitle?: string | null;
   socialDrafts: SocialDraft[];
 };
 
@@ -142,7 +146,9 @@ export function NewsEngineArticleActions({ article, onChanged }: Props) {
     region: article.region ?? "",
     tags: toCsv(article.tags),
     hashtags: toCsv(article.hashtags),
-    coverImageUrl: article.coverImageUrl ?? ""
+    coverImageUrl: article.coverImageUrl ?? "",
+    coverPrompt: article.coverPrompt ?? "",
+    coverFileName: article.coverFileName ?? ""
   });
   const [social, setSocial] = useState<SocialEditorState>(() => createInitialSocialState(article));
 
@@ -442,6 +448,18 @@ export function NewsEngineArticleActions({ article, onChanged }: Props) {
               Ver fuente original
             </a>
           ) : null}
+
+          {article.coverHeadline || article.coverSubtitle || article.coverFileName ? (
+            <div className="news-engine-preview-block">
+              <h3 style={{ margin: 0 }}>Portada SPM</h3>
+              <p className="muted" style={{ margin: 0 }}>
+                {article.coverHeadline || "Sin titular corto"} {article.coverSubtitle ? `· ${article.coverSubtitle}` : ""}
+              </p>
+              <p className="muted" style={{ margin: 0 }}>
+                {article.coverFileName || "Sin file name"}
+              </p>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -564,6 +582,25 @@ export function NewsEngineArticleActions({ article, onChanged }: Props) {
               />
             </label>
             <label>
+              Prompt portada SPM
+              <textarea
+                className="textarea"
+                rows={6}
+                value={editor.coverPrompt}
+                onChange={(event) => setEditor((current) => ({ ...current, coverPrompt: event.target.value }))}
+                placeholder="Prompt maestro para generar la portada estilo SPM News."
+              />
+            </label>
+            <label>
+              File name SEO
+              <input
+                className="input"
+                value={editor.coverFileName}
+                onChange={(event) => setEditor((current) => ({ ...current, coverFileName: event.target.value }))}
+                placeholder="spm_tema_keyword.png"
+              />
+            </label>
+            <label>
               Subir portada
               <input
                 className="input"
@@ -585,7 +622,7 @@ export function NewsEngineArticleActions({ article, onChanged }: Props) {
                 Programar en sitio
               </button>
               <span className="muted" style={{ fontSize: 12 }}>
-                {uploadingCover ? "Subiendo portada..." : "Puedes pegar URL o subir imagen directamente."}
+                {uploadingCover ? "Subiendo portada..." : "El prompt SPM se genera automatico, pero aqui lo puedes ajustar, subir la portada y publicar."}
               </span>
             </div>
             <label>

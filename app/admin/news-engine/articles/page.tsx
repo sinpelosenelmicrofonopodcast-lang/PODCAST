@@ -86,6 +86,10 @@ export default async function AdminNewsEngineArticlesPage({
       : Array.isArray(item?.ai_metadata?.impact_reasons)
         ? item.ai_metadata.impact_reasons.map((reason: unknown) => String(reason))
         : [],
+    coverPrompt: String(item?.ai_metadata?.cover?.prompt ?? "") || null,
+    coverFileName: String(item?.ai_metadata?.cover?.file_name ?? "") || null,
+    coverHeadline: String(item?.ai_metadata?.cover?.headline ?? "") || null,
+    coverSubtitle: String(item?.ai_metadata?.cover?.subtitle ?? "") || null,
     socialDrafts: Array.from(latestSocialByArticle.get(String(item.id))?.values() ?? []).map((publication: any) => ({
       id: String(publication.id),
       platform: String(publication.platform ?? "").toLowerCase() as "facebook" | "instagram" | "x" | "tiktok",

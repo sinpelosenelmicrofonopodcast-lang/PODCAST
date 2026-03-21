@@ -473,7 +473,10 @@ async function insertDraftArticle(service: SupabaseClient, candidate: IngestedCa
   const generated = await generateNewsDraftContent(candidate);
   const cover = generateSpmNewsImage({
     title: generated.title,
-    subtitle: generated.subtitle,
+    summary: generated.subtitle || generated.summary,
+    category: generated.category,
+    region: generated.region,
+    sourceName: candidate.sourceName,
     originalImageUrl: candidate.featuredImageUrl
   });
   const slug = await ensureUniqueSlug(service, slugify(generated.title));
@@ -525,6 +528,11 @@ async function insertDraftArticle(service: SupabaseClient, candidate: IngestedCa
       },
       cover: {
         prompt: cover.prompt,
+        file_name: cover.fileName,
+        headline: cover.headline,
+        subtitle: cover.subtitle,
+        visual_brief: cover.visualBrief,
+        layout: "spm_news_v1",
         used_original_image: cover.usedOriginalImage
       },
       source_meta: buildSourceMeta(candidate.sourceMeta)
@@ -592,6 +600,10 @@ async function insertDraftArticle(service: SupabaseClient, candidate: IngestedCa
       url: cover.imageUrl,
       meta: {
         prompt: cover.prompt,
+        file_name: cover.fileName,
+        headline: cover.headline,
+        subtitle: cover.subtitle,
+        visual_brief: cover.visualBrief,
         source_image_url: candidate.featuredImageUrl,
         used_original_image: cover.usedOriginalImage
       }

@@ -34,6 +34,10 @@ type NewsDeskCard = {
   impactScore: number;
   qualityScore: number;
   qualityReasons: string[];
+  coverPrompt: string | null;
+  coverFileName: string | null;
+  coverHeadline: string | null;
+  coverSubtitle: string | null;
   socialDrafts: SocialDraft[];
 };
 
@@ -120,6 +124,10 @@ export async function GET(request: NextRequest) {
         : Array.isArray(item?.ai_metadata?.impact_reasons)
           ? item.ai_metadata.impact_reasons.map((reason: unknown) => String(reason))
           : [],
+      coverPrompt: normalizeText(item?.ai_metadata?.cover?.prompt) || null,
+      coverFileName: normalizeText(item?.ai_metadata?.cover?.file_name) || null,
+      coverHeadline: normalizeText(item?.ai_metadata?.cover?.headline) || null,
+      coverSubtitle: normalizeText(item?.ai_metadata?.cover?.subtitle) || null,
       socialDrafts: Array.from(latestSocialByArticle.get(String(item.id))?.values() ?? []).map((publication: any) => ({
         id: String(publication.id),
         platform: String(publication.platform ?? "").toLowerCase() as "facebook" | "instagram" | "x" | "tiktok",
