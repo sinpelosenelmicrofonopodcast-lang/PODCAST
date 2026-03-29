@@ -721,6 +721,25 @@ function youtubeVideoToExternalRow(video: YouTubeVideo): ExternalPostRow {
   };
 }
 
+function youtubeVideoToHomePodcastItem(video: YouTubeVideo): HomePodcastItem {
+  return {
+    id: cleanText(video.id),
+    title: cleanText(video.title, "Podcast destacado"),
+    caption: video.description || null,
+    source_url: `https://www.youtube.com/watch?v=${video.id}`,
+    media_url: normalizeImageUrl(video.thumbnailUrl),
+    posted_at: video.publishedAt || null,
+    platform: "YouTube",
+    metrics: {
+      views: safeNum(video.viewCount),
+      likes: safeNum(video.likeCount),
+      comments: safeNum(video.commentCount),
+      durationSeconds: safeNum(video.durationSeconds),
+      isShort: false
+    }
+  };
+}
+
 function latestEpisodeCandidate(rows: ExternalPostRow[]) {
   const sorted = [...rows].sort((a, b) => {
     return new Date(b.posted_at ?? 0).getTime() - new Date(a.posted_at ?? 0).getTime();
@@ -728,21 +747,23 @@ function latestEpisodeCandidate(rows: ExternalPostRow[]) {
   return sorted.find((row) => isEpisodePost(row)) ?? sorted.find((row) => !isShortPost(row)) ?? null;
 }
 
-async function resolveLatestFeaturedEpisode(podcastRows: ExternalPostRow[]) {
+async function resolveLatestFeaturedEpisode(podcastRows: ExternalPostRow[]): Promise<HomePodcastItem | null> {
   const syncedCandidate = latestEpisodeCandidate(podcastRows);
 
   try {
-    const liveVideos = await fetchYouTubeVideos(12, { revalidateSeconds: 120 });
-    const liveCandidate = latestEpisodeCandidate(liveVideos.map(youtubeVideoToExternalRow));
-    if (!liveCandidate) return syncedCandidate;
-    if (!syncedCandidate) return liveCandidate;
+    const liveVideos = await fetchYouTubeVideos(25, { noStore: true });
+    const latestFullEpisode = [...liveVideos]
+      .filter((video) => !isShorts(video.durationSeconds))
+      .sort((a, b) => new Date(b.publishedAt ?? 0).getTime() - new Date(a.publishedAt ?? 0).getTime())[0];
 
-    const liveTime = new Date(liveCandidate.posted_at ?? 0).getTime();
-    const syncedTime = new Date(syncedCandidate.posted_at ?? 0).getTime();
-    return liveTime >= syncedTime ? liveCandidate : syncedCandidate;
+    if (latestFullEpisode) {
+      return youtubeVideoToHomePodcastItem(latestFullEpisode);
+    }
   } catch {
-    return syncedCandidate;
+    // Fallback to synced rows below.
   }
+
+  return syncedCandidate ? mapPodcastRow(syncedCandidate) : null;
 }
 
 function sponsorCandidate(row: PromotionRow) {
@@ -900,7 +921,7 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
       mundo: pickRegion(["mundo", "internacional", "global"])
     },
     podcast: {
-      featured: featuredEpisode ? mapPodcastRow(featuredEpisode) : null
+      featured: featuredEpisode
     },
     editorialStories: editorialStories.slice(0, 3),
     community: {
