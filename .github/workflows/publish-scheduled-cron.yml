@@ -8,14 +8,21 @@ on:
 jobs:
   run-publish-scheduled:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Trigger Publish Scheduled Cron Endpoint
+      - name: Validate Cron Secrets
         env:
           CRON_BASE_URL: ${{ secrets.CRON_BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        shell: bash
         run: |
-          if [ -z "$CRON_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
-            echo "Missing CRON_BASE_URL or CRON_SECRET repository secrets."
+          if [ -z "$CRON_BASE_URL" ]; then
+            echo "::error title=Missing CRON_BASE_URL::Add the CRON_BASE_URL Actions secret (example: https://www.sinpelosenelmicrofono.com)."
+            exit 1
+          fi
+
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error title=Missing CRON_SECRET::Add the CRON_SECRET Actions secret and keep it in sync with the server."
             exit 1
           fi
 
@@ -23,22 +30,65 @@ jobs:
           if [[ ! "$BASE_URL" =~ ^https?:// ]]; then
             BASE_URL="https://$BASE_URL"
           fi
+
           SECRET="$(printf '%s' "$CRON_SECRET" | tr -d '\r\n')"
           URL="$BASE_URL/api/cron/publish-scheduled"
+          echo "BASE_URL=$BASE_URL" >> "$GITHUB_ENV"
+          echo "CRON_ENDPOINT_URL=$URL" >> "$GITHUB_ENV"
+          echo "CRON_SECRET_CLEAN=$SECRET" >> "$GITHUB_ENV"
+
+      - name: Preflight Endpoint
+        shell: bash
+        run: |
+          PROBE_CODE=$(curl -sS \
+            --connect-timeout 10 \
+            --max-time 20 \
+            -o /tmp/publish-scheduled-probe.txt \
+            -w "%{http_code}" \
+            "$CRON_ENDPOINT_URL")
+
+          echo "Preflight response:"
+          cat /tmp/publish-scheduled-probe.txt
+          echo
+          echo "PRECHECK_HTTP_STATUS=$PROBE_CODE"
+
+          {
+            echo "## Publish Scheduled News"
+            echo "- Base URL: \`$BASE_URL\`"
+            echo "- Endpoint: \`$CRON_ENDPOINT_URL\`"
+            echo "- Preflight HTTP: \`$PROBE_CODE\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$PROBE_CODE" != "401" ]; then
+            echo "::error title=Endpoint preflight failed::Expected HTTP 401 from unauthenticated probe to $CRON_ENDPOINT_URL, got HTTP $PROBE_CODE."
+            exit 1
+          fi
+
+      - name: Trigger Publish Scheduled Cron Endpoint
+        shell: bash
+        run: |
+          URL="$CRON_ENDPOINT_URL"
 
           HTTP_CODE=$(curl -sS \
+            --connect-timeout 10 \
+            --max-time 30 \
             -o /tmp/publish-scheduled-response.json \
             -w "%{http_code}" \
             -X POST \
-            -H "Authorization: Bearer $SECRET" \
-            -H "x-cron-secret: $SECRET" \
+            -H "Authorization: Bearer $CRON_SECRET_CLEAN" \
+            -H "x-cron-secret: $CRON_SECRET_CLEAN" \
             "$URL")
 
+          echo "Cron response:"
           cat /tmp/publish-scheduled-response.json
           echo
           echo "HTTP_STATUS=$HTTP_CODE"
 
+          {
+            echo "- Trigger HTTP: \`$HTTP_CODE\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
           if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-            echo "Publish scheduled endpoint failed."
+            echo "::error title=Publish scheduled request failed::Authenticated POST to $URL returned HTTP $HTTP_CODE."
             exit 1
           fi
