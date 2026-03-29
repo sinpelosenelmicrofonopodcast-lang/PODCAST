@@ -1169,7 +1169,7 @@ async function queryHomepageFeedPageInternal(
   };
 }
 
-const cachedOverview = unstable_cache(queryHomepageOverviewInternal, ["home-overview-v2"], {
+const cachedOverview = unstable_cache(queryHomepageOverviewInternal, ["home-overview-v3"], {
   revalidate: 120,
   tags: ["home", "home-overview"]
 });
