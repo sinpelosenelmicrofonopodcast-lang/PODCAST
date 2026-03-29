@@ -1,1 +1,48 @@
-{}
+{
+  "crons": [
+    {
+      "path": "/api/cron/news-ingest",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/trends",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/publish-scheduled",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/process-jobs",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/auto-posts/publish",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/rescore",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/content-resurfacer",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/episode-resurfacer",
+      "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/cron/analytics-aggregation",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/seo",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/seo-daily",
+      "schedule": "0 7 * * *"
+    }
+  ]
+}
