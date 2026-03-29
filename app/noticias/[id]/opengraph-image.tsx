@@ -1,7 +1,6 @@
 import { ImageResponse } from "next/og";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { isUuid, normalizeNewsKey } from "@/lib/newsRoute";
-import { DEFAULT_OG_IMAGE } from "@/lib/seo/constants";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 export const runtime = "nodejs";
@@ -19,6 +18,8 @@ type OgNewsItem = {
   summary: string | null;
   cover_url: string | null;
 };
+
+const MAX_INLINE_IMAGE_BYTES = 6 * 1024 * 1024;
 
 function trimText(value: string | null | undefined, max: number) {
   const text = String(value ?? "").replace(/\s+/g, " ").trim();
@@ -56,9 +57,45 @@ async function loadOgItem(id: string) {
   return null;
 }
 
+async function inlineOgImage(rawUrl: string | null | undefined) {
+  const normalizedUrl = normalizeImageUrl(rawUrl);
+  if (!normalizedUrl) return null;
+  if (/^data:image\//i.test(normalizedUrl)) return normalizedUrl;
+
+  try {
+    const response = await fetch(normalizedUrl, {
+      headers: {
+        accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "user-agent": "Mozilla/5.0 (compatible; SPM-og-image/1.0; +https://www.sinpelosenelmicrofono.com)"
+      },
+      cache: "force-cache",
+      next: { revalidate: 60 * 60 * 24 }
+    });
+
+    if (!response.ok) return null;
+
+    const contentType = String(response.headers.get("content-type") ?? "")
+      .split(";")[0]
+      .trim()
+      .toLowerCase();
+    if (!contentType.startsWith("image/")) return null;
+
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    if (Number.isFinite(contentLength) && contentLength > MAX_INLINE_IMAGE_BYTES) return null;
+
+    const bytes = await response.arrayBuffer();
+    if (!bytes.byteLength || bytes.byteLength > MAX_INLINE_IMAGE_BYTES) return null;
+
+    return `data:${contentType};base64,${Buffer.from(bytes).toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 export default async function OgImage({ params }: { params: { id: string } }) {
   const item = await loadOgItem(params.id);
-  const coverImage = normalizeImageUrl(item?.cover_url) ?? DEFAULT_OG_IMAGE;
+  const coverImage = await inlineOgImage(item?.cover_url);
+  const hasCoverImage = Boolean(coverImage);
   const title = trimText(item?.title ?? "Sin Pelos en el Micrófono", 110);
   const summary = trimText(item?.summary ?? "Noticias y conversaciones sin libreto.", 180);
 
@@ -73,10 +110,10 @@ export default async function OgImage({ params }: { params: { id: string } }) {
           background: "#050505"
         }}
       >
-        {item?.cover_url ? (
+        {hasCoverImage ? (
           <>
             <img
-              src={coverImage}
+              src={coverImage ?? undefined}
               alt={title}
               style={{
                 position: "absolute",
