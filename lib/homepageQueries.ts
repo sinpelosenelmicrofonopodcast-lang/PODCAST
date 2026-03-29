@@ -2,7 +2,7 @@ import { unstable_cache } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { extractNewsPathSegmentFromUrl, newsHref } from "@/lib/newsRoute";
-import { getYouTubeVideoId } from "@/lib/youtube";
+import { fetchYouTubeVideos, getYouTubeVideoId, isShorts, type YouTubeVideo } from "@/lib/youtube";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 
 export type HomeNewsItem = {
@@ -293,29 +293,6 @@ function isEpisodePost(row: ExternalPostRow) {
   const hasEpisodeSignal = /(episodio|episode|podcast|capitulo|capítulo|entrevista|full episode|sin pelos)/i.test(text);
   if (!hasEpisodeSignal) return false;
   return !/(clip|highlights?|resumen|noticia|breaking|reel|short|tiktok)/i.test(text);
-}
-
-function chicagoDateKey(date = new Date()) {
-  const parts: Record<string, string> = {};
-  for (const part of new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Chicago",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(date)) {
-    if (part.type !== "literal") parts[part.type] = part.value;
-  }
-  return `${parts.year ?? "0000"}-${parts.month ?? "01"}-${parts.day ?? "01"}`;
-}
-
-function seededIndex(seed: string, length: number) {
-  if (length <= 1) return 0;
-  let hash = 2166136261;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash ^= seed.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0) % length;
 }
 
 function newsCategory(row: HomeNewsItem) {
@@ -724,6 +701,50 @@ function mapPodcastRow(row: ExternalPostRow): HomePodcastItem {
   };
 }
 
+function youtubeVideoToExternalRow(video: YouTubeVideo): ExternalPostRow {
+  const short = isShorts(video.durationSeconds);
+  return {
+    id: cleanText(video.id),
+    title: cleanText(video.title) || null,
+    caption: video.description || null,
+    source_url: short ? `https://www.youtube.com/shorts/${video.id}` : `https://www.youtube.com/watch?v=${video.id}`,
+    media_url: normalizeImageUrl(video.thumbnailUrl),
+    posted_at: video.publishedAt || null,
+    platform: "YouTube",
+    metrics: {
+      views: safeNum(video.viewCount),
+      likes: safeNum(video.likeCount),
+      comments: safeNum(video.commentCount),
+      durationSeconds: safeNum(video.durationSeconds),
+      isShort: short
+    }
+  };
+}
+
+function latestEpisodeCandidate(rows: ExternalPostRow[]) {
+  const sorted = [...rows].sort((a, b) => {
+    return new Date(b.posted_at ?? 0).getTime() - new Date(a.posted_at ?? 0).getTime();
+  });
+  return sorted.find((row) => isEpisodePost(row)) ?? sorted.find((row) => !isShortPost(row)) ?? null;
+}
+
+async function resolveLatestFeaturedEpisode(podcastRows: ExternalPostRow[]) {
+  const syncedCandidate = latestEpisodeCandidate(podcastRows);
+
+  try {
+    const liveVideos = await fetchYouTubeVideos(12, { revalidateSeconds: 120 });
+    const liveCandidate = latestEpisodeCandidate(liveVideos.map(youtubeVideoToExternalRow));
+    if (!liveCandidate) return syncedCandidate;
+    if (!syncedCandidate) return liveCandidate;
+
+    const liveTime = new Date(liveCandidate.posted_at ?? 0).getTime();
+    const syncedTime = new Date(syncedCandidate.posted_at ?? 0).getTime();
+    return liveTime >= syncedTime ? liveCandidate : syncedCandidate;
+  } catch {
+    return syncedCandidate;
+  }
+}
+
 function sponsorCandidate(row: PromotionRow) {
   const placement = cleanText(row.placement).toLowerCase();
   const targets = new Set(toArray(row.target_sections).map((x) => x.toLowerCase()));
@@ -779,10 +800,7 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
   };
 
   const podcastRows = podcastVisualRows;
-  const featuredCandidates = podcastRows.filter((row) => isEpisodePost(row));
-  const featuredPoolBase = featuredCandidates.length > 0 ? featuredCandidates : podcastRows.filter((row) => !isShortPost(row));
-  const featuredPool = featuredPoolBase.slice(0, Math.min(18, featuredPoolBase.length));
-  const featuredEpisode = featuredPool.length > 0 ? featuredPool[seededIndex(`featured-podcast:${chicagoDateKey()}`, featuredPool.length)] : null;
+  const featuredEpisode = await resolveLatestFeaturedEpisode(podcastRows);
 
   const editorialStories: HomeEditorialStory[] = [];
   for (const post of blogVisualRows) {
