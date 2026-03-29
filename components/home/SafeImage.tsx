@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { normalizeImageUrl } from "@/lib/imageUrl";
+import { useEffect, useMemo, useState } from "react";
+import { buildImageFallbackUrl, buildRenderableImageUrl } from "@/lib/imageUrl";
 
 export function SafeImage({
   src,
@@ -16,20 +16,28 @@ export function SafeImage({
   className?: string;
   fallbackClassName?: string;
 }) {
-  const normalized = useMemo(() => normalizeImageUrl(src), [src]);
-  const [failed, setFailed] = useState<boolean>(!normalized);
+  const fallbackSrc = useMemo(() => buildImageFallbackUrl(alt), [alt]);
+  const primarySrc = useMemo(() => buildRenderableImageUrl(src, alt), [src, alt]);
+  const [currentSrc, setCurrentSrc] = useState<string>(primarySrc || fallbackSrc);
 
-  if (!normalized || failed) {
-    return <div className={fallbackClassName} aria-hidden="true" />;
-  }
+  useEffect(() => {
+    setCurrentSrc(primarySrc || fallbackSrc);
+  }, [primarySrc, fallbackSrc]);
 
   return (
-    <img
-      src={normalized}
-      alt={alt}
-      loading={loading}
-      className={className}
-      onError={() => setFailed(true)}
-    />
+    <>
+      <img
+        src={currentSrc}
+        alt={alt}
+        loading={loading}
+        className={className}
+        onError={() => {
+          if (currentSrc !== fallbackSrc) setCurrentSrc(fallbackSrc);
+        }}
+      />
+      <noscript>
+        <img src={primarySrc || fallbackSrc} alt={alt} loading={loading} className={className ?? fallbackClassName} />
+      </noscript>
+    </>
   );
 }

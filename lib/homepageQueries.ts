@@ -753,6 +753,31 @@ function sponsorCandidate(row: PromotionRow) {
   return placement.includes("home") || placement.includes("sponsor");
 }
 
+async function resolveFacebookEventImage(flyerUrl?: string | null, infoUrl?: string | null) {
+  const direct = normalizeImageUrl(flyerUrl);
+  if (direct && !/\.fbcdn\.net\b/i.test(direct)) return direct;
+
+  const info = cleanText(infoUrl);
+  if (!info || !/facebook\.com\/events\//i.test(info)) return direct;
+
+  try {
+    const res = await fetch(info, {
+      next: { revalidate: 3600 },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; SPMHomeEventResolver/1.0; +https://www.sinpelosenelmicrofono.com)"
+      }
+    });
+    if (!res.ok) return direct;
+
+    const html = await res.text();
+    const match = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+    const ogImage = normalizeImageUrl(match?.[1] ?? "");
+    return ogImage || direct;
+  } catch {
+    return direct;
+  }
+}
+
 async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
   const supabase = supabaseServer();
 
@@ -829,6 +854,13 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
     }
   }
 
+  const resolvedEventRows = await Promise.all(
+    eventVisualRows.slice(0, 4).map(async (event) => ({
+      ...event,
+      flyer_url: await resolveFacebookEventImage(event.flyer_url, event.info_url)
+    }))
+  );
+
   const communityThreads = threadRows.filter((row) => row.space === "community").slice(0, 6);
   const fallbackTopics = newsRows.slice(0, 6).map((row) => row.title);
 
@@ -875,7 +907,7 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
       threads: communityThreads,
       fallbackTopics
     },
-    events: eventVisualRows.slice(0, 4),
+    events: resolvedEventRows,
     sponsors: {
       mid: sponsors[0] ?? null,
       footer: sponsors[1] ?? sponsors[0] ?? null
