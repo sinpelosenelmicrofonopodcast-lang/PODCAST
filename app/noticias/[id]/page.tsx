@@ -293,7 +293,10 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const item = await loadItem(supabase, params.id);
   const canonical = item ? newsHref(item) : `/noticias/${encodeURIComponent(params.id)}`;
   const ogVersion = encodeURIComponent(String(item?.updated_at ?? item?.published_at ?? "20260321"));
-  const socialImage = canonicalUrl(`${canonical}/opengraph-image?v=${ogVersion}`);
+  const directCoverImage =
+    item?.cover_url && /^https?:\/\//i.test(item.cover_url) ? item.cover_url : null;
+  const fallbackSocialImage = canonicalUrl(`${canonical}/opengraph-image?v=${ogVersion}`);
+  const socialImage = directCoverImage ?? fallbackSocialImage;
   const seo = newsSeoTemplate(item?.title ?? "Noticia", item?.summary ?? "Noticias Sin Pelos");
   const metadata = buildSeoMetadata({
     title: seo.title,
@@ -307,14 +310,21 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     ...metadata,
     openGraph: {
       ...metadata.openGraph,
-      images: [
-        {
-          url: socialImage,
-          width: 1200,
-          height: 630,
-          alt: item?.title ?? seo.title
-        }
-      ]
+      images: directCoverImage
+        ? [
+            {
+              url: socialImage,
+              alt: item?.title ?? seo.title
+            }
+          ]
+        : [
+            {
+              url: socialImage,
+              width: 1200,
+              height: 630,
+              alt: item?.title ?? seo.title
+            }
+          ]
     },
     twitter: {
       ...metadata.twitter,
