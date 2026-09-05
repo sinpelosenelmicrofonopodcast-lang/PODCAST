@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { generateImage } from "ai";
 import { escapeSvgText, svgToDataUrl } from "@/lib/images/utils";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { asString } from "@/lib/validations/common";
@@ -135,38 +136,23 @@ async function generateAiCover(
   spec: ReturnType<typeof buildSpmCoverPrompt>,
   service: SupabaseClient
 ): Promise<string | null> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) return null;
-
-  const apiBase = (process.env.OPENAI_API_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
-  const response = await fetch(`${apiBase}/images/generations`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
+  const result = await generateImage({
+    model: process.env.AI_GATEWAY_IMAGE_MODEL ?? "openai/gpt-image-2",
+    prompt: buildAiCoverPrompt(spec),
+    size: "1536x1024",
+    providerOptions: {
+      openai: {
+        outputFormat: "webp",
+        outputCompression: 65,
+        moderation: "auto"
+      }
     },
-    body: JSON.stringify({
-      model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1",
-      prompt: buildAiCoverPrompt(spec),
-      size: "1536x1024",
-      quality: "medium",
-      output_format: "webp",
-      output_compression: 65,
-      moderation: "auto"
-    }),
-    signal: AbortSignal.timeout(115000)
+    abortSignal: AbortSignal.timeout(115000)
   });
 
-  if (!response.ok) {
-    const requestId = response.headers.get("x-request-id");
-    throw new Error(`Image generation failed (${response.status})${requestId ? ` request ${requestId}` : ""}`);
-  }
-
-  const payload = (await response.json()) as { data?: Array<{ b64_json?: string }> };
-  const encoded = payload.data?.[0]?.b64_json;
-  if (!encoded) throw new Error("Image generation returned no image.");
-
-  const bytes = Uint8Array.from(Buffer.from(encoded, "base64"));
+  const generated = result.image;
+  const bytes = generated.uint8Array;
+  if (!bytes?.byteLength) throw new Error("Image generation returned no image.");
   if (bytes.byteLength > 1024 * 1024) {
     throw new Error("Generated image exceeds the 1 MB news-cover limit.");
   }
@@ -177,7 +163,7 @@ async function generateAiCover(
   const path = `ai/${folder}/${baseName}-${crypto.randomUUID()}.webp`;
   const bucket = process.env.NEWS_COVERS_BUCKET?.trim() || "news-covers";
   const upload = await service.storage.from(bucket).upload(path, bytes, {
-    contentType: "image/webp",
+    contentType: generated.mediaType || "image/webp",
     cacheControl: "31536000",
     upsert: false
   });
@@ -201,7 +187,7 @@ export async function generateSpmNewsImage(
   const fallback = generateFallbackSpmNewsImage(input);
   const originalImageUrl = normalizeImageUrl(input.originalImageUrl);
 
-  if (originalImageUrl || !service || !process.env.OPENAI_API_KEY) {
+  if (originalImageUrl || !service) {
     return { ...fallback, generatedWithAI: false };
   }
 
