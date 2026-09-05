@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireStaffApi } from "@/lib/adminAuth";
 import { generateArticleAssets } from "@/lib/news/editorial";
 
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireStaffApi(request, "manage_news");
   if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
