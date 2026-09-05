@@ -399,6 +399,11 @@ async function upsertLegacyDraft(
   imageUrl: string
 ) {
   const categories = cleanNewsCategories([generated.category, generated.region, ...(candidate.categories ?? [])]);
+  const legacyPublishedAt =
+    candidate.publishedAt && Number.isFinite(new Date(candidate.publishedAt).getTime())
+      ? new Date(candidate.publishedAt).toISOString()
+      : new Date().toISOString();
+
   const payload = {
     title: generated.title,
     summary: generated.summary,
@@ -413,7 +418,7 @@ async function upsertLegacyDraft(
     ).slice(0, 14),
     cover_url: imageUrl,
     publication_state: "draft" as const,
-    published_at: null,
+    published_at: legacyPublishedAt,
     ingest_source: candidate.sourceName,
     raw_title: candidate.title,
     raw_summary: candidate.summary,
