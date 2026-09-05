@@ -187,6 +187,10 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (isAssetPath(pathname)) return NextResponse.next();
 
+  // Vercel invokes cron routes on the deployment hostname. Let each route
+  // validate CRON_SECRET directly instead of redirecting and dropping auth.
+  if (pathname.startsWith("/api/cron/")) return NextResponse.next();
+
   const redirectTo = shouldCanonicalRedirect(request);
   if (redirectTo) return NextResponse.redirect(redirectTo, 308);
 
