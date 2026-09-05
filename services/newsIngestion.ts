@@ -476,14 +476,17 @@ async function upsertLegacyDraft(
 
 async function insertDraftArticle(service: SupabaseClient, candidate: IngestedCandidate) {
   const generated = await generateNewsDraftContent(candidate);
-  const cover = generateSpmNewsImage({
-    title: generated.title,
-    summary: generated.subtitle || generated.summary,
-    category: generated.category,
-    region: generated.region,
-    sourceName: candidate.sourceName,
-    originalImageUrl: candidate.featuredImageUrl
-  });
+  const cover = await generateSpmNewsImage(
+    {
+      title: generated.title,
+      summary: generated.subtitle || generated.summary,
+      category: generated.category,
+      region: generated.region,
+      sourceName: candidate.sourceName,
+      originalImageUrl: candidate.featuredImageUrl
+    },
+    service
+  );
   const slug = await ensureUniqueSlug(service, slugify(generated.title));
   const sourceName = candidate.sourceName;
   const sourceUrl = normalizeSourceUrl(candidate.sourceUrl) ?? candidate.sourceUrl;
@@ -538,7 +541,8 @@ async function insertDraftArticle(service: SupabaseClient, candidate: IngestedCa
         subtitle: cover.subtitle,
         visual_brief: cover.visualBrief,
         layout: "spm_news_v1",
-        used_original_image: cover.usedOriginalImage
+        used_original_image: cover.usedOriginalImage,
+        generated_with_ai: cover.generatedWithAI
       },
       source_meta: buildSourceMeta(candidate.sourceMeta)
     },

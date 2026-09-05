@@ -283,14 +283,17 @@ export async function rewriteArticle(service: SupabaseClient, articleId: string,
 export async function generateArticleAssets(service: SupabaseClient, articleId: string, actorId: string | null) {
   const article = await getArticleEditorRow(service, articleId);
 
-  const cover = generateSpmNewsImage({
-    title: article.title,
-    summary: article.summary ?? article.category ?? "SPM Noticias",
-    category: article.category,
-    region: article.region,
-    sourceName: article.source_name,
-    originalImageUrl: article.featured_image_url ?? article.cover_image_url
-  });
+  const cover = await generateSpmNewsImage(
+    {
+      title: article.title,
+      summary: article.summary ?? article.category ?? "SPM Noticias",
+      category: article.category,
+      region: article.region,
+      sourceName: article.source_name,
+      originalImageUrl: article.featured_image_url
+    },
+    service
+  );
   const meme = buildMemeTemplate({ top: article.title.slice(0, 60), bottom: article.summary ?? "Sin filtro" });
   const quote = buildQuoteCard({ quote: article.summary ?? article.title, author: "SPM News" });
   const thumb = buildThumbnail({ title: article.title, subtitle: article.summary ?? "SPM" });
@@ -333,7 +336,8 @@ export async function generateArticleAssets(service: SupabaseClient, articleId: 
           subtitle: cover.subtitle,
           visual_brief: cover.visualBrief,
           layout: "spm_news_v1",
-          used_original_image: cover.usedOriginalImage
+          used_original_image: cover.usedOriginalImage,
+          generated_with_ai: cover.generatedWithAI
         }
       },
       updated_by: actorId

@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { escapeSvgText, svgToDataUrl } from "@/lib/images/utils";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { asString } from "@/lib/validations/common";
@@ -40,7 +41,7 @@ function wrapText(raw: string, maxChars: number, maxLines: number) {
   return clipped.map((line) => escapeSvgText(line));
 }
 
-export function generateSpmNewsImage(input: {
+function generateFallbackSpmNewsImage(input: {
   title: string;
   summary?: string | null;
   category?: string | null;
@@ -112,4 +113,112 @@ export function generateSpmNewsImage(input: {
     height: 720,
     usedOriginalImage: useOriginal
   } satisfies GeneratedNewsImage;
+}
+
+
+function buildAiCoverPrompt(spec: ReturnType<typeof buildSpmCoverPrompt>) {
+  return [
+    "Create a professional 16:9 breaking-news cover for a Puerto Rican and Latino media brand.",
+    "The newsworthy photorealistic editorial scene must fill the frame and be the dominant visual.",
+    `Visual subject: ${spec.visualBrief}.`,
+    "Use cinematic documentary lighting, natural skin and realistic environments.",
+    "Do not depict a specific real person unless a source photo was supplied. Do not invent evidence, logos, badges, documents, injuries, weapons or identifiable victims.",
+    'Add a slim red masthead with the exact words "SPM NOTICIAS".',
+    `Add one short, large, highly legible Spanish headline: "${spec.headline}".`,
+    'Add a small label "IMAGEN ILUSTRATIVA" in the lower left.',
+    "Keep text inside safe margins. No paragraph text, no tiny subtitle, no clutter, no watermark, no distorted faces, no misspelled words.",
+    "Color grade: deep blacks, restrained red accents, crisp white typography, premium television-news look."
+  ].join(" ");
+}
+
+async function generateAiCover(
+  spec: ReturnType<typeof buildSpmCoverPrompt>,
+  service: SupabaseClient
+): Promise<string | null> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) return null;
+
+  const apiBase = (process.env.OPENAI_API_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
+  const response = await fetch(`${apiBase}/images/generations`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1",
+      prompt: buildAiCoverPrompt(spec),
+      size: "1536x1024",
+      quality: "medium",
+      output_format: "webp",
+      output_compression: 65,
+      moderation: "auto"
+    }),
+    signal: AbortSignal.timeout(115000)
+  });
+
+  if (!response.ok) {
+    const requestId = response.headers.get("x-request-id");
+    throw new Error(`Image generation failed (${response.status})${requestId ? ` request ${requestId}` : ""}`);
+  }
+
+  const payload = (await response.json()) as { data?: Array<{ b64_json?: string }> };
+  const encoded = payload.data?.[0]?.b64_json;
+  if (!encoded) throw new Error("Image generation returned no image.");
+
+  const bytes = Uint8Array.from(Buffer.from(encoded, "base64"));
+  if (bytes.byteLength > 1024 * 1024) {
+    throw new Error("Generated image exceeds the 1 MB news-cover limit.");
+  }
+
+  const now = new Date();
+  const folder = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const baseName = spec.fileName.replace(/\.png$/i, "").replace(/[^a-z0-9_-]+/gi, "-").slice(0, 90);
+  const path = `ai/${folder}/${baseName}-${crypto.randomUUID()}.webp`;
+  const bucket = process.env.NEWS_COVERS_BUCKET?.trim() || "news-covers";
+  const upload = await service.storage.from(bucket).upload(path, bytes, {
+    contentType: "image/webp",
+    cacheControl: "31536000",
+    upsert: false
+  });
+  if (upload.error) throw new Error(upload.error.message);
+
+  const publicUrl = service.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+  return normalizeImageUrl(publicUrl);
+}
+
+export async function generateSpmNewsImage(
+  input: {
+    title: string;
+    summary?: string | null;
+    category?: string | null;
+    region?: string | null;
+    sourceName?: string | null;
+    originalImageUrl?: string | null;
+  },
+  service?: SupabaseClient
+): Promise<GeneratedNewsImage & { generatedWithAI: boolean }> {
+  const fallback = generateFallbackSpmNewsImage(input);
+  const originalImageUrl = normalizeImageUrl(input.originalImageUrl);
+
+  if (originalImageUrl || !service || !process.env.OPENAI_API_KEY) {
+    return { ...fallback, generatedWithAI: false };
+  }
+
+  try {
+    const spec = buildSpmCoverPrompt(input);
+    const imageUrl = await generateAiCover(spec, service);
+    if (!imageUrl) return { ...fallback, generatedWithAI: false };
+    return {
+      ...fallback,
+      imageUrl,
+      fileName: spec.fileName.replace(/\.png$/i, ".webp"),
+      generatedWithAI: true
+    };
+  } catch (error) {
+    console.error("SPM AI cover generation failed", {
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
+    return { ...fallback, generatedWithAI: false };
+  }
 }
