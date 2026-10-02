@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { EditorialEngineWorkbench } from "@/components/admin/EditorialEngineWorkbench";
+import { EditorialEngineWorkbenchV2 } from "@/components/admin/EditorialEngineWorkbenchV2";
 import { requireStaffPageOrRedirect } from "@/lib/adminAuth";
 
 export const metadata: Metadata = {
@@ -12,7 +12,7 @@ export default async function EditorialEnginePage() {
 
   return (
     <main className="editorial-engine-page">
-      <EditorialEngineWorkbench />
+      <EditorialEngineWorkbenchV2 />
     </main>
   );
 }
