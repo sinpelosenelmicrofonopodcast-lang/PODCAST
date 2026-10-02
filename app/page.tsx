@@ -6,23 +6,29 @@ import { HeroNews } from "@/components/home/HeroNews";
 import { TrendingBlock } from "@/components/home/TrendingBlock";
 import { RegionNews } from "@/components/home/RegionNews";
 import { PodcastBlock } from "@/components/home/PodcastBlock";
+import { FromMicBlock } from "@/components/home/FromMicBlock";
 import { FeedCentral } from "@/components/home/FeedCentral";
 import { CommunityPreview } from "@/components/home/CommunityPreview";
 import { EventsPreview } from "@/components/home/EventsPreview";
 import { SponsorBlock } from "@/components/home/SponsorBlock";
 import { queryHomepageFeedPage, queryHomepageOverview, queryHomepageTrending } from "@/lib/homepageQueries";
+import { queryPodcastEditorialPosts } from "@/lib/homeEditorialQueries";
 
 export const revalidate = 120;
 
 export const metadata: Metadata = {
-  title: "Sin Pelos en el Micrófono | Noticias, podcast y comunidad",
+  title: "Sin Pelos en el Micrófono | Noticias, podcast y conversación real",
   description:
-    "Portada editorial para descubrir noticias, podcast, comunidad y eventos con jerarquía clara y sin contenido repetido.",
+    "Noticias, episodios, enseñanzas y editoriales nacidas de conversaciones reales. Puerto Rico, Texas y el mundo al estilo Sin Pelos.",
   alternates: { canonical: "/" }
 };
 
 export default async function HomePage() {
-  const [overview, trending] = await Promise.all([queryHomepageOverview(), queryHomepageTrending()]);
+  const [overview, trending, podcastEditorials] = await Promise.all([
+    queryHomepageOverview(),
+    queryHomepageTrending(),
+    queryPodcastEditorialPosts(3)
+  ]);
 
   const newsExcludeIds = new Set<string>();
   if (overview.hero.lead?.id) newsExcludeIds.add(overview.hero.lead.id);
@@ -54,13 +60,17 @@ export default async function HomePage() {
   const feed = await queryHomepageFeedPage(null, 8, feedExcludeIds);
 
   return (
-    <main className="app-enter home-media-v6">
+    <main className="app-enter home-media-v6 spm-media-hub">
       <Navbar />
 
       {overview.flags.showLatestNews ? (
         <>
-          <section className="section">
+          <section className="section spm-home-lead">
             <div className="container">
+              <div className="spm-home-manifesto">
+                <span>NOTICIAS · PODCAST · IDEAS</span>
+                <strong>La conversación no termina cuando se apagan los micrófonos.</strong>
+              </div>
               <HeroNews
                 kicker={overview.hero.kicker}
                 title={overview.hero.title}
@@ -85,11 +95,19 @@ export default async function HomePage() {
         </>
       ) : null}
 
-      <section className="section">
+      <section className="section spm-podcast-zone">
         <div className="container">
           <PodcastBlock featured={overview.podcast.featured} />
         </div>
       </section>
+
+      {podcastEditorials.length ? (
+        <section className="section spm-editorial-zone">
+          <div className="container">
+            <FromMicBlock posts={podcastEditorials} />
+          </div>
+        </section>
+      ) : null}
 
       <section className="section">
         <div className="container">
@@ -123,9 +141,9 @@ export default async function HomePage() {
           <div className="home-media-newsletter-wrap">
             <NewsletterForm
               variant="cta"
-              title="Recibe lo más polémico antes que nadie"
-              subtitle="Alertas de portada y picks editoriales sin ruido."
-              buttonLabel="SUSCRIBIRME"
+              title="Que el algoritmo no decida lo que tú te enteras"
+              subtitle="Lo importante de Sin Pelos directo a tu correo, sin ruido ni relleno."
+              buttonLabel="QUIERO ESTAR AL DÍA"
             />
           </div>
         </div>
