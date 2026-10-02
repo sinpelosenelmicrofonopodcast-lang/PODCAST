@@ -1,4 +1,5 @@
 import "./globals.css";
+import "./spm-rebrand.css";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { CANONICAL_SITE_URL } from "@/lib/seo/constants";
