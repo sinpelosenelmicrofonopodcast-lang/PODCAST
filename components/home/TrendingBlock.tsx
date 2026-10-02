@@ -6,10 +6,12 @@ function compact(value: number) {
 
 function TrendColumn({
   title,
-  items
+  items,
+  showMetrics
 }: {
-  title: "EN TENDENCIA" | "SUBIENDO" | "VIRAL";
+  title: string;
   items: HomeTrendItem[];
+  showMetrics: boolean;
 }) {
   return (
     <article className="card home-trending-column">
@@ -26,7 +28,7 @@ function TrendColumn({
                 <span className="home-trending-headline clamp-2">{item.title}</span>
                 <span className="home-trending-meta">
                   <span className="home-media-chip">{item.category}</span>
-                  <span>{compact(item.views)} views</span>
+                  {showMetrics && item.views > 0 ? <span>{compact(item.views)} views</span> : null}
                 </span>
               </a>
             </li>
@@ -46,15 +48,18 @@ export function TrendingBlock({
   subiendo: HomeTrendItem[];
   viral: HomeTrendItem[];
 }) {
+  const allItems = [...enTendencia, ...subiendo, ...viral];
+  const hasEngagement = allItems.some((item) => item.views > 0 || item.shares > 0 || item.comments > 0);
+
   return (
-    <section className="home-media-section" aria-label="Tendencias 24h">
+    <section className="home-media-section" aria-label={hasEngagement ? "Tendencias de las últimas 24 horas" : "Historias recientes"}>
       <div className="home-media-section-head">
-        <h2>TENDENCIAS 24H</h2>
+        <h2>{hasEngagement ? "TENDENCIAS 24H" : "LO MÁS RECIENTE"}</h2>
       </div>
       <div className="home-trending-grid">
-        <TrendColumn title="EN TENDENCIA" items={enTendencia} />
-        <TrendColumn title="SUBIENDO" items={subiendo} />
-        <TrendColumn title="VIRAL" items={viral} />
+        <TrendColumn title={hasEngagement ? "EN TENDENCIA" : "PORTADA"} items={enTendencia} showMetrics={hasEngagement} />
+        <TrendColumn title={hasEngagement ? "SUBIENDO" : "PARA LEER"} items={subiendo} showMetrics={hasEngagement} />
+        <TrendColumn title={hasEngagement ? "VIRAL" : "MÁS HISTORIAS"} items={viral} showMetrics={hasEngagement} />
       </div>
     </section>
   );

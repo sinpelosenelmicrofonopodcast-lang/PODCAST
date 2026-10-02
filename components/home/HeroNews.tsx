@@ -17,13 +17,23 @@ function firstCategory(item: HomeNewsItem | null | undefined) {
   return category || "Noticias";
 }
 
+function ageHours(value?: string | null) {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return Number.POSITIVE_INFINITY;
+  return Math.max(0, (Date.now() - timestamp) / (1000 * 60 * 60));
+}
+
 function urgencyBadge(item: HomeNewsItem | null | undefined) {
-  if (!item) return "TENDENCIA";
+  if (!item) return "PORTADA";
   const text = `${item.title} ${(item.categories ?? []).join(" ")}`.toLowerCase();
-  if (/breaking|urgente|ultima hora/.test(text)) return "BREAKING";
+  const recent = ageHours(item.published_at) <= 24;
+
+  if (recent && /breaking|urgente|ultima hora/.test(text)) return "BREAKING";
+  if (recent && /en vivo|live/.test(text)) return "EN VIVO";
   if (/exclusivo/.test(text)) return "EXCLUSIVO";
-  if (/en vivo|live/.test(text)) return "EN VIVO";
-  return "TENDENCIA";
+  if (recent) return "NUEVO";
+  return "PORTADA";
 }
 
 export function HeroNews({
@@ -40,7 +50,7 @@ export function HeroNews({
   trending: HomeNewsItem[];
 }) {
   return (
-    <section className="home-media-section home-media-hero" aria-label="Breaking news hero">
+    <section className="home-media-section home-media-hero" aria-label="Noticias destacadas">
       <div className="home-media-headline">
         <span className="home-media-kicker">{kicker}</span>
         <h1>{title}</h1>
@@ -61,7 +71,7 @@ export function HeroNews({
                   <span className="home-media-date">{formatDate(lead.published_at)}</span>
                 </div>
                 <h2 className="clamp-2">{lead.title}</h2>
-                <p className="clamp-2">{lead.summary ?? "Contexto, análisis y señal editorial en tiempo real."}</p>
+                <p className="clamp-2">{lead.summary ?? "Contexto, análisis y señal editorial con los hechos por delante."}</p>
                 <Link className="button" href={newsHref(lead)}>
                   LEER ANÁLISIS
                 </Link>
@@ -69,13 +79,13 @@ export function HeroNews({
             </>
           ) : (
             <div className="home-empty-state">
-              <h2>Sin breaking activo</h2>
-              <p>Publica una noticia para activar el hero principal.</p>
+              <h2>La redacción está preparando la próxima historia</h2>
+              <p>Cuando una noticia pase revisión editorial aparecerá aquí.</p>
             </div>
           )}
         </article>
 
-        <aside className="home-media-hero-side" aria-label="Trending cards">
+        <aside className="home-media-hero-side" aria-label="Más noticias destacadas">
           {trending.length > 0 ? (
             trending.slice(0, 3).map((item) => (
               <Link key={item.id} href={newsHref(item)} className="card home-media-trend-card">
@@ -93,8 +103,8 @@ export function HeroNews({
             ))
           ) : (
             <article className="card home-empty-state">
-              <h3>Sin tendencia adicional</h3>
-              <p>Aun no hay noticias secundarias para mostrar.</p>
+              <h3>Más historias pronto</h3>
+              <p>La redacción todavía no tiene noticias secundarias listas.</p>
             </article>
           )}
         </aside>

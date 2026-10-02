@@ -26,8 +26,9 @@ const links: LinkItem[] = [
   { href: "/admin/stats", label: "Estadísticas", section: "overview", required: "view_stats" },
   { href: "/admin/reports", label: "Reportes", section: "overview", required: "view_reports" },
   { href: "/admin/schedule", label: "Programación", section: "overview", required: "view_schedule" },
+  { href: "/admin/editorial-engine" as Route, label: "Editorial Engine", section: "content", required: "manage_news" },
   { href: "/admin/news", label: "Noticias", section: "content", required: "manage_news" },
-  { href: "/admin/news-engine", label: "News Engine", section: "content", required: "manage_news" },
+  { href: "/admin/news-engine", label: "Newsroom", section: "content", required: "manage_news" },
   { href: "/admin/news-sources", label: "Fuentes RSS", section: "content", required: "manage_news_sources" },
   { href: "/admin/blog", label: "Blog", section: "content", required: "manage_blog" },
   { href: "/admin/events", label: "Eventos", section: "content", required: "manage_events" },
@@ -75,8 +76,8 @@ export function Sidebar({ access }: { access: AccessState }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="badge">Admin Core</div>
-        <p className="sidebar-copy muted">Operación editorial, comunidad y distribución desde un solo panel.</p>
+        <div className="badge">SPM Editorial OS</div>
+        <p className="sidebar-copy muted">Noticias, podcasts, comunidad y distribución desde una sola cabina.</p>
       </div>
       {sections.map((group) => (
         <div key={group.section} className="sidebar-section">
