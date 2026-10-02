@@ -165,6 +165,7 @@ function shouldCanonicalRedirect(request: NextRequest) {
   const host = hostHeader || url.host.toLowerCase();
   const protocol = (request.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "")).toLowerCase();
   const localHost = host.includes("localhost") || host.startsWith("127.0.0.1");
+  const previewHost = host.endsWith(".vercel.app") && process.env.VERCEL_ENV === "preview";
   const targetHost = canonicalHost();
 
   let changed = false;
@@ -172,7 +173,7 @@ function shouldCanonicalRedirect(request: NextRequest) {
     url.protocol = "https:";
     changed = true;
   }
-  if (!localHost && host !== targetHost) {
+  if (!localHost && !previewHost && host !== targetHost) {
     url.host = targetHost;
     changed = true;
   }
