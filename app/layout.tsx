@@ -1,6 +1,7 @@
 import "./globals.css";
 import "./spm-rebrand.css";
 import "./home-rebrand.css";
+import "./spm-polish.css";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { Bebas_Neue, Manrope } from "next/font/google";
