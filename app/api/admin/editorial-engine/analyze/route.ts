@@ -89,19 +89,19 @@ export async function POST(request: NextRequest) {
       ? {
           mode: input.mode,
           episodeSourceId,
-          episode: input.episode,
+          episode: input.episode ?? "",
           title: input.title,
-          guest: input.guest,
-          sourceUrl: input.sourceUrl,
+          guest: input.guest ?? "",
+          sourceUrl: input.sourceUrl ?? "",
           transcriptChars: input.transcript.length
         }
       : {
           mode: input.mode,
           title: input.title,
-          sourceUrl: input.sourceUrl,
-          sourceName: input.sourceName,
-          region: input.region,
-          sourceChars: input.sourceText.length + input.additionalSources.length
+          sourceUrl: input.sourceUrl ?? "",
+          sourceName: input.sourceName ?? "",
+          region: input.region ?? "",
+          sourceChars: input.sourceText.length + (input.additionalSources?.length ?? 0)
         };
 
     const { data: saved, error: saveError } = await auth.service
