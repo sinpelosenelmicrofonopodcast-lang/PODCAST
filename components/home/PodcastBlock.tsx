@@ -52,9 +52,11 @@ export function PodcastBlock({
   featured: HomePodcastItem | null;
 }) {
   const [resolvedFeatured, setResolvedFeatured] = useState<HomePodcastItem | null>(featured);
+  const [syncingYouTube, setSyncingYouTube] = useState(!featured);
 
   useEffect(() => {
     setResolvedFeatured(featured);
+    setSyncingYouTube(!featured);
   }, [featured]);
 
   useEffect(() => {
@@ -76,7 +78,9 @@ export function PodcastBlock({
           setResolvedFeatured(mapYouTubeItemToPodcast(latestFullEpisode));
         }
       } catch {
-        // Keep the server-provided fallback copy if YouTube cannot be reached.
+        // Keep a neutral library fallback if YouTube cannot be reached.
+      } finally {
+        if (!cancelled) setSyncingYouTube(false);
       }
     }
 
@@ -86,6 +90,11 @@ export function PodcastBlock({
       cancelled = true;
     };
   }, [featured]);
+
+  const emptyTitle = syncingYouTube ? "Cargando el último episodio…" : "Explora los episodios de Sin Pelos";
+  const emptyCaption = syncingYouTube
+    ? "Estamos sincronizando YouTube para mostrarte el episodio completo más reciente."
+    : "Entra al archivo del podcast para ver episodios, invitados y conversaciones completas.";
 
   return (
     <section className="home-media-section" aria-label="Podcast destacado">
@@ -98,26 +107,22 @@ export function PodcastBlock({
           <SafeImage src={resolvedFeatured?.media_url} alt={resolvedFeatured?.title ?? "Podcast destacado"} loading="lazy" />
         </div>
         <div className="home-podcast-body">
-          <span className="home-urgency-badge">DESTACADO HOY</span>
-          <h3 className="clamp-2">{resolvedFeatured?.title ?? "No hay episodio sincronizado"}</h3>
-          <p className="clamp-2">
-            {resolvedFeatured?.caption ??
-              "Activa la sincronizacion de YouTube para mostrar automaticamente episodios completos del repertorio."}
-          </p>
-          <div className="home-podcast-metrics">
-            <span>{compact(resolvedFeatured?.metrics?.views)} views</span>
-            <span>{compact(resolvedFeatured?.metrics?.likes)} likes</span>
-          </div>
+          <span className="home-urgency-badge">{resolvedFeatured ? "DESTACADO HOY" : syncingYouTube ? "SINCRONIZANDO" : "PODCAST"}</span>
+          <h3 className="clamp-2">{resolvedFeatured?.title ?? emptyTitle}</h3>
+          <p className="clamp-2">{resolvedFeatured?.caption ?? emptyCaption}</p>
+          {resolvedFeatured ? (
+            <div className="home-podcast-metrics">
+              <span>{compact(resolvedFeatured.metrics?.views)} views</span>
+              <span>{compact(resolvedFeatured.metrics?.likes)} likes</span>
+            </div>
+          ) : null}
           <div className="home-cta-row">
-            <a
-              className="button"
-              href={sourceLink(resolvedFeatured)}
-              target={resolvedFeatured?.source_url ? "_blank" : undefined}
-              rel="noreferrer"
-            >
-              VER EPISODIO
-            </a>
-            <Link className="button secondary" href="/podcast">
+            {resolvedFeatured ? (
+              <a className="button" href={sourceLink(resolvedFeatured)} target="_blank" rel="noreferrer">
+                VER EPISODIO
+              </a>
+            ) : null}
+            <Link className={resolvedFeatured ? "button secondary" : "button"} href="/podcast">
               IR AL PODCAST
             </Link>
           </div>
