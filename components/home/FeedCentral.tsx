@@ -70,15 +70,13 @@ export function FeedCentral({
     qs.set("limit", "8");
     if (cursor) qs.set("cursor", cursor);
     const mergedExclude = Array.from(new Set([...staticExclude, ...Array.from(itemIds)])).slice(0, 400);
-    if (mergedExclude.length > 0) {
-      qs.set("exclude", mergedExclude.join(","));
-    }
+    if (mergedExclude.length > 0) qs.set("exclude", mergedExclude.join(","));
 
     const res = await fetch(`/api/home/feed?${qs.toString()}`, { cache: "no-store" }).catch(() => null);
     const json = (await res?.json().catch(() => null)) as FeedResponse | null;
 
     if (!res?.ok || !json?.ok) {
-      setError(json?.error ?? "No se pudo cargar mas contenido.");
+      setError(json?.error ?? "No se pudo cargar más contenido.");
       setLoading(false);
       return;
     }
@@ -104,25 +102,23 @@ export function FeedCentral({
 
   useEffect(() => {
     if (!sentinelRef.current || !hasMore) return;
-
     const observer = new IntersectionObserver(
       (entries) => {
-        const first = entries[0];
-        if (first?.isIntersecting) {
-          loadMore();
-        }
+        if (entries[0]?.isIntersecting) loadMore();
       },
       { rootMargin: "280px 0px" }
     );
-
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
   return (
-    <section className="home-media-section" aria-label="Feed central de contenido">
+    <section className="home-media-section" aria-label="Más contenido para descubrir">
       <div className="home-media-section-head">
-        <h2>FEED CENTRAL DE CONTENIDO</h2>
+        <div>
+          <span className="spm-brand-eyebrow">SIGUE EXPLORANDO</span>
+          <h2>MÁS PARA DESCUBRIR</h2>
+        </div>
       </div>
 
       <div className="home-feed-grid">
@@ -152,7 +148,7 @@ export function FeedCentral({
           })
         ) : (
           <article className="card home-empty-state">
-            <p>No hay contenido para el feed central todavia.</p>
+            <p>Estamos preparando nuevas historias para descubrir.</p>
           </article>
         )}
       </div>
@@ -162,10 +158,10 @@ export function FeedCentral({
       <div className="home-feed-actions">
         {hasMore ? (
           <button type="button" className="button secondary" onClick={loadMore} disabled={loading || !hasMore}>
-            {loading ? "Cargando..." : "Cargar mas"}
+            {loading ? "Cargando..." : "Ver más"}
           </button>
         ) : (
-          <span className="home-muted">No hay mas publicaciones por ahora.</span>
+          <span className="home-muted">Llegaste al final por ahora.</span>
         )}
       </div>
 
