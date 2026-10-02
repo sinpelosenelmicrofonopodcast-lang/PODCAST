@@ -21,13 +21,15 @@ export function TopBannerPromo() {
   const [animate, setAnimate] = useState(false);
   const sentImpression = useRef(false);
 
-  // Always reserve space (no CLS). Content can be empty if no promo active.
   useEffect(() => {
     const run = async () => {
       const res = await fetch(`/api/promotions/active?placement=top_banner&limit=1&section=${encodeURIComponent(section)}`, {
         cache: "no-store"
       }).catch(() => null);
-      if (!res?.ok) return;
+      if (!res?.ok) {
+        setPromo(null);
+        return;
+      }
       const json = await res.json().catch(() => null);
       const item = (json?.items?.[0] ?? null) as Promo | null;
       setPromo(item);
@@ -36,14 +38,10 @@ export function TopBannerPromo() {
     run();
   }, [section]);
 
-  const canShow = useMemo(() => {
-    // Avoid promos on admin pages.
-    return !pathname.startsWith("/admin");
-  }, [pathname]);
+  const canShow = useMemo(() => !pathname.startsWith("/admin"), [pathname]);
 
   useEffect(() => {
-    if (!canShow) return;
-    if (!promo) return;
+    if (!canShow || !promo) return;
 
     const key = `spm_promo_seen_top_banner_${section}_${promo.id}`;
     const seen = sessionStorage.getItem(key) === "1";
@@ -75,17 +73,19 @@ export function TopBannerPromo() {
     });
   };
 
-  if (!canShow) return <div className="promo-top-slot" aria-hidden="true" />;
+  // A promotion should earn its space. Do not leave an empty 52px band in the
+  // navigation when there is no active sponsor/internal message.
+  if (!canShow || !promo) return null;
 
-  const clickable = Boolean(promo?.cta_url);
-  const ctaLabel = promo?.cta_label ?? "Ver";
-  const title = promo?.title ?? "";
-  const imageUrl = promo?.image_url ?? null;
+  const clickable = Boolean(promo.cta_url);
+  const ctaLabel = promo.cta_label ?? "Ver";
+  const title = promo.title ?? "";
+  const imageUrl = promo.image_url ?? null;
 
   const Root: any = clickable ? "a" : "div";
   const rootProps = clickable
     ? {
-        href: promo?.cta_url ?? "#",
+        href: promo.cta_url ?? "#",
         target: "_blank",
         rel: "noreferrer",
         onClick
@@ -98,32 +98,30 @@ export function TopBannerPromo() {
     : undefined;
 
   return (
-    <div className="promo-top-slot" role="complementary" aria-label="Promoción" data-type={promo?.promo_type ?? "sponsor"}>
-      {promo ? (
-        <Root
-          className={`promo-top-inner promo-top-banner ${animate ? "promo-animate-in" : ""}`}
-          aria-label={title || "Promoción"}
-          style={rootStyle}
-          {...rootProps}
-        >
-          <div className="promo-top-media" aria-hidden="true">
-            <img src={imageUrl || "/logo.png"} alt="" loading="lazy" decoding="async" />
-          </div>
+    <div className="promo-top-slot" role="complementary" aria-label="Promoción" data-type={promo.promo_type ?? "sponsor"}>
+      <Root
+        className={`promo-top-inner promo-top-banner ${animate ? "promo-animate-in" : ""}`}
+        aria-label={title || "Promoción"}
+        style={rootStyle}
+        {...rootProps}
+      >
+        <div className="promo-top-media" aria-hidden="true">
+          <img src={imageUrl || "/logo.png"} alt="" loading="lazy" decoding="async" />
+        </div>
 
-          <div className="promo-top-content">
-            <div className="promo-top-one">
-              <span className="promo-top-label">
-                {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "RECOMENDADO" : "SPONSOR"}
-              </span>
-              <span className="promo-top-title clamp-2">{title}</span>
-            </div>
+        <div className="promo-top-content">
+          <div className="promo-top-one">
+            <span className="promo-top-label">
+              {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "RECOMENDADO" : "SPONSOR"}
+            </span>
+            <span className="promo-top-title clamp-2">{title}</span>
           </div>
+        </div>
 
-          <div className="promo-top-right">
-            <span className="promo-top-cta">{ctaLabel}</span>
-          </div>
-        </Root>
-      ) : null}
+        <div className="promo-top-right">
+          <span className="promo-top-cta">{ctaLabel}</span>
+        </div>
+      </Root>
     </div>
   );
 }
