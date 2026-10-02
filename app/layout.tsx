@@ -3,7 +3,21 @@ import "./spm-rebrand.css";
 import "./home-rebrand.css";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
+import { Bebas_Neue, Manrope } from "next/font/google";
 import { CANONICAL_SITE_URL } from "@/lib/seo/constants";
+
+const displayFont = Bebas_Neue({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-spm-display",
+  display: "swap"
+});
+
+const bodyFont = Manrope({
+  subsets: ["latin"],
+  variable: "--font-spm-body",
+  display: "swap"
+});
 
 const PageViewTracker = dynamic(() => import("@/components/PageViewTracker").then((m) => m.PageViewTracker), { ssr: false });
 const OneSignalInit = dynamic(() => import("@/components/OneSignalInit").then((m) => m.OneSignalInit), { ssr: false });
@@ -31,10 +45,10 @@ const oneSignalSafariWebId = String(
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "Sin Pelos en el Micrófono",
-  description: "Noticias, podcast y comunidad en un solo lugar. Sin filtros, sin libreto y con conversación real.",
+  description: "Podcast, historias y comunidad. Conversación real, sin libreto y sin filtros.",
   openGraph: {
     title: "Sin Pelos en el Micrófono",
-    description: "Noticias, podcast y comunidad en un solo lugar. Sin filtros, sin libreto y con conversación real.",
+    description: "Podcast, historias y comunidad. Conversación real, sin libreto y sin filtros.",
     url: siteUrl,
     siteName: "Sin Pelos en el Micrófono",
     type: "website",
@@ -50,7 +64,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Sin Pelos en el Micrófono",
-    description: "Noticias, podcast y comunidad en un solo lugar. Sin filtros, sin libreto y con conversación real.",
+    description: "Podcast, historias y comunidad. Conversación real, sin libreto y sin filtros.",
     images: [socialImage]
   },
   icons: {
@@ -62,7 +76,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="es" className={`${displayFont.variable} ${bodyFont.variable}`}>
       <head>
         {oneSignalAppId ? (
           <>
@@ -79,8 +93,7 @@ OneSignalDeferred.push(async function(OneSignal) {
       serviceWorkerPath: "/OneSignalSDKWorker.js",
       serviceWorkerUpdaterPath: "/OneSignalSDKUpdaterWorker.js",
       serviceWorkerParam: { scope: "/" },
-      notifyButton: { enable: true, position: "bottom-right" }${oneSignalSafariWebId ? `,
-      safari_web_id: "${oneSignalSafariWebId}"` : ""}
+      notifyButton: { enable: true, position: "bottom-right" }${oneSignalSafariWebId ? `,\n      safari_web_id: "${oneSignalSafariWebId}"` : ""}
     });
     window.__spmOneSignalInitialized = true;
     window.__spmOneSignalInitError = undefined;
