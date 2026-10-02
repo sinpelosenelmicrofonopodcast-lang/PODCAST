@@ -116,7 +116,6 @@ function generateFallbackSpmNewsImage(input: {
   } satisfies GeneratedNewsImage;
 }
 
-
 function buildAiCoverPrompt(spec: ReturnType<typeof buildSpmCoverPrompt>) {
   return [
     "Create a professional 16:9 breaking-news cover for a Puerto Rican and Latino media brand.",
@@ -132,7 +131,90 @@ function buildAiCoverPrompt(spec: ReturnType<typeof buildSpmCoverPrompt>) {
   ].join(" ");
 }
 
-async function generateAiCover(
+function openAiBaseUrl() {
+  return String(process.env.OPENAI_API_BASE_URL ?? "https://api.openai.com/v1")
+    .trim()
+    .replace(/\/+$/, "");
+}
+
+function directImageModel() {
+  const direct = String(process.env.OPENAI_IMAGE_MODEL ?? "").trim();
+  if (direct) return direct.replace(/^openai\//i, "");
+
+  const gateway = String(process.env.AI_GATEWAY_IMAGE_MODEL ?? "").trim();
+  if (gateway) return gateway.replace(/^openai\//i, "");
+
+  return "gpt-image-2";
+}
+
+async function uploadGeneratedCover(
+  bytes: Uint8Array,
+  mediaType: string,
+  spec: ReturnType<typeof buildSpmCoverPrompt>,
+  service: SupabaseClient
+) {
+  if (!bytes?.byteLength) throw new Error("Image generation returned no image.");
+  if (bytes.byteLength > 1024 * 1024) {
+    throw new Error("Generated image exceeds the 1 MB news-cover limit.");
+  }
+
+  const now = new Date();
+  const folder = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const baseName = spec.fileName.replace(/\.png$/i, "").replace(/[^a-z0-9_-]+/gi, "-").slice(0, 90);
+  const path = `ai/${folder}/${baseName}-${crypto.randomUUID()}.webp`;
+  const bucket = process.env.NEWS_COVERS_BUCKET?.trim() || "news-covers";
+  const upload = await service.storage.from(bucket).upload(path, bytes, {
+    contentType: mediaType || "image/webp",
+    cacheControl: "31536000",
+    upsert: false
+  });
+  if (upload.error) throw new Error(upload.error.message);
+
+  return normalizeImageUrl(service.storage.from(bucket).getPublicUrl(path).data.publicUrl);
+}
+
+async function generateAiCoverDirect(
+  spec: ReturnType<typeof buildSpmCoverPrompt>,
+  service: SupabaseClient
+): Promise<string | null> {
+  const apiKey = String(process.env.OPENAI_API_KEY ?? "").trim();
+  if (!apiKey) return null;
+
+  const response = await fetch(`${openAiBaseUrl()}/images/generations`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "X-Client-Request-Id": crypto.randomUUID()
+    },
+    body: JSON.stringify({
+      model: directImageModel(),
+      prompt: buildAiCoverPrompt(spec),
+      size: "1536x1024",
+      quality: "low",
+      output_format: "webp",
+      output_compression: 65,
+      moderation: "auto",
+      n: 1
+    }),
+    signal: AbortSignal.timeout(115000),
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    const detail = asString(await response.text().catch(() => ""), 800);
+    throw new Error(`OpenAI image request failed (${response.status})${detail ? `: ${detail}` : ""}`);
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as any;
+  const b64 = String(payload?.data?.[0]?.b64_json ?? "").trim();
+  if (!b64) throw new Error("OpenAI image request returned no base64 image.");
+
+  const bytes = new Uint8Array(Buffer.from(b64, "base64"));
+  return uploadGeneratedCover(bytes, "image/webp", spec, service);
+}
+
+async function generateAiCoverGateway(
   spec: ReturnType<typeof buildSpmCoverPrompt>,
   service: SupabaseClient
 ): Promise<string | null> {
@@ -151,26 +233,7 @@ async function generateAiCover(
   });
 
   const generated = result.image;
-  const bytes = generated.uint8Array;
-  if (!bytes?.byteLength) throw new Error("Image generation returned no image.");
-  if (bytes.byteLength > 1024 * 1024) {
-    throw new Error("Generated image exceeds the 1 MB news-cover limit.");
-  }
-
-  const now = new Date();
-  const folder = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-  const baseName = spec.fileName.replace(/\.png$/i, "").replace(/[^a-z0-9_-]+/gi, "-").slice(0, 90);
-  const path = `ai/${folder}/${baseName}-${crypto.randomUUID()}.webp`;
-  const bucket = process.env.NEWS_COVERS_BUCKET?.trim() || "news-covers";
-  const upload = await service.storage.from(bucket).upload(path, bytes, {
-    contentType: generated.mediaType || "image/webp",
-    cacheControl: "31536000",
-    upsert: false
-  });
-  if (upload.error) throw new Error(upload.error.message);
-
-  const publicUrl = service.storage.from(bucket).getPublicUrl(path).data.publicUrl;
-  return normalizeImageUrl(publicUrl);
+  return uploadGeneratedCover(generated.uint8Array, generated.mediaType || "image/webp", spec, service);
 }
 
 export async function generateSpmNewsImage(
@@ -191,9 +254,19 @@ export async function generateSpmNewsImage(
     return { ...fallback, generatedWithAI: false };
   }
 
+  const hasDirectOpenAi = Boolean(String(process.env.OPENAI_API_KEY ?? "").trim());
+  const gatewayEnabled = String(process.env.AI_GATEWAY_IMAGE_ENABLED ?? "false").trim().toLowerCase() === "true";
+
+  if (!hasDirectOpenAi && !gatewayEnabled) {
+    return { ...fallback, generatedWithAI: false };
+  }
+
   try {
     const spec = buildSpmCoverPrompt(input);
-    const imageUrl = await generateAiCover(spec, service);
+    const imageUrl = hasDirectOpenAi
+      ? await generateAiCoverDirect(spec, service)
+      : await generateAiCoverGateway(spec, service);
+
     if (!imageUrl) return { ...fallback, generatedWithAI: false };
     return {
       ...fallback,
@@ -202,7 +275,10 @@ export async function generateSpmNewsImage(
       generatedWithAI: true
     };
   } catch (error) {
-    console.error("SPM AI cover generation failed", {
+    // An unavailable image provider should never fail the news pipeline.
+    // Keep this as a warning so the intentional SVG fallback does not appear
+    // as a production runtime error cluster.
+    console.warn("SPM AI cover unavailable; using fallback", {
       message: error instanceof Error ? error.message : "Unknown error"
     });
     return { ...fallback, generatedWithAI: false };
