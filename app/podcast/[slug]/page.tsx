@@ -49,6 +49,27 @@ function formatDuration(seconds?: number | null) {
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
 }
 
+function cleanEpisodeDescription(value?: string | null) {
+  const raw = String(value ?? "").replace(/\r/g, "").trim();
+  if (!raw) return "Una conversación real, sin libreto y sin filtro.";
+
+  const cutMarkers = [
+    "\n\nSin Pelos en el Micrófono.",
+    "\n\n¿Te atreves",
+    "\n\n🔗",
+    "\n\nWebsite:",
+    "\n\nInstagram:"
+  ];
+  let cleaned = raw;
+  for (const marker of cutMarkers) {
+    const index = cleaned.indexOf(marker);
+    if (index > 0) cleaned = cleaned.slice(0, index);
+  }
+
+  cleaned = cleaned.replace(/https?:\/\/\S+/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  return cleaned.length > 1500 ? `${cleaned.slice(0, 1497).trimEnd()}…` : cleaned;
+}
+
 export default async function PodcastEpisodePage({ params }: { params: { slug: string } }) {
   const episode = await resolveEpisodeBySlug(params.slug);
   if (!episode) notFound();
@@ -66,6 +87,7 @@ export default async function PodcastEpisodePage({ params }: { params: { slug: s
   const nextEpisode = idx >= 0 && idx + 1 < allEpisodes.length ? allEpisodes[idx + 1] : null;
   const related = allEpisodes.filter((row) => row.id !== episode.id).slice(0, 4);
   const duration = formatDuration(episode.duration_seconds);
+  const heroDescription = cleanEpisodeDescription(episode.description);
 
   const schema = buildPodcastEpisodeJsonLd({
     canonicalPath: `/podcast/${encodeURIComponent(episode.slug)}`,
@@ -94,7 +116,7 @@ export default async function PodcastEpisodePage({ params }: { params: { slug: s
               {duration ? <span>{duration}</span> : null}
               <span>Conversación completa</span>
             </div>
-            <p>{episode.description ?? "Una conversación real, sin libreto y sin filtro."}</p>
+            <p className="episode-hero-description">{heroDescription}</p>
             <div className="episode-actions">
               {episode.youtube_url ? (
                 <a className="button episode-primary-cta" href={episode.youtube_url} target="_blank" rel="noreferrer">
