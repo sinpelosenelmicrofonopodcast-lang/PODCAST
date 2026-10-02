@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
       payload: {
         cadence: "30m",
         draftOnly: true,
-        cleanupHours: 48
+        cleanupHours: 48,
+        rankedLimit: 12
       },
       status: "running",
       priority: 30
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
         sourceLimit: 50,
         perSourceLimit: 12,
         timeoutMs: 12000,
-        rankedLimit: 18
+        rankedLimit: 12
       },
       service
     );
