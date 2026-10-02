@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
         sourceKey = String(source.episode_code ?? source.id);
         input = {
-          mode,
+          mode: "podcast",
           episode: String(source.episode_code ?? ""),
           title: String(source.title ?? ""),
           guest: String(source.guest ?? ""),
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         };
       } else {
         input = {
-          mode,
+          mode: "podcast",
           episode: String(body.episode ?? ""),
           title: String(body.title ?? ""),
           guest: String(body.guest ?? ""),
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     } else {
       sourceKey = String(body.sourceUrl ?? body.title ?? "manual-news").slice(0, 500);
       input = {
-        mode,
+        mode: "news",
         title: String(body.title ?? ""),
         sourceUrl: String(body.sourceUrl ?? ""),
         sourceName: String(body.sourceName ?? ""),
@@ -85,9 +85,9 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await runEditorialAgent(input);
-    const inputSnapshot = mode === "podcast"
+    const inputSnapshot = input.mode === "podcast"
       ? {
-          mode,
+          mode: input.mode,
           episodeSourceId,
           episode: input.episode,
           title: input.title,
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
           transcriptChars: input.transcript.length
         }
       : {
-          mode,
+          mode: input.mode,
           title: input.title,
           sourceUrl: input.sourceUrl,
           sourceName: input.sourceName,
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     const { data: saved, error: saveError } = await auth.service
       .from("editorial_runs")
       .insert({
-        mode,
+        mode: input.mode,
         episode_source_id: episodeSourceId,
         source_key: sourceKey,
         input_snapshot: inputSnapshot,
