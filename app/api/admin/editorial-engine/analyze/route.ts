@@ -1,9 +1,24 @@
+import { gunzipSync } from "node:zlib";
 import { NextRequest, NextResponse } from "next/server";
 import { requireStaffApi } from "@/lib/adminAuth";
 import { runEditorialAgent, type EditorialInput } from "@/services/editorialAgent";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+function decodeStoredTranscript(value: unknown, metadata: unknown) {
+  const raw = String(value ?? "");
+  const encoding = String((metadata as any)?.encoding ?? "");
+  if (raw.startsWith("gzip64:") || encoding === "gzip64") {
+    const payload = raw.startsWith("gzip64:") ? raw.slice(7) : raw;
+    try {
+      return gunzipSync(Buffer.from(payload, "base64")).toString("utf8");
+    } catch {
+      throw new Error("La fuente guardada está comprimida pero no se pudo decodificar.");
+    }
+  }
+  return raw;
+}
 
 export async function POST(request: NextRequest) {
   const auth = await requireStaffApi(request, "manage_news");
@@ -29,9 +44,12 @@ export async function POST(request: NextRequest) {
           .maybeSingle();
         if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
         if (!source) return NextResponse.json({ ok: false, error: "Fuente del episodio no encontrada." }, { status: 404 });
-        if (String(source.transcript ?? "").trim().length < 120) {
+
+        const transcript = decodeStoredTranscript(source.transcript, source.metadata);
+        if (transcript.trim().length < 120) {
           return NextResponse.json({ ok: false, error: "El episodio todavía no tiene transcript suficiente cargado." }, { status: 409 });
         }
+
         sourceKey = String(source.episode_code ?? source.id);
         input = {
           mode,
@@ -40,7 +58,7 @@ export async function POST(request: NextRequest) {
           guest: String(source.guest ?? ""),
           sourceUrl: String(source.source_url ?? ""),
           metadata: JSON.stringify(source.metadata ?? {}),
-          transcript: String(source.transcript ?? "")
+          transcript
         };
       } else {
         input = {
