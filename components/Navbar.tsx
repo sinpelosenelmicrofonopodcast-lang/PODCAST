@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { SocialBrandIcon } from "@/components/SocialBrandIcon";
 import { TopBannerPromo } from "@/components/promotions/TopBannerPromo";
 import type { Session } from "@supabase/supabase-js";
 import { navTexts } from "@/lib/i18n";
@@ -70,8 +71,6 @@ export function Navbar() {
       if (mounted && profile?.nickname) setNickname(profile.nickname);
       if (mounted) setAvatarUrl(profile?.avatar_url ?? null);
 
-      // Admin check must NOT rely on client-side RLS (can fail and hide admin UI).
-      // We validate via server route that uses service role for role lookup.
       const { data: sessionData } = await supabase.auth.getSession();
       await syncServerSession(sessionData.session ?? null);
       const token = sessionData.session?.access_token;
@@ -116,7 +115,6 @@ export function Navbar() {
     };
   }, []);
 
-  // UX: close dropdowns on outside click + ESC, and when route changes.
   useEffect(() => {
     setMenuOpen(false);
     setCommunityOpen(false);
@@ -348,10 +346,8 @@ export function Navbar() {
             rel="noreferrer"
             aria-label="Facebook Sin Pelos en el Micrófono"
           >
-            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-              <path d="M13 9h3V6h-3c-2.21 0-4 1.79-4 4v2H7v3h2v6h3v-6h3l1-3h-4v-2c0-.55.45-1 1-1Z" fill="currentColor" />
-            </svg>
-            Facebook
+            <SocialBrandIcon network="facebook" />
+            <span>Facebook</span>
           </a>
           <a
             className="social-strip-link"
@@ -360,13 +356,8 @@ export function Navbar() {
             rel="noreferrer"
             aria-label="Instagram Sin Pelos en el Micrófono"
           >
-            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-              <path
-                d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm8.5 2h-8.5A3.75 3.75 0 0 0 4 7.75v8.5A3.75 3.75 0 0 0 7.75 20h8.5A3.75 3.75 0 0 0 20 16.25v-8.5A3.75 3.75 0 0 0 16.25 4ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm5.25-2.75a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Z"
-                fill="currentColor"
-              />
-            </svg>
-            Instagram
+            <SocialBrandIcon network="instagram" />
+            <span>Instagram</span>
           </a>
           <a
             className="social-strip-link"
@@ -375,13 +366,8 @@ export function Navbar() {
             rel="noreferrer"
             aria-label="TikTok Sin Pelos en el Micrófono"
           >
-            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-              <path
-                d="M14 3h2.2c.3 1.8 1.7 3.2 3.5 3.5V9c-1.3 0-2.5-.4-3.5-1.1V15a6 6 0 1 1-6-6c.3 0 .5 0 .8.1v2.4a3.6 3.6 0 1 0 2.9 3.5V3Z"
-                fill="currentColor"
-              />
-            </svg>
-            TikTok
+            <SocialBrandIcon network="tiktok" />
+            <span>TikTok</span>
           </a>
           <a
             className="social-strip-link"
@@ -390,13 +376,8 @@ export function Navbar() {
             rel="noreferrer"
             aria-label="YouTube Sin Pelos en el Micrófono"
           >
-            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-              <path
-                d="M22 12c0 2.5-.3 4.3-.6 5.3-.3.8-1 1.5-1.8 1.8-1 .3-3 .6-7.6.6s-6.6-.3-7.6-.6c-.8-.3-1.5-1-1.8-1.8C2.3 16.3 2 14.5 2 12s.3-4.3.6-5.3c.3-.8 1-1.5 1.8-1.8 1-.3 3-.6 7.6-.6s6.6.3 7.6.6c.8.3 1.5 1 1.8 1.8.3 1 .6 2.8.6 5.3Zm-12-3.5v7l6-3.5-6-3.5Z"
-                fill="currentColor"
-              />
-            </svg>
-            YouTube
+            <SocialBrandIcon network="youtube" />
+            <span>YouTube</span>
           </a>
         </div>
       </div>
