@@ -6,7 +6,8 @@ import { Footer } from "@/components/Footer";
 import { SafeImage } from "@/components/home/SafeImage";
 import { EpisodeEditorial } from "@/components/podcast/EpisodeEditorial";
 import { buildSeoMetadata, episodeSeoTemplate } from "@/lib/seo/meta";
-import { getEpisodeBySlug, getPublishedEpisodes } from "@/lib/seo/content";
+import { getPublishedEpisodes } from "@/lib/seo/content";
+import { resolveEpisodeBySlug } from "@/lib/episodeResolver";
 import { getPublishedEpisodeEditorial } from "@/lib/episodeEditorials";
 import { buildPodcastEpisodeJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
 import { DEFAULT_OG_IMAGE } from "@/lib/seo/constants";
@@ -14,7 +15,7 @@ import { DEFAULT_OG_IMAGE } from "@/lib/seo/constants";
 export const revalidate = 180;
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const episode = await getEpisodeBySlug(params.slug);
+  const episode = await resolveEpisodeBySlug(params.slug);
   if (!episode) {
     return buildSeoMetadata({
       title: "Episodio no encontrado | Sin Pelos en el Micrófono",
@@ -49,14 +50,17 @@ function formatDuration(seconds?: number | null) {
 }
 
 export default async function PodcastEpisodePage({ params }: { params: { slug: string } }) {
-  const episode = await getEpisodeBySlug(params.slug);
+  const episode = await resolveEpisodeBySlug(params.slug);
   if (!episode) notFound();
 
-  const [allEpisodes, editorial] = await Promise.all([
+  const [storedEpisodes, editorial] = await Promise.all([
     getPublishedEpisodes(24),
     getPublishedEpisodeEditorial(episode)
   ]);
 
+  const allEpisodes = storedEpisodes.some((row) => row.slug === episode.slug || row.id === episode.id)
+    ? storedEpisodes
+    : [episode, ...storedEpisodes];
   const idx = allEpisodes.findIndex((row) => row.slug === episode.slug || row.id === episode.id);
   const prevEpisode = idx > 0 ? allEpisodes[idx - 1] : null;
   const nextEpisode = idx >= 0 && idx + 1 < allEpisodes.length ? allEpisodes[idx + 1] : null;
