@@ -11,10 +11,12 @@ import { FeedCentral } from "@/components/home/FeedCentral";
 import { CommunityPreview } from "@/components/home/CommunityPreview";
 import { EventsPreview } from "@/components/home/EventsPreview";
 import { SponsorBlock } from "@/components/home/SponsorBlock";
-import { queryHomepageFeedPage, queryHomepageOverview, queryHomepageTrending } from "@/lib/homepageQueries";
+import { queryHomepageFeedPage, queryHomepageOverview, queryHomepageTrending, type HomeNewsItem } from "@/lib/homepageQueries";
 import { queryPodcastEditorialPosts } from "@/lib/homeEditorialQueries";
 
 export const revalidate = 120;
+
+const CURRENT_NEWS_MAX_AGE_DAYS = 7;
 
 export const metadata: Metadata = {
   title: "Sin Pelos en el Micrófono | Noticias, podcast y conversación real",
@@ -23,6 +25,14 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" }
 };
 
+function isFreshApprovedNews(item: HomeNewsItem | null | undefined) {
+  if (!item?.published_at) return false;
+  const publishedAt = new Date(item.published_at).getTime();
+  if (!Number.isFinite(publishedAt)) return false;
+  const ageMs = Date.now() - publishedAt;
+  return ageMs >= 0 && ageMs <= CURRENT_NEWS_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+}
+
 export default async function HomePage() {
   const [overview, trending, podcastEditorials] = await Promise.all([
     queryHomepageOverview(),
@@ -30,19 +40,43 @@ export default async function HomePage() {
     queryPodcastEditorialPosts(3)
   ]);
 
-  const newsExcludeIds = new Set<string>();
-  if (overview.hero.lead?.id) newsExcludeIds.add(overview.hero.lead.id);
-  overview.hero.trending.forEach((item) => {
-    if (item?.id) newsExcludeIds.add(item.id);
-  });
+  // The Newsroom is manual by design. Only recently approved/published stories
+  // are presented as current coverage. Older published stories remain available
+  // through Noticias and the central feed instead of masquerading as today's news.
+  const freshHeroLead = isFreshApprovedNews(overview.hero.lead) ? overview.hero.lead : null;
+  const freshHeroTrending = overview.hero.trending.filter(isFreshApprovedNews);
+  const freshRegions = {
+    puertoRico: overview.regions.puertoRico.filter(isFreshApprovedNews),
+    texas: overview.regions.texas.filter(isFreshApprovedNews),
+    usa: overview.regions.usa.filter(isFreshApprovedNews),
+    mundo: overview.regions.mundo.filter(isFreshApprovedNews)
+  };
+
+  const freshNewsIds = new Set<string>();
+  if (freshHeroLead?.id) freshNewsIds.add(freshHeroLead.id);
+  freshHeroTrending.forEach((item) => freshNewsIds.add(item.id));
   [
-    ...overview.regions.puertoRico,
-    ...overview.regions.texas,
-    ...overview.regions.usa,
-    ...overview.regions.mundo,
-    ...trending.enTendencia.map((item) => ({ id: item.id })),
-    ...trending.subiendo.map((item) => ({ id: item.id })),
-    ...trending.viral.map((item) => ({ id: item.id }))
+    ...freshRegions.puertoRico,
+    ...freshRegions.texas,
+    ...freshRegions.usa,
+    ...freshRegions.mundo
+  ].forEach((item) => freshNewsIds.add(item.id));
+
+  const freshTrending = {
+    enTendencia: trending.enTendencia.filter((item) => freshNewsIds.has(item.id)),
+    subiendo: trending.subiendo.filter((item) => freshNewsIds.has(item.id)),
+    viral: trending.viral.filter((item) => freshNewsIds.has(item.id))
+  };
+  const hasFreshTrending =
+    freshTrending.enTendencia.length + freshTrending.subiendo.length + freshTrending.viral.length > 0;
+  const hasFreshRegions =
+    freshRegions.puertoRico.length + freshRegions.texas.length + freshRegions.usa.length + freshRegions.mundo.length > 0;
+
+  const newsExcludeIds = new Set<string>(freshNewsIds);
+  [
+    ...freshTrending.enTendencia,
+    ...freshTrending.subiendo,
+    ...freshTrending.viral
   ].forEach((item) => {
     if (item?.id) newsExcludeIds.add(item.id);
   });
@@ -75,23 +109,31 @@ export default async function HomePage() {
                 kicker={overview.hero.kicker}
                 title={overview.hero.title}
                 subtitle={overview.hero.subtitle}
-                lead={overview.hero.lead}
-                trending={overview.hero.trending}
+                lead={freshHeroLead}
+                trending={freshHeroTrending}
               />
             </div>
           </section>
 
-          <section className="section">
-            <div className="container">
-              <TrendingBlock enTendencia={trending.enTendencia} subiendo={trending.subiendo} viral={trending.viral} />
-            </div>
-          </section>
+          {hasFreshTrending ? (
+            <section className="section">
+              <div className="container">
+                <TrendingBlock
+                  enTendencia={freshTrending.enTendencia}
+                  subiendo={freshTrending.subiendo}
+                  viral={freshTrending.viral}
+                />
+              </div>
+            </section>
+          ) : null}
 
-          <section className="section">
-            <div className="container">
-              <RegionNews regions={overview.regions} />
-            </div>
-          </section>
+          {hasFreshRegions ? (
+            <section className="section">
+              <div className="container">
+                <RegionNews regions={freshRegions} />
+              </div>
+            </section>
+          ) : null}
         </>
       ) : null}
 
