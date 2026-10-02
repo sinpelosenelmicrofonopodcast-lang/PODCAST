@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { NewsletterForm } from "@/components/newsletter/NewsletterForm";
+import { BrandHero } from "@/components/home/BrandHero";
 import { HeroNews } from "@/components/home/HeroNews";
 import { TrendingBlock } from "@/components/home/TrendingBlock";
 import { RegionNews } from "@/components/home/RegionNews";
@@ -19,9 +20,9 @@ export const revalidate = 120;
 const CURRENT_NEWS_MAX_AGE_DAYS = 7;
 
 export const metadata: Metadata = {
-  title: "Sin Pelos en el Micrófono | Noticias, podcast y conversación real",
+  title: "Sin Pelos en el Micrófono | Conversaciones que se quedan contigo",
   description:
-    "Noticias, episodios, enseñanzas y editoriales nacidas de conversaciones reales. Puerto Rico, Texas y el mundo al estilo Sin Pelos.",
+    "Podcast, historias y editoriales nacidas de conversaciones reales. Lo que nos impactó, lo que aprendimos y lo que vale la pena seguir hablando.",
   alternates: { canonical: "/" }
 };
 
@@ -40,9 +41,6 @@ export default async function HomePage() {
     queryPodcastEditorialPosts(3)
   ]);
 
-  // The Newsroom is manual by design. Only recently approved/published stories
-  // are presented as current coverage. Older published stories remain available
-  // through Noticias and the central feed instead of masquerading as today's news.
   const freshHeroLead = isFreshApprovedNews(overview.hero.lead) ? overview.hero.lead : null;
   const freshHeroTrending = overview.hero.trending.filter(isFreshApprovedNews);
   const freshRegions = {
@@ -67,6 +65,8 @@ export default async function HomePage() {
     subiendo: trending.subiendo.filter((item) => freshNewsIds.has(item.id)),
     viral: trending.viral.filter((item) => freshNewsIds.has(item.id))
   };
+
+  const hasFreshCoverage = Boolean(freshHeroLead) || freshHeroTrending.length > 0;
   const hasFreshTrending =
     freshTrending.enTendencia.length + freshTrending.subiendo.length + freshTrending.viral.length > 0;
   const hasFreshRegions =
@@ -96,62 +96,57 @@ export default async function HomePage() {
   return (
     <main className="app-enter home-media-v6 spm-media-hub">
       <Navbar />
+      <BrandHero />
 
-      {overview.flags.showLatestNews ? (
-        <>
-          <section className="section spm-home-lead">
-            <div className="container">
-              <div className="spm-home-manifesto">
-                <span>NOTICIAS · PODCAST · IDEAS</span>
-                <strong>La conversación no termina cuando se apagan los micrófonos.</strong>
-              </div>
-              <HeroNews
-                kicker={overview.hero.kicker}
-                title={overview.hero.title}
-                subtitle={overview.hero.subtitle}
-                lead={freshHeroLead}
-                trending={freshHeroTrending}
-              />
-            </div>
-          </section>
-
-          {hasFreshTrending ? (
-            <section className="section">
-              <div className="container">
-                <TrendingBlock
-                  enTendencia={freshTrending.enTendencia}
-                  subiendo={freshTrending.subiendo}
-                  viral={freshTrending.viral}
-                />
-              </div>
-            </section>
-          ) : null}
-
-          {hasFreshRegions ? (
-            <section className="section">
-              <div className="container">
-                <RegionNews regions={freshRegions} />
-              </div>
-            </section>
-          ) : null}
-        </>
-      ) : null}
-
-      <section className="section spm-podcast-zone">
+      <section className="section spm-podcast-zone spm-section-breathe">
         <div className="container">
           <PodcastBlock featured={overview.podcast.featured} />
         </div>
       </section>
 
       {podcastEditorials.length ? (
-        <section className="section spm-editorial-zone">
+        <section className="section spm-editorial-zone spm-section-breathe">
           <div className="container">
             <FromMicBlock posts={podcastEditorials} />
           </div>
         </section>
       ) : null}
 
-      <section className="section">
+      {overview.flags.showLatestNews && hasFreshCoverage ? (
+        <section className="section spm-news-zone spm-section-breathe">
+          <div className="container">
+            <HeroNews
+              kicker="SPM NEWS · SOLO LO QUE MERECE TU TIEMPO"
+              title="Lo que está pasando"
+              subtitle="Noticias revisadas, contexto claro y cero relleno. Si no hay nada que valga la pena, no llenamos la portada por llenar."
+              lead={freshHeroLead}
+              trending={freshHeroTrending}
+            />
+          </div>
+        </section>
+      ) : null}
+
+      {hasFreshTrending ? (
+        <section className="section spm-section-breathe">
+          <div className="container">
+            <TrendingBlock
+              enTendencia={freshTrending.enTendencia}
+              subiendo={freshTrending.subiendo}
+              viral={freshTrending.viral}
+            />
+          </div>
+        </section>
+      ) : null}
+
+      {hasFreshRegions ? (
+        <section className="section spm-section-breathe">
+          <div className="container">
+            <RegionNews regions={freshRegions} />
+          </div>
+        </section>
+      ) : null}
+
+      <section className="section spm-feed-zone spm-section-breathe">
         <div className="container">
           <FeedCentral
             initialItems={feed.items}
@@ -163,7 +158,7 @@ export default async function HomePage() {
       </section>
 
       {overview.flags.showCommunity ? (
-        <section className="section">
+        <section className="section spm-community-zone spm-section-breathe">
           <div className="container">
             <CommunityPreview threads={overview.community.threads} fallbackTopics={overview.community.fallbackTopics} />
           </div>
@@ -171,20 +166,20 @@ export default async function HomePage() {
       ) : null}
 
       {overview.flags.showEvents ? (
-        <section className="section">
+        <section className="section spm-events-zone spm-section-breathe">
           <div className="container">
             <EventsPreview events={overview.events} />
           </div>
         </section>
       ) : null}
 
-      <section className="section">
+      <section className="section spm-newsletter-zone spm-section-breathe">
         <div className="container">
           <div className="home-media-newsletter-wrap">
             <NewsletterForm
               variant="cta"
-              title="Que el algoritmo no decida lo que tú te enteras"
-              subtitle="Lo importante de Sin Pelos directo a tu correo, sin ruido ni relleno."
+              title="Lo bueno no debería depender del algoritmo"
+              subtitle="Episodios, historias y lo que de verdad vale la pena — directo a tu correo."
               buttonLabel="QUIERO ESTAR AL DÍA"
             />
           </div>
@@ -192,9 +187,9 @@ export default async function HomePage() {
       </section>
 
       {overview.flags.showPromotions ? (
-        <section className="section">
+        <section className="section spm-sponsor-zone spm-section-breathe">
           <div className="container">
-            <SponsorBlock title="SPONSOR DE CIERRE" sponsor={overview.sponsors.footer} slot="footer" />
+            <SponsorBlock title="CON LOS QUE CREEN EN ESTO" sponsor={overview.sponsors.footer} slot="footer" />
           </div>
         </section>
       ) : null}

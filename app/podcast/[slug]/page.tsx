@@ -3,15 +3,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { SafeImage } from "@/components/home/SafeImage";
+import { EpisodeEditorial } from "@/components/podcast/EpisodeEditorial";
 import { buildSeoMetadata, episodeSeoTemplate } from "@/lib/seo/meta";
-import { getEpisodeBySlug, getPublishedEpisodes } from "@/lib/seo/content";
+import { getPublishedEpisodes } from "@/lib/seo/content";
+import { resolveEpisodeBySlug } from "@/lib/episodeResolver";
+import { getPublishedEpisodeEditorial } from "@/lib/episodeEditorials";
 import { buildPodcastEpisodeJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
 import { DEFAULT_OG_IMAGE } from "@/lib/seo/constants";
 
 export const revalidate = 180;
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const episode = await getEpisodeBySlug(params.slug);
+  const episode = await resolveEpisodeBySlug(params.slug);
   if (!episode) {
     return buildSeoMetadata({
       title: "Episodio no encontrado | Sin Pelos en el Micrófono",
@@ -32,20 +36,58 @@ function formatDate(value?: string | null) {
   if (!value) return "";
   return new Date(value).toLocaleDateString("es-PR", {
     day: "2-digit",
-    month: "short",
+    month: "long",
     year: "numeric"
   });
 }
 
+function formatDuration(seconds?: number | null) {
+  const total = Number(seconds ?? 0);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.round((total % 3600) / 60);
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
+}
+
+function cleanEpisodeDescription(value?: string | null) {
+  const raw = String(value ?? "").replace(/\r/g, "").trim();
+  if (!raw) return "Una conversación real, sin libreto y sin filtro.";
+
+  const cutMarkers = [
+    "\n\nSin Pelos en el Micrófono.",
+    "\n\n¿Te atreves",
+    "\n\n🔗",
+    "\n\nWebsite:",
+    "\n\nInstagram:"
+  ];
+  let cleaned = raw;
+  for (const marker of cutMarkers) {
+    const index = cleaned.indexOf(marker);
+    if (index > 0) cleaned = cleaned.slice(0, index);
+  }
+
+  cleaned = cleaned.replace(/https?:\/\/\S+/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  return cleaned.length > 1500 ? `${cleaned.slice(0, 1497).trimEnd()}…` : cleaned;
+}
+
 export default async function PodcastEpisodePage({ params }: { params: { slug: string } }) {
-  const episode = await getEpisodeBySlug(params.slug);
+  const episode = await resolveEpisodeBySlug(params.slug);
   if (!episode) notFound();
 
-  const allEpisodes = await getPublishedEpisodes(24);
+  const [storedEpisodes, editorial] = await Promise.all([
+    getPublishedEpisodes(24),
+    getPublishedEpisodeEditorial(episode)
+  ]);
+
+  const allEpisodes = storedEpisodes.some((row) => row.slug === episode.slug || row.id === episode.id)
+    ? storedEpisodes
+    : [episode, ...storedEpisodes];
   const idx = allEpisodes.findIndex((row) => row.slug === episode.slug || row.id === episode.id);
   const prevEpisode = idx > 0 ? allEpisodes[idx - 1] : null;
   const nextEpisode = idx >= 0 && idx + 1 < allEpisodes.length ? allEpisodes[idx + 1] : null;
-  const related = allEpisodes.filter((row) => row.id !== episode.id).slice(0, 6);
+  const related = allEpisodes.filter((row) => row.id !== episode.id).slice(0, 4);
+  const duration = formatDuration(episode.duration_seconds);
+  const heroDescription = cleanEpisodeDescription(episode.description);
 
   const schema = buildPodcastEpisodeJsonLd({
     canonicalPath: `/podcast/${encodeURIComponent(episode.slug)}`,
@@ -58,33 +100,27 @@ export default async function PodcastEpisodePage({ params }: { params: { slug: s
   });
 
   return (
-    <main>
+    <main className="episode-page">
       <Navbar />
-      <section className="section">
-        <div className="container">
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-            <Link className="button secondary" href="/podcast">
-              Volver a podcast
-            </Link>
-            <span className="muted">{formatDate(episode.published_at)}</span>
-          </div>
 
-          <article className="card" style={{ marginTop: 12, display: "grid", gap: 14 }}>
-            <h1 style={{ margin: 0 }}>{episode.title}</h1>
-            {episode.thumbnail_url ? (
-              <img
-                src={episode.thumbnail_url}
-                alt={episode.title}
-                loading="eager"
-                decoding="async"
-                style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover", borderRadius: 12 }}
-              />
-            ) : null}
-            <p className="muted">{episode.description ?? "Episodio completo."}</p>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <section className="episode-hero">
+        <div className="container episode-hero-grid">
+          <div className="episode-hero-copy">
+            <Link className="episode-back" href="/podcast">
+              ← Todos los episodios
+            </Link>
+            <span className="episode-kicker">SIN PELOS EN EL MICRÓFONO</span>
+            <h1>{episode.title}</h1>
+            <div className="episode-meta">
+              {episode.published_at ? <span>{formatDate(episode.published_at)}</span> : null}
+              {duration ? <span>{duration}</span> : null}
+              <span>Conversación completa</span>
+            </div>
+            <p className="episode-hero-description">{heroDescription}</p>
+            <div className="episode-actions">
               {episode.youtube_url ? (
-                <a className="button secondary" href={episode.youtube_url} target="_blank" rel="noreferrer">
-                  Ver en YouTube
+                <a className="button episode-primary-cta" href={episode.youtube_url} target="_blank" rel="noreferrer">
+                  ▶ Ver episodio completo
                 </a>
               ) : null}
               {episode.audio_url ? (
@@ -93,41 +129,66 @@ export default async function PodcastEpisodePage({ params }: { params: { slug: s
                 </a>
               ) : null}
             </div>
-          </article>
+          </div>
 
-          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <div className="episode-hero-media">
+            <div className="episode-hero-glow" aria-hidden="true" />
+            <SafeImage src={episode.thumbnail_url} alt={episode.title} loading="eager" />
+            <span className="episode-media-tag">SIN PELOS</span>
+          </div>
+        </div>
+      </section>
+
+      {editorial ? (
+        <section className="episode-editorial-zone">
+          <div className="container">
+            <EpisodeEditorial editorial={editorial} />
+          </div>
+        </section>
+      ) : null}
+
+      <section className="episode-navigation-zone">
+        <div className="container">
+          <div className="episode-nav-row">
             {prevEpisode ? (
-              <Link className="button secondary" href={`/podcast/${encodeURIComponent(prevEpisode.slug)}`}>
-                Episodio anterior
+              <Link className="episode-nav-card" href={`/podcast/${encodeURIComponent(prevEpisode.slug)}`}>
+                <small>EPISODIO ANTERIOR</small>
+                <strong>{prevEpisode.title}</strong>
               </Link>
-            ) : null}
+            ) : <span />}
             {nextEpisode ? (
-              <Link className="button secondary" href={`/podcast/${encodeURIComponent(nextEpisode.slug)}`}>
-                Siguiente episodio
+              <Link className="episode-nav-card is-next" href={`/podcast/${encodeURIComponent(nextEpisode.slug)}`}>
+                <small>SIGUIENTE EPISODIO</small>
+                <strong>{nextEpisode.title}</strong>
               </Link>
             ) : null}
           </div>
 
           {related.length > 0 ? (
-            <section style={{ marginTop: 18 }}>
-              <h2 className="section-title" style={{ marginBottom: 10 }}>
-                Episodios relacionados
-              </h2>
-              <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(min(280px,100%),1fr))" }}>
+            <section className="episode-related">
+              <div className="episode-related-heading">
+                <span>SEGUIMOS HABLANDO</span>
+                <h2>Más conversaciones que valen la pena</h2>
+              </div>
+              <div className="episode-related-grid">
                 {related.map((item) => (
-                  <article key={item.id} className="card" style={{ display: "grid", gap: 8 }}>
-                    <h3 style={{ margin: 0 }}>{item.title}</h3>
-                    <p className="muted">{item.description ?? "Episodio completo."}</p>
-                    <Link className="button secondary" href={`/podcast/${encodeURIComponent(item.slug)}`}>
-                      Ver episodio
-                    </Link>
-                  </article>
+                  <Link key={item.id} className="episode-related-card" href={`/podcast/${encodeURIComponent(item.slug)}`}>
+                    <div className="episode-related-media">
+                      <SafeImage src={item.thumbnail_url} alt={item.title} loading="lazy" />
+                    </div>
+                    <div>
+                      <small>{formatDate(item.published_at)}</small>
+                      <h3>{item.title}</h3>
+                      <span>Ver episodio →</span>
+                    </div>
+                  </Link>
                 ))}
               </div>
             </section>
           ) : null}
         </div>
       </section>
+
       <Footer />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(schema) }} />
     </main>
