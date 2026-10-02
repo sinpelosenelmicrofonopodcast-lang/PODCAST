@@ -5,10 +5,10 @@ const footerGroups = [
   {
     title: "Explora",
     links: [
+      { href: "/podcast", label: "Episodios" },
+      { href: "/blog", label: "Desde el Micrófono" },
       { href: "/noticias", label: "Noticias" },
-      { href: "/feed", label: "Feed" },
-      { href: "/podcast", label: "Podcast" },
-      { href: "/blog", label: "Blog" },
+      { href: "/feed", label: "Descubrir" },
       { href: "/eventos", label: "Eventos" }
     ]
   },
@@ -23,11 +23,11 @@ const footerGroups = [
     ]
   },
   {
-    title: "Negocio y legal",
+    title: "Sin Pelos",
     links: [
+      { href: "/quiero-salir", label: "Quiero ser invitado" },
       { href: "/publicidad", label: "Publicidad" },
-      { href: "/quiero-salir", label: "Invitados" },
-      { href: "/rss", label: "RSS audio" },
+      { href: "/rss", label: "RSS / Audio" },
       { href: "/terminos", label: "Términos" }
     ]
   }
@@ -46,9 +46,9 @@ export function Footer() {
       <div className="container footer-grid">
         <div className="footer-brand">
           <p className="footer-kicker">Sin Pelos en el Micrófono</p>
-          <h2>Noticias, podcast y conversación con criterio editorial claro.</h2>
+          <h2>La conversación no termina cuando se apagan los micrófonos.</h2>
           <p className="muted">
-            Una sola plataforma para descubrir lo importante, seguir el programa y entrar a la comunidad sin ruido visual.
+            Episodios, historias, enseñanzas y comunidad. Lo que se dijo en la mesa sigue viviendo aquí.
           </p>
         </div>
 
@@ -66,8 +66,8 @@ export function Footer() {
         ))}
       </div>
       <div className="container footer-bottom">
-        <span>“Aquí no estamos para agradarte. Estamos para pensar sin miedo.”</span>
-        <span>© 2026 Sin Pelos en el Micrófono</span>
+        <span>“Aquí no venimos a quedar bien. Venimos a hablar claro.”</span>
+        <span>© 2026 Sin Pelos en el Micrófono · B&B Entertainment Hub LLC</span>
       </div>
     </footer>
   );
