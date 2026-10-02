@@ -1,0 +1,236 @@
+.spm-media-hub .section {
+  position: relative;
+}
+
+.spm-home-lead {
+  padding-top: 22px;
+}
+
+.spm-home-manifesto {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 11px 14px;
+  border-left: 4px solid #ff6600;
+  background: linear-gradient(90deg, rgba(255,102,0,.12), transparent 70%);
+}
+
+.spm-home-manifesto span {
+  color: #ff6600;
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.spm-home-manifesto strong {
+  font-size: 13px;
+  color: #fff;
+  letter-spacing: .15px;
+}
+
+.spm-podcast-zone::before,
+.spm-editorial-zone::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.spm-podcast-zone::before {
+  background: linear-gradient(180deg, transparent, rgba(255,102,0,.045), transparent);
+}
+
+.spm-editorial-zone {
+  padding-top: 18px;
+  padding-bottom: 42px;
+}
+
+.spm-editorial-zone::before {
+  background: radial-gradient(circle at 90% 10%, rgba(255,102,0,.08), transparent 30%);
+}
+
+.from-mic-block {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+}
+
+.from-mic-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 22px;
+  align-items: end;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #333;
+}
+
+.from-mic-heading span {
+  color: #ff6600;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 1.45px;
+}
+
+.from-mic-heading h2 {
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: clamp(32px, 5vw, 58px);
+  line-height: .95;
+  max-width: 760px;
+}
+
+.from-mic-all {
+  color: #ff6600;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .8px;
+  white-space: nowrap;
+  padding-bottom: 5px;
+}
+
+.from-mic-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1fr;
+  gap: 14px;
+}
+
+.from-mic-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  border: 1px solid #333;
+  border-radius: 18px;
+  background: #151515;
+  min-width: 0;
+  transition: transform .2s ease, border-color .2s ease;
+}
+
+.from-mic-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255,102,0,.65);
+}
+
+.from-mic-card.featured {
+  border-color: rgba(255,102,0,.4);
+}
+
+.from-mic-media {
+  aspect-ratio: 16/9;
+  background: #0a0a0a;
+  overflow: hidden;
+  position: relative;
+}
+
+.from-mic-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: saturate(.9) contrast(1.04);
+  transition: transform .28s ease;
+}
+
+.from-mic-card:hover .from-mic-media img {
+  transform: scale(1.025);
+}
+
+.from-mic-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 45%, rgba(0,0,0,.9));
+}
+
+.from-mic-media > span {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  right: 12px;
+  bottom: 11px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .55px;
+  text-transform: uppercase;
+}
+
+.from-mic-fallback {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #ff6600;
+  font-family: var(--font-display);
+  font-size: 62px;
+  letter-spacing: 2px;
+  background:
+    radial-gradient(circle at 25% 25%, rgba(255,102,0,.22), transparent 35%),
+    #090909;
+}
+
+.from-mic-copy {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.from-mic-copy small {
+  color: #9d9d9d;
+  text-transform: uppercase;
+  letter-spacing: .55px;
+}
+
+.from-mic-copy h3 {
+  margin: 9px 0 10px;
+  font-size: 21px;
+  line-height: 1.14;
+}
+
+.from-mic-card.featured .from-mic-copy h3 {
+  font-size: clamp(24px, 2.7vw, 34px);
+}
+
+.from-mic-copy p {
+  margin: 0 0 18px;
+  color: #d0d0d0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.from-mic-copy strong {
+  margin-top: auto;
+  color: #ff6600;
+  font-size: 10px;
+  letter-spacing: .8px;
+}
+
+@media (max-width: 900px) {
+  .from-mic-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .from-mic-card.featured {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .spm-home-manifesto {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+  .from-mic-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+  .from-mic-grid {
+    grid-template-columns: 1fr;
+  }
+  .from-mic-card.featured {
+    grid-column: auto;
+  }
+}
