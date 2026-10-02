@@ -1,3 +1,4 @@
+import "../editorial-v2.css";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { AdminShell } from "@/components/AdminShell";
