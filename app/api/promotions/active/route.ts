@@ -3,19 +3,35 @@ import { supabaseServer } from "@/lib/supabaseServer";
 
 export const revalidate = 60;
 
+function shuffle<T>(input: T[]) {
+  const items = [...input];
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+function rotateByPriority(items: any[], limit: number) {
+  if (!items.length) return [];
+  const priorities = Array.from(new Set(items.map((item) => Number(item?.display_order ?? 0)))).sort((a, b) => a - b);
+  const ordered: any[] = [];
+  for (const priority of priorities) {
+    ordered.push(...shuffle(items.filter((item) => Number(item?.display_order ?? 0) === priority)));
+  }
+  return ordered.slice(0, limit);
+}
+
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const placement = (url.searchParams.get("placement") ?? "toast").trim();
     const section = (url.searchParams.get("section") ?? "").trim();
     const limit = Math.min(10, Math.max(1, Number(url.searchParams.get("limit") ?? 10)));
-    // If we need to pick a section-targeted promo, query a bit more then filter.
-    const dbLimit = section ? Math.min(30, Math.max(limit, limit * 6)) : limit;
+    const dbLimit = section ? Math.min(30, Math.max(limit * 8, 12)) : Math.min(30, Math.max(limit * 6, 10));
     const nowIso = new Date().toISOString();
 
     const supabase = supabaseServer();
-    // Avoid Supabase "schema cache" hard-fail if promo_type hasn't been migrated yet.
-    // We'll try with promo_type first; fallback to a column-safe select on older schemas.
     const run = async (selectCols: string) => {
       const q = supabase
         .from("promotions")
@@ -34,7 +50,9 @@ export async function GET(request: NextRequest) {
       "id, title, description, image_url, cta_label, cta_url, placement, display_order, starts_at, ends_at, promo_type, target_sections"
     );
     if (error && /(promo_type|target_sections)/i.test(error.message)) {
-      const fallback = await run("id, title, description, image_url, cta_label, cta_url, placement, display_order, starts_at, ends_at");
+      const fallback = await run(
+        "id, title, description, image_url, cta_label, cta_url, placement, display_order, starts_at, ends_at"
+      );
       data = fallback.data;
       error = fallback.error;
     }
@@ -42,33 +60,28 @@ export async function GET(request: NextRequest) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
     let items = (data ?? []) as any[];
-    if (section && Array.isArray(items) && items.length) {
+    if (section && items.length) {
       const sec = section.toLowerCase();
-      const isAll = (v: any) => String(v ?? "").toLowerCase() === "all";
-
       const targeted: any[] = [];
       const global: any[] = [];
-      for (const p of items) {
-        const ts = (p as any).target_sections;
-        if (!ts || (Array.isArray(ts) && ts.length === 0)) {
-          global.push(p);
+
+      for (const promo of items) {
+        const targets = promo?.target_sections;
+        if (!targets || (Array.isArray(targets) && targets.length === 0) || !Array.isArray(targets)) {
+          global.push(promo);
           continue;
         }
-        if (!Array.isArray(ts)) {
-          global.push(p);
-          continue;
-        }
-        const lower = ts.map((x) => String(x).toLowerCase());
-        if (lower.includes(sec)) targeted.push(p);
-        else if (lower.some(isAll)) global.push(p);
+        const normalized = targets.map((value: unknown) => String(value).toLowerCase());
+        if (normalized.includes(sec)) targeted.push(promo);
+        else if (normalized.includes("all") || normalized.includes("global")) global.push(promo);
       }
 
-      const chosen = targeted.length ? targeted : global;
-      items = chosen.slice(0, limit);
+      items = targeted.length ? targeted : global;
     }
 
-    return NextResponse.json({ ok: true, items: items.slice(0, limit) });
-  } catch {
+    return NextResponse.json({ ok: true, items: rotateByPriority(items, limit) });
+  } catch (error: any) {
+    console.error("active promotion selection failed", error?.message ?? error);
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
