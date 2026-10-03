@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { trackPromoEvent } from "@/lib/promoTracking";
+import { getSessionId, trackPromoEvent } from "@/lib/promoTracking";
 import { promoSectionFromPath, type PromoSection } from "@/lib/promoSection";
 
 type Promo = {
@@ -39,8 +39,7 @@ export function MidContentAdSlot({ placement = "mid_content", section, className
         const first = entries[0];
         if (!first?.isIntersecting) return;
         obs.disconnect();
-        if (loaded) return;
-        setLoaded(true);
+        if (!loaded) setLoaded(true);
       },
       { rootMargin: "200px 0px" }
     );
@@ -51,10 +50,15 @@ export function MidContentAdSlot({ placement = "mid_content", section, className
   useEffect(() => {
     if (!loaded) return;
     const run = async () => {
-      const res = await fetch(`/api/promotions/active?placement=${encodeURIComponent(placement)}&limit=1&section=${encodeURIComponent(currentSection)}`, {
-        cache: "no-store"
-      }).catch(() => null);
-      if (!res?.ok) return;
+      const sid = getSessionId();
+      const res = await fetch(
+        `/api/promotions/active?placement=${encodeURIComponent(placement)}&limit=1&section=${encodeURIComponent(currentSection)}&sid=${encodeURIComponent(sid)}`,
+        { cache: "no-store" }
+      ).catch(() => null);
+      if (!res?.ok) {
+        setPromo(null);
+        return;
+      }
       const json = await res.json().catch(() => null);
       const item = (json?.items?.[0] ?? null) as Promo | null;
       setPromo(item);
