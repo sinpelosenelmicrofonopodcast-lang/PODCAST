@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { usePathname } from "next/navigation";
-import { trackPromoEvent } from "@/lib/promoTracking";
+import { getSessionId, trackPromoEvent } from "@/lib/promoTracking";
 import { promoSectionFromPath } from "@/lib/promoSection";
 
 type Promo = {
@@ -14,6 +14,14 @@ type Promo = {
   promo_type?: "sponsor" | "internal" | "affiliate" | null;
 };
 
+const HOUSE_PROMO = {
+  title: "¿Quieres tu marca aquí? Anúnciate con Sin Pelos.",
+  image_url: "/logo.png",
+  cta_label: "Anúnciate",
+  cta_url: "/publicidad",
+  promo_type: "internal" as const
+};
+
 export function TopBannerPromo() {
   const pathname = usePathname() ?? "/";
   const section = promoSectionFromPath(pathname);
@@ -21,11 +29,16 @@ export function TopBannerPromo() {
   const [animate, setAnimate] = useState(false);
   const sentImpression = useRef(false);
 
+  const canShow = useMemo(() => !pathname.startsWith("/admin"), [pathname]);
+
   useEffect(() => {
+    if (!canShow) return;
     const run = async () => {
-      const res = await fetch(`/api/promotions/active?placement=top_banner&limit=1&section=${encodeURIComponent(section)}`, {
-        cache: "no-store"
-      }).catch(() => null);
+      const sid = getSessionId();
+      const res = await fetch(
+        `/api/promotions/active?placement=top_banner&limit=1&section=${encodeURIComponent(section)}&sid=${encodeURIComponent(sid)}`,
+        { cache: "no-store" }
+      ).catch(() => null);
       if (!res?.ok) {
         setPromo(null);
         return;
@@ -36,9 +49,7 @@ export function TopBannerPromo() {
       sentImpression.current = false;
     };
     run();
-  }, [section]);
-
-  const canShow = useMemo(() => !pathname.startsWith("/admin"), [pathname]);
+  }, [section, canShow]);
 
   useEffect(() => {
     if (!canShow || !promo) return;
@@ -73,32 +84,30 @@ export function TopBannerPromo() {
     });
   };
 
-  // A promotion should earn its space. Do not leave an empty 52px band in the
-  // navigation when there is no active sponsor/internal message.
-  if (!canShow || !promo) return null;
+  if (!canShow) return null;
 
-  const clickable = Boolean(promo.cta_url);
-  const ctaLabel = promo.cta_label ?? "Ver";
-  const title = promo.title ?? "";
-  const imageUrl = promo.image_url ?? null;
+  const display = promo ?? HOUSE_PROMO;
+  const clickable = Boolean(display.cta_url);
+  const ctaLabel = display.cta_label ?? "Ver";
+  const title = display.title ?? "";
+  const imageUrl = display.image_url ?? "/logo.png";
+  const promoType = display.promo_type ?? "sponsor";
 
   const Root: any = clickable ? "a" : "div";
+  const isExternal = Boolean(display.cta_url?.startsWith("http"));
   const rootProps = clickable
     ? {
-        href: promo.cta_url ?? "#",
-        target: "_blank",
-        rel: "noreferrer",
-        onClick
+        href: display.cta_url ?? "#",
+        ...(isExternal ? { target: "_blank", rel: "noreferrer" } : {}),
+        onClick: promo ? onClick : undefined
       }
     : {};
   const rootStyle = imageUrl
-    ? ({
-        ["--promo-bg" as any]: `url("${imageUrl}")`
-      } as CSSProperties)
+    ? ({ ["--promo-bg" as any]: `url("${imageUrl}")` } as CSSProperties)
     : undefined;
 
   return (
-    <div className="promo-top-slot" role="complementary" aria-label="Promoción" data-type={promo.promo_type ?? "sponsor"}>
+    <div className="promo-top-slot" role="complementary" aria-label="Promoción" data-type={promoType}>
       <Root
         className={`promo-top-inner promo-top-banner ${animate ? "promo-animate-in" : ""}`}
         aria-label={title || "Promoción"}
@@ -106,13 +115,13 @@ export function TopBannerPromo() {
         {...rootProps}
       >
         <div className="promo-top-media" aria-hidden="true">
-          <img src={imageUrl || "/logo.png"} alt="" loading="lazy" decoding="async" />
+          <img src={imageUrl} alt="" width={34} height={34} loading="eager" decoding="async" />
         </div>
 
         <div className="promo-top-content">
           <div className="promo-top-one">
             <span className="promo-top-label">
-              {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "RECOMENDADO" : "SPONSOR"}
+              {promoType === "internal" ? "SPM" : promoType === "affiliate" ? "RECOMENDADO" : "SPONSOR"}
             </span>
             <span className="promo-top-title clamp-2">{title}</span>
           </div>
