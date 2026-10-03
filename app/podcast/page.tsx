@@ -2,6 +2,7 @@ import { ListenLinks } from "@/components/podcast/ListenLinks";
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { buildSeoMetadata } from "@/lib/seo/meta";
 import { getPublishedEpisodes } from "@/lib/seo/content";
 import { buildPodcastSeriesJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
@@ -130,8 +131,6 @@ export default async function PodcastPage() {
     else noVideoId.push(item);
   });
 
-  // Live YouTube data wins for title, description, date, thumbnail, duration and metrics.
-  // Stored IDs/slugs are preserved when a historical database row already exists.
   liveEpisodes.forEach((video) => {
     const stored = byVideoId.get(video.id);
     byVideoId.set(video.id, {
@@ -169,6 +168,7 @@ export default async function PodcastPage() {
       <section className="section podcast-page-section">
         <div className="container">
           <ListenLinks />
+          <MidContentAdSlot placement="podcast_sponsor" section="podcast" className="podcast-sponsor-slot" compact />
           <PodcastHubClient episodes={uiEpisodes} featuredEpisodeId={featured?.id ?? null} />
         </div>
       </section>
