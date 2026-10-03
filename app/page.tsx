@@ -12,11 +12,17 @@ import { FeedCentral } from "@/components/home/FeedCentral";
 import { CommunityPreview } from "@/components/home/CommunityPreview";
 import { EventsPreview } from "@/components/home/EventsPreview";
 import { SponsorBlock } from "@/components/home/SponsorBlock";
-import { queryHomepageFeedPage, queryHomepageOverview, queryHomepageTrending, type HomeNewsItem } from "@/lib/homepageQueries";
+import {
+  queryHomepageFeedPage,
+  queryHomepageOverview,
+  queryHomepageTrending,
+  type HomeNewsItem,
+  type HomePodcastItem
+} from "@/lib/homepageQueries";
 import { queryPodcastEditorialPosts } from "@/lib/homeEditorialQueries";
+import { fetchYouTubeVideos, isFullPodcastEpisode } from "@/lib/youtube";
 
 export const revalidate = 120;
-
 const CURRENT_NEWS_MAX_AGE_DAYS = 7;
 
 export const metadata: Metadata = {
@@ -34,13 +40,41 @@ function isFreshApprovedNews(item: HomeNewsItem | null | undefined) {
   return ageMs >= 0 && ageMs <= CURRENT_NEWS_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 }
 
+async function latestPodcastFromYouTube(): Promise<HomePodcastItem | null> {
+  try {
+    const videos = await fetchYouTubeVideos(80, { revalidateSeconds: 120 });
+    const video = videos.find(isFullPodcastEpisode);
+    if (!video) return null;
+    return {
+      id: video.id,
+      title: video.title || "Último episodio",
+      caption: video.description || null,
+      source_url: `https://www.youtube.com/watch?v=${video.id}`,
+      media_url: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`,
+      posted_at: video.publishedAt || null,
+      platform: "YouTube",
+      metrics: {
+        views: video.viewCount || 0,
+        likes: video.likeCount || 0,
+        comments: video.commentCount || 0,
+        durationSeconds: video.durationSeconds || 0,
+        isShort: false
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default async function HomePage() {
-  const [overview, trending, podcastEditorials] = await Promise.all([
+  const [overview, trending, podcastEditorials, livePodcast] = await Promise.all([
     queryHomepageOverview(),
     queryHomepageTrending(),
-    queryPodcastEditorialPosts(3)
+    queryPodcastEditorialPosts(3),
+    latestPodcastFromYouTube()
   ]);
 
+  const featuredPodcast = livePodcast ?? overview.podcast.featured;
   const freshHeroLead = isFreshApprovedNews(overview.hero.lead) ? overview.hero.lead : null;
   const freshHeroTrending = overview.hero.trending.filter(isFreshApprovedNews);
   const freshRegions = {
@@ -53,12 +87,9 @@ export default async function HomePage() {
   const freshNewsIds = new Set<string>();
   if (freshHeroLead?.id) freshNewsIds.add(freshHeroLead.id);
   freshHeroTrending.forEach((item) => freshNewsIds.add(item.id));
-  [
-    ...freshRegions.puertoRico,
-    ...freshRegions.texas,
-    ...freshRegions.usa,
-    ...freshRegions.mundo
-  ].forEach((item) => freshNewsIds.add(item.id));
+  [...freshRegions.puertoRico, ...freshRegions.texas, ...freshRegions.usa, ...freshRegions.mundo].forEach((item) =>
+    freshNewsIds.add(item.id)
+  );
 
   const freshTrending = {
     enTendencia: trending.enTendencia.filter((item) => freshNewsIds.has(item.id)),
@@ -67,17 +98,12 @@ export default async function HomePage() {
   };
 
   const hasFreshCoverage = Boolean(freshHeroLead) || freshHeroTrending.length > 0;
-  const hasFreshTrending =
-    freshTrending.enTendencia.length + freshTrending.subiendo.length + freshTrending.viral.length > 0;
+  const hasFreshTrending = freshTrending.enTendencia.length + freshTrending.subiendo.length + freshTrending.viral.length > 0;
   const hasFreshRegions =
     freshRegions.puertoRico.length + freshRegions.texas.length + freshRegions.usa.length + freshRegions.mundo.length > 0;
 
   const newsExcludeIds = new Set<string>(freshNewsIds);
-  [
-    ...freshTrending.enTendencia,
-    ...freshTrending.subiendo,
-    ...freshTrending.viral
-  ].forEach((item) => {
+  [...freshTrending.enTendencia, ...freshTrending.subiendo, ...freshTrending.viral].forEach((item) => {
     if (item?.id) newsExcludeIds.add(item.id);
   });
 
@@ -90,7 +116,6 @@ export default async function HomePage() {
     ...Array.from(newsExcludeIds).map((id) => `news:${id}`),
     ...Array.from(communityExcludeIds).map((id) => `community:${id}`)
   ];
-
   const feed = await queryHomepageFeedPage(null, 8, feedExcludeIds);
 
   return (
@@ -100,7 +125,7 @@ export default async function HomePage() {
 
       <section className="section spm-podcast-zone spm-section-breathe">
         <div className="container">
-          <PodcastBlock featured={overview.podcast.featured} />
+          <PodcastBlock featured={featuredPodcast} />
         </div>
       </section>
 

@@ -1,17 +1,41 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useEffect, useState } from "react";
 import type { HomePodcastItem } from "@/lib/homepageQueries";
 import { SafeImage } from "@/components/home/SafeImage";
 
 function compact(value: unknown) {
-  return new Intl.NumberFormat("es-PR", { notation: "compact" }).format(Number(value ?? 0));
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n) || n <= 0) return "0";
+  return new Intl.NumberFormat("es-PR", { notation: "compact" }).format(n);
 }
 
-function sourceLink(item: HomePodcastItem | null | undefined) {
-  const href = String(item?.source_url ?? "").trim();
-  return href || "/podcast";
+function videoIdFromSource(input?: string | null) {
+  const raw = String(input ?? "").trim();
+  if (!raw) return null;
+  const direct = raw.match(/^[A-Za-z0-9_-]{11}$/)?.[0];
+  if (direct) return direct;
+  const match = raw.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|live\/|embed\/))([A-Za-z0-9_-]{11})/i);
+  return match?.[1] ?? null;
+}
+
+function internalEpisodeLink(item: HomePodcastItem | null | undefined): Route {
+  const videoId = videoIdFromSource(item?.source_url) || (/^[A-Za-z0-9_-]{11}$/.test(String(item?.id ?? "")) ? item?.id : null);
+  return (videoId ? `/podcast/${encodeURIComponent(videoId)}` : "/podcast") as Route;
+}
+
+function cleanCaption(value?: string | null) {
+  let text = String(value ?? "").replace(/\r/g, "").trim();
+  if (!text) return "Conversación completa, sin libreto y sin filtro.";
+  const markers = ["¿Te atreves a escuchar la verdad?", "🔗 Conecta con la Comunidad", "Conecta con la Comunidad", "🌐 Website:"];
+  for (const marker of markers) {
+    const idx = text.indexOf(marker);
+    if (idx > 0) text = text.slice(0, idx);
+  }
+  text = text.replace(/https?:\/\/\S+/g, "").replace(/\n+/g, " ").replace(/\s{2,}/g, " ").trim();
+  return text || "Conversación completa, sin libreto y sin filtro.";
 }
 
 type YouTubeApiItem = {
@@ -32,7 +56,7 @@ function mapYouTubeItemToPodcast(item: YouTubeApiItem): HomePodcastItem {
     id: String(item.id ?? "").trim(),
     title: String(item.title ?? "").trim() || "Podcast destacado",
     caption: String(item.description ?? "").trim() || null,
-    source_url: item.id ? `https://www.youtube.com/watch?v=${item.id}` : "/podcast",
+    source_url: item.id ? `https://www.youtube.com/watch?v=${item.id}` : null,
     media_url: String(item.thumbnailUrl ?? "").trim() || null,
     posted_at: String(item.publishedAt ?? "").trim() || null,
     platform: "YouTube",
@@ -46,11 +70,7 @@ function mapYouTubeItemToPodcast(item: YouTubeApiItem): HomePodcastItem {
   };
 }
 
-export function PodcastBlock({
-  featured
-}: {
-  featured: HomePodcastItem | null;
-}) {
+export function PodcastBlock({ featured }: { featured: HomePodcastItem | null }) {
   const [resolvedFeatured, setResolvedFeatured] = useState<HomePodcastItem | null>(featured);
   const [syncingYouTube, setSyncingYouTube] = useState(!featured);
 
@@ -61,7 +81,6 @@ export function PodcastBlock({
 
   useEffect(() => {
     if (featured) return;
-
     let cancelled = false;
 
     async function loadLatestEpisode() {
@@ -71,21 +90,17 @@ export function PodcastBlock({
         const data = await res.json();
         const items = Array.isArray(data?.items) ? (data.items as YouTubeApiItem[]) : [];
         const latestFullEpisode = [...items]
-          .filter((item) => !item?.isShort)
+          .filter((item) => !item?.isShort && Number(item?.durationSeconds ?? 0) >= 8 * 60)
           .sort((a, b) => new Date(String(b?.publishedAt ?? 0)).getTime() - new Date(String(a?.publishedAt ?? 0)).getTime())[0];
-
-        if (!cancelled && latestFullEpisode) {
-          setResolvedFeatured(mapYouTubeItemToPodcast(latestFullEpisode));
-        }
+        if (!cancelled && latestFullEpisode) setResolvedFeatured(mapYouTubeItemToPodcast(latestFullEpisode));
       } catch {
-        // Keep a neutral library fallback if YouTube cannot be reached.
+        // Neutral library fallback below.
       } finally {
         if (!cancelled) setSyncingYouTube(false);
       }
     }
 
     void loadLatestEpisode();
-
     return () => {
       cancelled = true;
     };
@@ -97,34 +112,43 @@ export function PodcastBlock({
     : "Entra al archivo del podcast para ver episodios, invitados y conversaciones completas.";
 
   return (
-    <section className="home-media-section" aria-label="Podcast destacado">
-      <div className="home-media-section-head">
-        <h2>PODCAST DESTACADO</h2>
+    <section className="home-media-section" aria-label="Último episodio del podcast">
+      <div className="home-media-section-head spm-section-heading-row">
+        <div>
+          <span className="spm-section-kicker">RECIÉN SALIDO DEL MICRÓFONO</span>
+          <h2>ÚLTIMO EPISODIO</h2>
+        </div>
+        <Link className="spm-text-link" href="/podcast">VER TODOS <span>→</span></Link>
       </div>
 
       <article className="card home-podcast-featured">
-        <div className="home-podcast-media">
-          <SafeImage src={resolvedFeatured?.media_url} alt={resolvedFeatured?.title ?? "Podcast destacado"} loading="lazy" />
-        </div>
+        <Link className="home-podcast-media" href={internalEpisodeLink(resolvedFeatured)} aria-label="Abrir último episodio">
+          <SafeImage src={resolvedFeatured?.media_url} alt={resolvedFeatured?.title ?? "Último episodio"} loading="eager" />
+          {resolvedFeatured ? <span className="spm-play-button" aria-hidden="true">▶</span> : null}
+        </Link>
         <div className="home-podcast-body">
-          <span className="home-urgency-badge">{resolvedFeatured ? "DESTACADO HOY" : syncingYouTube ? "SINCRONIZANDO" : "PODCAST"}</span>
+          <span className="home-urgency-badge">{resolvedFeatured ? "NUEVO EPISODIO" : syncingYouTube ? "SINCRONIZANDO" : "PODCAST"}</span>
           <h3 className="clamp-2">{resolvedFeatured?.title ?? emptyTitle}</h3>
-          <p className="clamp-2">{resolvedFeatured?.caption ?? emptyCaption}</p>
+          <p className="clamp-3">{resolvedFeatured ? cleanCaption(resolvedFeatured.caption) : emptyCaption}</p>
           {resolvedFeatured ? (
             <div className="home-podcast-metrics">
-              <span>{compact(resolvedFeatured.metrics?.views)} views</span>
-              <span>{compact(resolvedFeatured.metrics?.likes)} likes</span>
+              {Number(resolvedFeatured.metrics?.views ?? 0) > 0 ? <span>{compact(resolvedFeatured.metrics?.views)} views</span> : null}
+              {Number(resolvedFeatured.metrics?.likes ?? 0) > 0 ? <span>{compact(resolvedFeatured.metrics?.likes)} likes</span> : null}
             </div>
           ) : null}
           <div className="home-cta-row">
             {resolvedFeatured ? (
-              <a className="button" href={sourceLink(resolvedFeatured)} target="_blank" rel="noreferrer">
+              <Link className="button" href={internalEpisodeLink(resolvedFeatured)}>
                 VER EPISODIO
-              </a>
+              </Link>
             ) : null}
-            <Link className={resolvedFeatured ? "button secondary" : "button"} href="/podcast">
-              IR AL PODCAST
-            </Link>
+            {resolvedFeatured?.source_url ? (
+              <a className="button secondary" href={resolvedFeatured.source_url} target="_blank" rel="noreferrer">
+                YOUTUBE
+              </a>
+            ) : (
+              <Link className="button" href="/podcast">IR AL PODCAST</Link>
+            )}
           </div>
         </div>
       </article>

@@ -2,6 +2,8 @@ import "./globals.css";
 import "./spm-rebrand.css";
 import "./home-rebrand.css";
 import "./spm-polish.css";
+import "./site-refresh.css";
+import "./news-refresh.css";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { Bebas_Neue, Manrope } from "next/font/google";
@@ -46,13 +48,16 @@ const oneSignalSafariWebId = String(
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "Sin Pelos en el Micrófono",
-  description: "Podcast, historias y comunidad. Conversación real, sin libreto y sin filtros.",
+  description: "Podcast, historias, noticias y comunidad. Conversación real, sin libreto y sin filtros.",
+  applicationName: "Sin Pelos en el Micrófono",
+  category: "entertainment",
   openGraph: {
     title: "Sin Pelos en el Micrófono",
-    description: "Podcast, historias y comunidad. Conversación real, sin libreto y sin filtros.",
+    description: "Podcast, historias, noticias y comunidad. Conversación real, sin libreto y sin filtros.",
     url: siteUrl,
     siteName: "Sin Pelos en el Micrófono",
     type: "website",
+    locale: "es_PR",
     images: [
       {
         url: socialImage,
@@ -65,7 +70,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Sin Pelos en el Micrófono",
-    description: "Podcast, historias y comunidad. Conversación real, sin libreto y sin filtros.",
+    description: "Podcast, historias, noticias y comunidad. Conversación real, sin libreto y sin filtros.",
     images: [socialImage]
   },
   icons: {
@@ -110,12 +115,7 @@ OneSignalDeferred.push(async function(OneSignal) {
         ) : null}
       </head>
       <body>
-        <a className="skip-link" href="#main-content">
-          Saltar al contenido
-        </a>
-        <div className="splash" aria-hidden="true">
-          <div className="splash-logo" />
-        </div>
+        <a className="skip-link" href="#main-content">Saltar al contenido</a>
         <PageViewTracker />
         <OneSignalInit appId={oneSignalAppId} safariWebId={oneSignalSafariWebId} />
         <OneSignalAutoPrompt appId={oneSignalAppId} safariWebId={oneSignalSafariWebId} />

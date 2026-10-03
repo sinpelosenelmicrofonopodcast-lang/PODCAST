@@ -1,5 +1,5 @@
 import { getEpisodeBySlug, type SeoEpisode } from "@/lib/seo/content";
-import { fetchYouTubeVideos, isShorts } from "@/lib/youtube";
+import { fetchYouTubeVideos, isFullPodcastEpisode } from "@/lib/youtube";
 
 function fromYouTube(video: Awaited<ReturnType<typeof fetchYouTubeVideos>>[number]): SeoEpisode {
   return {
@@ -9,7 +9,7 @@ function fromYouTube(video: Awaited<ReturnType<typeof fetchYouTubeVideos>>[numbe
     description: video.description || null,
     youtube_url: `https://www.youtube.com/watch?v=${video.id}`,
     audio_url: null,
-    thumbnail_url: video.thumbnailUrl || null,
+    thumbnail_url: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`,
     duration_seconds: video.durationSeconds || null,
     is_published: true,
     published_at: video.publishedAt || null,
@@ -23,15 +23,13 @@ export async function resolveEpisodeBySlug(slug: string): Promise<SeoEpisode | n
 
   const stored = await getEpisodeBySlug(cleanSlug);
   if (stored) return stored;
-
-  // The public YouTube feed can be a few minutes/hours ahead of the historical
-  // external_posts mirror. Resolve recent video IDs directly so a new episode
-  // never 404s while the archive catches up.
   if (!/^[A-Za-z0-9_-]{11}$/.test(cleanSlug)) return null;
 
+  // New episodes can be live on YouTube before the archive/background sync catches up.
+  // Resolve against a generous recent upload window so internal links never 404.
   try {
-    const videos = await fetchYouTubeVideos(50, { revalidateSeconds: 300 });
-    const video = videos.find((item) => item.id === cleanSlug && !isShorts(item.durationSeconds));
+    const videos = await fetchYouTubeVideos(180, { revalidateSeconds: 120 });
+    const video = videos.find((item) => item.id === cleanSlug && isFullPodcastEpisode(item));
     return video ? fromYouTube(video) : null;
   } catch {
     return null;
