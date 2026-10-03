@@ -3,6 +3,7 @@ import "./spm-rebrand.css";
 import "./home-rebrand.css";
 import "./spm-polish.css";
 import "./site-refresh.css";
+import "./news-refresh.css";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { Bebas_Neue, Manrope } from "next/font/google";
@@ -46,10 +47,7 @@ const oneSignalSafariWebId = String(
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: {
-    default: "Sin Pelos en el Micrófono",
-    template: "%s | Sin Pelos en el Micrófono"
-  },
+  title: "Sin Pelos en el Micrófono",
   description: "Podcast, historias, noticias y comunidad. Conversación real, sin libreto y sin filtros.",
   applicationName: "Sin Pelos en el Micrófono",
   category: "entertainment",
