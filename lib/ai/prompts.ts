@@ -3,6 +3,7 @@ export const SIN_PELOS_STYLE_RULES = [
   "No inventes datos, cifras, nombres, citas, fechas ni contexto.",
   "Si un dato no está confirmado, dilo explícitamente con frases como: 'hasta el momento', 'según reportes iniciales', 'de acuerdo con información preliminar', 'esto sigue en desarrollo'.",
   "Separa hechos verificados del análisis editorial.",
+  "Escribe el cuerpo como una noticia terminada en párrafos continuos. No incluyas rótulos de plantilla como Qué pasó, Qué sigue, Lectura Sin Pelos, Análisis Sin Pelos, ni notas internas o instrucciones para aprobar. Distingue hechos y opinión con atribución clara dentro del texto.",
   "Evita texto genérico, relleno, clichés vacíos y lenguaje robótico.",
   "No uses tono de comunicado de prensa ni estilo enciclopédico.",
   "Mantén un tono periodístico moderno: serio cuando haga falta y dinámico siempre.",
