@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { trackPromoEvent } from "@/lib/promoTracking";
+import { getSessionId, trackPromoEvent } from "@/lib/promoTracking";
 import { promoSectionFromPath } from "@/lib/promoSection";
 
 type Promo = {
@@ -32,17 +32,22 @@ export function PromoPopup() {
   const canShow = useMemo(() => {
     if (pathname.startsWith("/admin")) return false;
     if (pathname === "/login" || pathname === "/register" || pathname === "/reset") return false;
-    // Popup only in high-intent surfaces to keep UX non-invasive.
     if (!(pathname === "/" || pathname.startsWith("/confesiones") || pathname.startsWith("/confesionario"))) return false;
     return true;
   }, [pathname]);
 
   useEffect(() => {
+    if (!canShow) return;
     const run = async () => {
-      const res = await fetch(`/api/promotions/active?placement=popup&limit=1&section=${encodeURIComponent(section)}`, {
-        cache: "no-store"
-      }).catch(() => null);
-      if (!res?.ok) return;
+      const sid = getSessionId();
+      const res = await fetch(
+        `/api/promotions/active?placement=popup&limit=1&section=${encodeURIComponent(section)}&sid=${encodeURIComponent(sid)}`,
+        { cache: "no-store" }
+      ).catch(() => null);
+      if (!res?.ok) {
+        setPromo(null);
+        return;
+      }
       const json = await res.json().catch(() => null);
       const item = (json?.items?.[0] ?? null) as Promo | null;
       setPromo(item);
@@ -50,27 +55,22 @@ export function PromoPopup() {
       sentImpression.current = false;
     };
     run();
-  }, [section]);
+  }, [section, canShow]);
 
   useEffect(() => {
-    if (!canShow) return;
-    if (!promo) return;
+    if (!canShow || !promo) return;
 
     const key = `spm_popup_seen_${promo.id}`;
     if (sessionStorage.getItem(key) === "1") return;
 
-    // Delay trigger (25s)
     if (timerRef.current) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => {
       sessionStorage.setItem(key, "1");
       setOpen(true);
     }, 25_000);
 
-    // Exit intent trigger (desktop only)
     const onMouseLeave = (e: MouseEvent) => {
-      if (!isDesktop()) return;
-      if (e.clientY > 0) return;
-      if (sessionStorage.getItem(key) === "1") return;
+      if (!isDesktop() || e.clientY > 0 || sessionStorage.getItem(key) === "1") return;
       sessionStorage.setItem(key, "1");
       setOpen(true);
     };
@@ -84,9 +84,7 @@ export function PromoPopup() {
   }, [promo, canShow]);
 
   useEffect(() => {
-    if (!open) return;
-    if (!promo) return;
-    if (sentImpression.current) return;
+    if (!open || !promo || sentImpression.current) return;
     sentImpression.current = true;
     const key = `spm_promo_seen_popup_${section}_${promo.id}`;
     const seen = sessionStorage.getItem(key) === "1";
@@ -127,18 +125,14 @@ export function PromoPopup() {
     });
   };
 
-  if (!canShow) return null;
-  if (!promo) return null;
-  if (!open) return null;
+  if (!canShow || !promo || !open) return null;
 
   return (
     <div className="promo-popup-wrap" role="dialog" aria-modal="false" aria-label="Sugerencia">
       <div className={`promo-popup card ${animate ? "promo-animate-in" : ""}`} data-type={promo.promo_type ?? "sponsor"}>
         <div className="promo-popup-top">
-          <span className="badge">Nuevo</span>
-          <button className="promo-popup-close" type="button" onClick={onClose} aria-label="Cerrar">
-            ×
-          </button>
+          <span className="badge">{promo.promo_type === "sponsor" ? "Patrocinado" : "Nuevo"}</span>
+          <button className="promo-popup-close" type="button" onClick={onClose} aria-label="Cerrar">×</button>
         </div>
         {promo.image_url ? (
           <div className="promo-popup-media" style={{ backgroundImage: `url(${promo.image_url})` }} aria-hidden="true" />
@@ -153,9 +147,7 @@ export function PromoPopup() {
               {promo.cta_label ?? "Abrir"}
             </a>
           ) : null}
-          <button className="button secondary" type="button" onClick={onClose}>
-            Cerrar
-          </button>
+          <button className="button secondary" type="button" onClick={onClose}>Cerrar</button>
         </div>
       </div>
     </div>
