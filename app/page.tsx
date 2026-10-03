@@ -211,11 +211,18 @@ export default async function HomePage() {
       </section>
 
       {overview.flags.showCommunity ? (
-        <section className="section spm-community-zone spm-section-breathe">
-          <div className="container">
-            <CommunityPreview threads={overview.community.threads} fallbackTopics={overview.community.fallbackTopics} />
-          </div>
-        </section>
+        <>
+          <section className="section spm-ad-zone spm-section-breathe" aria-label="Community Partner">
+            <div className="container">
+              <MidContentAdSlot placement="community_partner" section="home" className="home-mid-ad-slot" compact />
+            </div>
+          </section>
+          <section className="section spm-community-zone spm-section-breathe">
+            <div className="container">
+              <CommunityPreview threads={overview.community.threads} fallbackTopics={overview.community.fallbackTopics} />
+            </div>
+          </section>
+        </>
       ) : null}
 
       {overview.flags.showEvents ? (
