@@ -47,15 +47,19 @@ async function latestPodcastFromYouTube(): Promise<HomePodcastItem | null> {
     if (!video) return null;
     return {
       id: video.id,
-      slug: video.id,
       title: video.title || "Último episodio",
-      description: video.description || null,
-      thumbnail_url: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`,
-      youtube_url: `https://www.youtube.com/watch?v=${video.id}`,
-      audio_url: null,
-      duration_seconds: video.durationSeconds || null,
-      published_at: video.publishedAt || null,
-      view_count: video.viewCount || null
+      caption: video.description || null,
+      source_url: `https://www.youtube.com/watch?v=${video.id}`,
+      media_url: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`,
+      posted_at: video.publishedAt || null,
+      platform: "YouTube",
+      metrics: {
+        views: video.viewCount || 0,
+        likes: video.likeCount || 0,
+        comments: video.commentCount || 0,
+        durationSeconds: video.durationSeconds || 0,
+        isShort: false
+      }
     };
   } catch {
     return null;
