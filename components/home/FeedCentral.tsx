@@ -33,6 +33,14 @@ function formatDate(value: string) {
   });
 }
 
+function displayBadge(item: HomeFeedItem) {
+  if (item.sourceType !== "news") return item.badge;
+  const ts = new Date(item.createdAt).getTime();
+  if (!Number.isFinite(ts)) return item.badge;
+  const ageDays = (Date.now() - ts) / (24 * 60 * 60 * 1000);
+  return ageDays > 7 ? `ARCHIVO · ${item.badge}` : item.badge;
+}
+
 export function FeedCentral({
   initialItems,
   initialCursor,
@@ -132,7 +140,7 @@ export function FeedCentral({
                 </a>
                 <div className="home-feed-body">
                   <div className="home-feed-meta-row">
-                    <span className="home-media-chip">{item.badge}</span>
+                    <span className="home-media-chip">{displayBadge(item)}</span>
                     <span className="home-muted">{formatDate(item.createdAt)}</span>
                   </div>
                   <h3 className="clamp-2">{item.title}</h3>
