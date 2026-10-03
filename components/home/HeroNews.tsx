@@ -53,7 +53,16 @@ export function HeroNews({
     <section className="home-media-section home-media-hero" aria-label="Noticias destacadas">
       <div className="home-media-headline">
         <span className="home-media-kicker">{kicker}</span>
-        <h1>{title}</h1>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: "clamp(1.5rem, 4vw, 2.4rem)",
+            lineHeight: 1.06,
+            textTransform: "uppercase"
+          }}
+        >
+          {title}
+        </h2>
         <p>{subtitle}</p>
       </div>
 
