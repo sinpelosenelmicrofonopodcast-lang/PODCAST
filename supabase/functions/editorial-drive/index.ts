@@ -51,7 +51,7 @@ async function sync(c:any,actor:string){if(!c.enabled||!c.google_cipher)return {
  if(d.published_hash===h&&d.status==='Aprobado'){d=check(await db.from('editorial_drive_drafts').update({status:'Publicado'}).eq('id',id).select('*').single());}
  if(d.status==='Publicado'&&d.published_hash===h&&d.facebook_selected&&d.facebook_approved_hash===await socialHash(d)){const latest=await sheetRows(c,t);const rr=latest[i];if(rr?.[0]===id&&rr[10]==='Publicado'||rr?.[0]===id&&rr[10]==='Aprobado'){const sp=socialRow(rr);if(await hash(JSON.stringify(fromRow(rr)))===h&&sp.facebook_selected&&sp.facebook_caption===d.facebook_caption)await deliverNewsFacebook(c,d);}}
  d.facebook_delivery=check(await db.from('editorial_facebook_deliveries').select('*').eq('draft_id',id).maybeSingle());
- if(JSON.stringify(r.slice(17,21))!==JSON.stringify(rowData(d).slice(17,21))||changed||d.status!==r[10]||d.public_url!==(r[11]||null)||d.last_error!==null||String(d.revision)!==String(r[12])){await systemCells(c,t,i+2,d,h,String(r[10]||'En revisión'));processed++;}
+ if(JSON.stringify(Array.from({length:4},(_,i)=>r[17+i]||''))!==JSON.stringify(rowData(d).slice(17,21))||changed||d.status!==r[10]||d.public_url!==(r[11]||null)||d.last_error!==null||String(d.revision)!==String(r[12])){await systemCells(c,t,i+2,d,h,String(r[10]||'En revisión'));processed++;}
  }catch(e){const message=(e as Error).message;if(d){check(await db.from('editorial_drive_drafts').update({last_error:message}).eq('id',id));try{const current=await sheetRows(c,t);if(current[i]?.[0]===id)await google(t,c.spreadsheet_id+'/values/'+encodeURIComponent("'"+tab+"'!N"+(i+2))+'?valueInputOption=RAW',{values:[[message]]},'PUT');}catch{}} // Keep the row and retry; never silently mark published.
  }
  }
