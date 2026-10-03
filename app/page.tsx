@@ -21,6 +21,7 @@ import {
   type HomePodcastItem
 } from "@/lib/homepageQueries";
 import { queryPodcastEditorialPosts } from "@/lib/homeEditorialQueries";
+import { getPublishedEpisodes } from "@/lib/seo/content";
 import { fetchYouTubeVideos, isFullPodcastEpisode } from "@/lib/youtube";
 
 export const revalidate = 120;
@@ -67,15 +68,35 @@ async function latestPodcastFromYouTube(): Promise<HomePodcastItem | null> {
   }
 }
 
+async function latestStoredPodcast(): Promise<HomePodcastItem | null> {
+  try {
+    const episode = (await getPublishedEpisodes(1))[0];
+    if (!episode) return null;
+    return {
+      id: episode.slug || episode.id,
+      title: episode.title || "Último episodio",
+      caption: episode.description || null,
+      source_url: episode.youtube_url || episode.audio_url || `/podcast/${encodeURIComponent(episode.slug || episode.id)}`,
+      media_url: episode.thumbnail_url || null,
+      posted_at: episode.published_at || episode.updated_at || null,
+      platform: episode.youtube_url ? "YouTube" : episode.audio_url ? "Podcast" : "Sin Pelos",
+      metrics: episode.duration_seconds ? { durationSeconds: episode.duration_seconds, isShort: false } : null
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default async function HomePage() {
-  const [overview, trending, podcastEditorials, livePodcast] = await Promise.all([
+  const [overview, trending, podcastEditorials, livePodcast, storedPodcast] = await Promise.all([
     queryHomepageOverview(),
     queryHomepageTrending(),
     queryPodcastEditorialPosts(3),
-    latestPodcastFromYouTube()
+    latestPodcastFromYouTube(),
+    latestStoredPodcast()
   ]);
 
-  const featuredPodcast = livePodcast ?? overview.podcast.featured;
+  const featuredPodcast = livePodcast ?? overview.podcast.featured ?? storedPodcast;
   const approvedHeroLead = isFreshApprovedNews(overview.hero.lead) ? overview.hero.lead : null;
   const approvedHeroTrending = overview.hero.trending.filter(isFreshApprovedNews);
   const freshRegions = {
