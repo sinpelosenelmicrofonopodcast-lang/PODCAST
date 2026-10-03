@@ -72,6 +72,7 @@ export async function rewriteNewsWithAI(input: RewriteInput): Promise<RewriteOut
     "3) Título con gancho periodístico y claridad (sin clickbait engañoso).",
     "4) Summary (max 280) debe explicar qué pasó, dónde, quién y por qué importa.",
     "5) Analysis en 2-4 párrafos: contexto, impacto, posibles consecuencias y qué sigue.",
+    "Escribe el cuerpo como una noticia terminada en párrafos continuos. No incluyas rótulos de plantilla como Qué pasó, Qué sigue, Lectura Sin Pelos, Análisis Sin Pelos, ni notas internas o instrucciones para aprobar. Distingue hechos y opinión con atribución clara dentro del texto.",
     "6) Tono Sin Pelos: directo, con personalidad y ritmo; no robótico, no Wikipedia, no nota de prensa.",
     "7) No copies literal bloques largos de la fuente.",
     "8) Si el contenido fuente es insuficiente o ambiguo, marca needs_review=true.",
