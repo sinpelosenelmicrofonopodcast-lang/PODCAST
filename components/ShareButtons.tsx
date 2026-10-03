@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+const CANONICAL_ORIGIN = "https://www.sinpelosenelmicrofono.com";
+
 type ShareButtonsProps = {
   path: string;
   text: string;
@@ -10,7 +12,7 @@ type ShareButtonsProps = {
 export function ShareButtons({ path, text }: ShareButtonsProps) {
   const [copied, setCopied] = useState(false);
 
-  const url = typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
+  const url = /^https?:\/\//i.test(path) ? path : new URL(path, CANONICAL_ORIGIN).toString();
   const encodedUrl = encodeURIComponent(url);
   const encodedText = encodeURIComponent(text);
 
@@ -20,7 +22,7 @@ export function ShareButtons({ path, text }: ShareButtonsProps) {
         await navigator.share({ title: text, text, url });
         return;
       } catch {
-        // ignore
+        // User cancelled or native share is unavailable.
       }
     }
   };
@@ -31,7 +33,7 @@ export function ShareButtons({ path, text }: ShareButtonsProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch {
-      // ignore
+      // Clipboard may be blocked by browser permissions.
     }
   };
 
@@ -84,10 +86,7 @@ export function ShareButtons({ path, text }: ShareButtonsProps) {
         aria-label="Compartir en X"
       >
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-          <path
-            d="M18.2 3H21l-6.3 7.2L22 21h-6.7l-4.2-5.4L5.8 21H3l6.7-7.7L2 3h6.9l3.8 4.9L18.2 3Zm-1 16h1.6L8.6 5H7L17.2 19Z"
-            fill="currentColor"
-          />
+          <path d="M18.2 3H21l-6.3 7.2L22 21h-6.7l-4.2-5.4L5.8 21H3l6.7-7.7L2 3h6.9l3.8 4.9L18.2 3Zm-1 16h1.6L8.6 5H7L17.2 19Z" fill="currentColor" />
         </svg>
       </a>
       <a
@@ -99,10 +98,7 @@ export function ShareButtons({ path, text }: ShareButtonsProps) {
         aria-label="Compartir en Telegram"
       >
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-          <path
-            d="M21.9 2.1c.3-.3.7-.1.6.3l-3.6 17.4c-.1.4-.5.6-.9.4l-5.1-2.9-2.5 2.4c-.3.3-.8.2-.8-.3l.1-3.8 8.8-8.2c.3-.3 0-.7-.4-.5l-11 6.8-4.7-1.5c-.5-.2-.5-.8 0-1l19.5-9.1Z"
-            fill="currentColor"
-          />
+          <path d="M21.9 2.1c.3-.3.7-.1.6.3l-3.6 17.4c-.1.4-.5.6-.9.4l-5.1-2.9-2.5 2.4c-.3.3-.8.2-.8-.3l.1-3.8 8.8-8.2c.3-.3 0-.7-.4-.5l-11 6.8-4.7-1.5c-.5-.2-.5-.8 0-1l19.5-9.1Z" fill="currentColor" />
         </svg>
       </a>
       <button className="share-btn" type="button" onClick={handleCopy} title="Copiar link" aria-label="Copiar link">
@@ -112,10 +108,7 @@ export function ShareButtons({ path, text }: ShareButtonsProps) {
           </svg>
         ) : (
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <path
-              d="M8 8V5a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-3v-2h3a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v3H8Zm-3 4h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1Zm1 2v4h4v-4H6Z"
-              fill="currentColor"
-            />
+            <path d="M8 8V5a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-3v-2h3a1 1 0 0 0 1-1V5a1 1 0 0 0-1 1v3H8Zm-3 4h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1Zm1 2v4h4v-4H6Z" fill="currentColor" />
           </svg>
         )}
       </button>
