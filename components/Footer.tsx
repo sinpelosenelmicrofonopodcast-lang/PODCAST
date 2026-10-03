@@ -1,3 +1,4 @@
+import { ListenLinks } from "@/components/podcast/ListenLinks";
 import Link from "next/link";
 import type { Route } from "next";
 
@@ -8,7 +9,7 @@ const footerGroups = [
       { href: "/podcast", label: "Episodios" },
       { href: "/blog", label: "Desde el Micrófono" },
       { href: "/noticias", label: "Noticias" },
-      { href: "/feed", label: "Descubrir" },
+      { href: "/podcast", label: "Catálogo completo" },
       { href: "/eventos", label: "Eventos" }
     ]
   },
@@ -50,6 +51,7 @@ export function Footer() {
           <p className="muted">
             Episodios, historias, enseñanzas y comunidad. Lo que se dijo en la mesa sigue viviendo aquí.
           </p>
+          <ListenLinks />
         </div>
 
         {groups.map((group) => (

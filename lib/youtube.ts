@@ -138,7 +138,7 @@ export function isFullPodcastEpisode(video: Pick<YouTubeVideo, "title" | "descri
 export async function fetchYouTubeVideos(limit = 25, options?: FetchYouTubeVideosOptions): Promise<YouTubeVideo[]> {
   const apiKey = requireEnv("YOUTUBE_API_KEY");
   const channelId = requireEnv("YOUTUBE_CHANNEL_ID");
-  const maxResults = Math.min(Math.max(1, Math.floor(Number(limit) || 25)), 250);
+  const maxResults = Math.min(Math.max(1, Math.floor(Number(limit) || 25)), 2500);
 
   let ids: string[] = [];
   try {

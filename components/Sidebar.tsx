@@ -27,6 +27,7 @@ const links: LinkItem[] = [
   { href: "/admin/reports", label: "Reportes", section: "overview", required: "view_reports" },
   { href: "/admin/schedule", label: "Programación", section: "overview", required: "view_schedule" },
   { href: "/admin/editorial-engine" as Route, label: "Podcast Editorial", section: "content", required: "manage_news" },
+  { href: "/admin/editorial-drive" as Route, label: "Editorial · Drive", section: "content", adminOnly: true },
   { href: "/admin/news", label: "Noticias publicadas", section: "content", required: "manage_news" },
   { href: "/admin/blog", label: "Editoriales", section: "content", required: "manage_blog" },
   { href: "/admin/events", label: "Eventos", section: "content", required: "manage_events" },

@@ -14,7 +14,7 @@ export function BrandHero() {
             Conversaciones que <em>se quedan contigo.</em>
           </h1>
           <p>
-            Gente real. Historias reales. Puntos de vista que no se quedan en el estudio. Cada episodio continúa aquí con lo que nos impactó, lo que aprendimos y lo que vale la pena seguir hablando.
+            Bito y Bebo se sientan con gente real a hablar sin libreto. Vivencias, preguntas incómodas y conversaciones que siguen contigo después de apagar los micrófonos.
           </p>
           <div className="spm-brand-actions">
             <Link className="button spm-hero-primary" href="/podcast">

@@ -138,9 +138,9 @@ export function FeedCentral({
                   <h3 className="clamp-2">{item.title}</h3>
                   <p className="clamp-2">{item.excerpt}</p>
                   <div className="home-feed-counters">
-                    <span>{compact(item.counters.views)} views</span>
-                    <span>{compact(item.counters.comments)} comments</span>
-                    <span>{compact(item.counters.shares)} shares</span>
+                    {item.counters.views > 0 ? <span>{compact(item.counters.views)} vistas</span> : null}
+                    {item.counters.comments > 0 ? <span>{compact(item.counters.comments)} comentarios</span> : null}
+                    {item.counters.shares > 0 ? <span>{compact(item.counters.shares)} compartidos</span> : null}
                   </div>
                 </div>
               </article>

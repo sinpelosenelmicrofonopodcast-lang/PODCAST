@@ -1,3 +1,4 @@
+import { ListenLinks } from "@/components/podcast/ListenLinks";
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -29,9 +30,10 @@ export default function RssPlayerPage() {
             </div>
 
             <p className="muted" style={{ marginTop: 8 }}>
-              Reproductor embebido (tema oscuro).
+              Dale play aquí o escoge tu plataforma favorita.
             </p>
 
+            <ListenLinks />
             <div className="rss-player" style={{ marginTop: 14 }}>
               <iframe
                 src="https://player.rss.com/sin-pelos-en-el-microfono/?theme=dark&v=2"

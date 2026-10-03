@@ -1,5 +1,6 @@
 "use client";
 
+import { ListenLinks } from "@/components/podcast/ListenLinks";
 import Link from "next/link";
 import type { Route } from "next";
 import { useEffect, useState } from "react";
@@ -150,6 +151,7 @@ export function PodcastBlock({ featured }: { featured: HomePodcastItem | null })
               <Link className="button" href="/podcast">IR AL PODCAST</Link>
             )}
           </div>
+          <ListenLinks />
         </div>
       </article>
     </section>

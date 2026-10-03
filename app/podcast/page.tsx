@@ -1,3 +1,4 @@
+import { ListenLinks } from "@/components/podcast/ListenLinks";
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -64,7 +65,7 @@ function cleanDescription(title: string, value?: string | null) {
 
 async function getLiveEpisodes() {
   try {
-    const videos = await fetchYouTubeVideos(180, { revalidateSeconds: 120 });
+    const videos = await fetchYouTubeVideos(2500, { revalidateSeconds: 3600 });
     return videos.filter(isFullPodcastEpisode);
   } catch {
     return [];
@@ -167,6 +168,7 @@ export default async function PodcastPage() {
       <Navbar />
       <section className="section podcast-page-section">
         <div className="container">
+          <ListenLinks />
           <PodcastHubClient episodes={uiEpisodes} featuredEpisodeId={featured?.id ?? null} />
         </div>
       </section>
