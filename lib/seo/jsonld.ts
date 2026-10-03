@@ -1,11 +1,40 @@
 import { PUBLISHER_NAME, canonicalUrl } from "@/lib/seo/constants";
 
 const publisherLogo = canonicalUrl("/logo.png");
+const organizationId = canonicalUrl("/#organization");
 
 type JsonLdObject = Record<string, any>;
 
 export function jsonLdScript(data: JsonLdObject) {
   return JSON.stringify(data);
+}
+
+export function buildBreadcrumbJsonLd(items: Array<{ name: string; path: string }>) {
+  return {
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: canonicalUrl(item.path)
+    }))
+  };
+}
+
+function editorialAuthor(authorName?: string | null) {
+  const raw = String(authorName ?? "").trim();
+  const generic = !raw || /^(spm news|sin pelos en el micr[oó]fono|redacci[oó]n sin pelos)$/i.test(raw);
+  if (generic) {
+    return {
+      "@type": "Organization",
+      name: "Redacción Sin Pelos",
+      url: canonicalUrl("/noticias")
+    };
+  }
+  return {
+    "@type": "Person",
+    name: raw
+  };
 }
 
 export function buildNewsArticleJsonLd(input: {
@@ -21,20 +50,18 @@ export function buildNewsArticleJsonLd(input: {
   isNews?: boolean;
 }) {
   const canonical = canonicalUrl(input.canonicalPath);
-  return {
-    "@context": "https://schema.org",
+  const article = {
     "@type": input.isNews === false ? "Article" : "NewsArticle",
+    "@id": `${canonical}#article`,
     headline: input.title,
     description: input.description || undefined,
     image: input.image ? [input.image] : undefined,
     datePublished: input.datePublished || undefined,
     dateModified: input.dateModified || input.datePublished || undefined,
-    author: {
-      "@type": "Person",
-      name: input.authorName || PUBLISHER_NAME
-    },
+    author: editorialAuthor(input.authorName),
     publisher: {
       "@type": "Organization",
+      "@id": organizationId,
       name: PUBLISHER_NAME,
       logo: {
         "@type": "ImageObject",
@@ -46,6 +73,17 @@ export function buildNewsArticleJsonLd(input: {
     keywords: (input.tags ?? []).filter(Boolean).join(", ") || undefined,
     isAccessibleForFree: true
   };
+
+  const breadcrumbs = buildBreadcrumbJsonLd([
+    { name: "Inicio", path: "/" },
+    { name: "Noticias", path: "/noticias" },
+    { name: input.title, path: input.canonicalPath }
+  ]);
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [article, breadcrumbs]
+  };
 }
 
 export function buildPodcastSeriesJsonLd(input: {
@@ -54,18 +92,24 @@ export function buildPodcastSeriesJsonLd(input: {
   description: string;
   image?: string | null;
 }) {
-  return {
-    "@context": "https://schema.org",
+  const series = {
     "@type": "PodcastSeries",
+    "@id": `${canonicalUrl(input.canonicalPath)}#series`,
     name: input.name,
     description: input.description,
     url: canonicalUrl(input.canonicalPath),
     image: input.image || undefined,
     publisher: {
       "@type": "Organization",
+      "@id": organizationId,
       name: PUBLISHER_NAME
     }
   };
+  const breadcrumbs = buildBreadcrumbJsonLd([
+    { name: "Inicio", path: "/" },
+    { name: "Podcast", path: input.canonicalPath }
+  ]);
+  return { "@context": "https://schema.org", "@graph": [series, breadcrumbs] };
 }
 
 export function buildPodcastEpisodeJsonLd(input: {
@@ -77,9 +121,9 @@ export function buildPodcastEpisodeJsonLd(input: {
   youtubeUrl?: string | null;
   thumbnailUrl?: string | null;
 }) {
-  return {
-    "@context": "https://schema.org",
+  const episode = {
     "@type": "PodcastEpisode",
+    "@id": `${canonicalUrl(input.canonicalPath)}#episode`,
     name: input.title,
     description: input.description || undefined,
     datePublished: input.datePublished || undefined,
@@ -94,9 +138,16 @@ export function buildPodcastEpisodeJsonLd(input: {
       : undefined,
     partOfSeries: {
       "@type": "PodcastSeries",
+      "@id": `${canonicalUrl("/podcast")}#series`,
       name: "Sin Pelos en el Micrófono"
     }
   };
+  const breadcrumbs = buildBreadcrumbJsonLd([
+    { name: "Inicio", path: "/" },
+    { name: "Podcast", path: "/podcast" },
+    { name: input.title, path: input.canonicalPath }
+  ]);
+  return { "@context": "https://schema.org", "@graph": [episode, breadcrumbs] };
 }
 
 export function buildVideoJsonLd(input: {
@@ -132,8 +183,7 @@ export function buildEventJsonLd(input: {
   state?: string | null;
   organizerName?: string | null;
 }) {
-  return {
-    "@context": "https://schema.org",
+  const event = {
     "@type": "Event",
     name: input.title,
     description: input.description || undefined,
@@ -159,4 +209,10 @@ export function buildEventJsonLd(input: {
       }
     }
   };
+  const breadcrumbs = buildBreadcrumbJsonLd([
+    { name: "Inicio", path: "/" },
+    { name: "Eventos", path: "/eventos" },
+    { name: input.title, path: input.canonicalPath }
+  ]);
+  return { "@context": "https://schema.org", "@graph": [event, breadcrumbs] };
 }
