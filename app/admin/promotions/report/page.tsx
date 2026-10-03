@@ -34,6 +34,7 @@ type Promotion = {
   max_impressions: number | null;
   daily_cap: number | null;
   revenue_cents: number | null;
+  report_token: string | null;
 };
 
 type PromoEvent = {
@@ -77,7 +78,7 @@ export default async function PromotionsReportPage() {
   const [promosResp, eventsResp] = await Promise.all([
     service
       .from("promotions")
-      .select("id,title,placement,promo_type,is_active,starts_at,ends_at,campaign_id,advertiser,creative_id,weight,frequency_cap,max_impressions,daily_cap,revenue_cents")
+      .select("id,title,placement,promo_type,is_active,starts_at,ends_at,campaign_id,advertiser,creative_id,weight,frequency_cap,max_impressions,daily_cap,revenue_cents,report_token")
       .order("is_active", { ascending: false })
       .order("display_order", { ascending: true }),
     service
@@ -132,7 +133,7 @@ export default async function PromotionsReportPage() {
         <div>
           <p className="page-kicker">MONETIZACIÓN · ÚLTIMOS 30 DÍAS</p>
           <h1>Reporte de sponsors</h1>
-          <p className="muted">Impresiones, clics, CTR, sesiones, revenue y ocupación de inventario por campaña.</p>
+          <p className="muted">Impresiones, clics, CTR, sesiones, revenue, ocupación de inventario y portal privado por campaña.</p>
         </div>
         <div className="admin-item-actions">
           <Link className="button secondary" href="/admin/promotions">Gestionar campañas</Link>
@@ -159,7 +160,7 @@ export default async function PromotionsReportPage() {
       </section>
 
       <section className="card" style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1180 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1320 }}>
           <thead>
             <tr style={{ textAlign: "left" }}>
               <th style={{ padding: 12 }}>Campaña</th>
@@ -173,6 +174,7 @@ export default async function PromotionsReportPage() {
               <th style={{ padding: 12 }}>Caps</th>
               <th style={{ padding: 12 }}>Revenue</th>
               <th style={{ padding: 12 }}>Periodo</th>
+              <th style={{ padding: 12 }}>Sponsor portal</th>
             </tr>
           </thead>
           <tbody>
@@ -189,6 +191,11 @@ export default async function PromotionsReportPage() {
                 <td style={{ padding: 12 }}><small>sesión {row.promotion.frequency_cap ?? "∞"}<br />día {row.promotion.daily_cap ?? "∞"}<br />total {row.promotion.max_impressions ?? "∞"}</small></td>
                 <td style={{ padding: 12 }}>{money(Number(row.promotion.revenue_cents ?? 0))}</td>
                 <td style={{ padding: 12 }}>{dateLabel(row.promotion.starts_at)} → {dateLabel(row.promotion.ends_at)}</td>
+                <td style={{ padding: 12 }}>
+                  {row.promotion.report_token ? (
+                    <a className="button secondary" href={`/sponsor-report/${row.promotion.report_token}`} target="_blank" rel="noreferrer">Abrir reporte</a>
+                  ) : "—"}
+                </td>
               </tr>
             ))}
           </tbody>
