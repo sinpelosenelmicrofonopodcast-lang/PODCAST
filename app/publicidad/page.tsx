@@ -6,11 +6,27 @@ import { AdRequestForm } from "@/components/AdRequestForm";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const salesTitle = "Anúnciate con Sin Pelos | Patrocinios y publicidad";
+const salesDescription =
+  "Patrocina Sin Pelos en el Micrófono con presencia en la web, noticias, podcast y redes. Campañas con ubicaciones claras y métricas de impresiones y clics.";
+
 export const metadata: Metadata = {
-  title: "Anúnciate con Sin Pelos | Patrocinios y publicidad",
-  description:
-    "Patrocina Sin Pelos en el Micrófono con presencia en la web, noticias, podcast y redes. Campañas con ubicaciones claras y métricas de impresiones y clics.",
-  alternates: { canonical: "/publicidad" }
+  title: salesTitle,
+  description: salesDescription,
+  alternates: { canonical: "/publicidad" },
+  openGraph: {
+    title: salesTitle,
+    description: salesDescription,
+    url: "/publicidad",
+    type: "website",
+    images: [{ url: "/og-share.png", width: 1200, height: 630, alt: "Anúnciate con Sin Pelos en el Micrófono" }]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: salesTitle,
+    description: salesDescription,
+    images: ["/og-share.png"]
+  }
 };
 
 const inventory = [
