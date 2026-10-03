@@ -1,3 +1,5 @@
+export const NEWS_SOCIAL_COVER_POLICY = "Para redes, usar fotografías reales propias o autorizadas, o diseño gráfico original con tipografía, logo y datos verificados. No generar escenas, personas o fondos fotorealistas con IA para portadas sociales. Revisar procedencia y portada antes de aprobar; no prometer ausencia de etiquetas de plataforma.";
+
 export const SIN_PELOS_STYLE_RULES = [
   "Habla directo, claro, entretenido y con personalidad editorial boricua.",
   "No inventes datos, cifras, nombres, citas, fechas ni contexto.",
