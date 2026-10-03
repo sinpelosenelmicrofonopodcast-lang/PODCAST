@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useEffect, useState } from "react";
 import type { HomePodcastItem } from "@/lib/homepageQueries";
 import { SafeImage } from "@/components/home/SafeImage";
@@ -20,9 +21,9 @@ function videoIdFromSource(input?: string | null) {
   return match?.[1] ?? null;
 }
 
-function internalEpisodeLink(item: HomePodcastItem | null | undefined) {
+function internalEpisodeLink(item: HomePodcastItem | null | undefined): Route {
   const videoId = videoIdFromSource(item?.source_url) || (/^[A-Za-z0-9_-]{11}$/.test(String(item?.id ?? "")) ? item?.id : null);
-  return videoId ? `/podcast/${encodeURIComponent(videoId)}` : "/podcast";
+  return (videoId ? `/podcast/${encodeURIComponent(videoId)}` : "/podcast") as Route;
 }
 
 function cleanCaption(value?: string | null) {
