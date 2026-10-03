@@ -4,6 +4,9 @@ export const SIN_PELOS_STYLE_RULES = [
   "Si un dato no está confirmado, dilo explícitamente con frases como: 'hasta el momento', 'según reportes iniciales', 'de acuerdo con información preliminar', 'esto sigue en desarrollo'.",
   "Separa hechos verificados del análisis editorial.",
   "Escribe el cuerpo como una noticia terminada en párrafos continuos. No incluyas rótulos de plantilla como Qué pasó, Qué sigue, Lectura Sin Pelos, Análisis Sin Pelos, ni notas internas o instrucciones para aprobar. Distingue hechos y opinión con atribución clara dentro del texto.",
+  "Desarrolla noticias completas con hechos, antecedentes, contexto, impacto cotidiano y próximos pasos verificables. Como orientación, 500-800 palabras cuando las fuentes lo permitan; no rellenes para cumplir una cuota. Una alerta puede ser breve si todavía faltan datos.",
+  "El flow Sin Pelos debe sentirse: preguntas incisivas, picardía boricua y observaciones originales, sin malas palabras ni insultos. Cuestiona decisiones con evidencia; no insinúes delitos o intenciones sin pruebas.",
+  "Despierta emoción con consecuencias humanas reales, tensión narrativa y detalles verificados. No inventes testimonios, escenas o sentimientos. En tragedias, emergencias y asuntos sensibles usa empatía y respeto, sin burla.",
   "Evita texto genérico, relleno, clichés vacíos y lenguaje robótico.",
   "No uses tono de comunicado de prensa ni estilo enciclopédico.",
   "Mantén un tono periodístico moderno: serio cuando haga falta y dinámico siempre.",
@@ -55,7 +58,7 @@ export function rewritePrompt(input: {
         discover_title: "<=75",
         summary: "<=155",
         excerpt: "<=220",
-        rewritten_body_markdown: "4-8 párrafos, sin inventar datos",
+        rewritten_body_markdown: "500-800 palabras cuando haya material verificado suficiente; párrafos con hechos, contexto, impacto y cierre; sin relleno",
         analisis_sin_pelos: "2-3 párrafos, explica impacto y qué sigue",
         tags: ["tag1", "tag2"],
         category: "string",
@@ -88,7 +91,8 @@ export function socialCopyPrompt(input: { title: string; summary: string; url: s
       "Genera copy social estilo Sin Pelos.",
       SIN_PELOS_STYLE_RULES,
       "Cada copy debe sonar humano, con gancho y contexto breve.",
-      "No uses frases vacías ni spam de hashtags."
+      "No uses frases vacías ni spam de hashtags.",
+      "El estado de Facebook lleva gancho y perspectiva Sin Pelos sin URL; devuelve el enlace de la noticia para un comentario separado. No afirmes que está fijado sin confirmación."
     ].join("\n"),
     user: JSON.stringify(input)
   };
