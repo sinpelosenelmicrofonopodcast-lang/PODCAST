@@ -22,7 +22,7 @@ import {
 } from "@/lib/homepageQueries";
 import { queryPodcastEditorialPosts } from "@/lib/homeEditorialQueries";
 import { getPublishedEpisodes } from "@/lib/seo/content";
-import { fetchYouTubeVideos, isFullPodcastEpisode } from "@/lib/youtube";
+import { fetchLatestYouTubeEpisodeFromFeed, fetchYouTubeVideos, isFullPodcastEpisode, type YouTubeVideo } from "@/lib/youtube";
 
 export const revalidate = 120;
 const CURRENT_NEWS_MAX_AGE_DAYS = 7;
@@ -42,27 +42,37 @@ function isFreshApprovedNews(item: HomeNewsItem | null | undefined) {
   return ageMs >= 0 && ageMs <= CURRENT_NEWS_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 }
 
+function podcastFromVideo(video: YouTubeVideo): HomePodcastItem {
+  return {
+    id: video.id,
+    title: video.title || "Último episodio",
+    caption: video.description || null,
+    source_url: `https://www.youtube.com/watch?v=${video.id}`,
+    media_url: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`,
+    posted_at: video.publishedAt || null,
+    platform: "YouTube",
+    metrics: {
+      views: video.viewCount || 0,
+      likes: video.likeCount || 0,
+      comments: video.commentCount || 0,
+      durationSeconds: video.durationSeconds || 0,
+      isShort: false
+    }
+  };
+}
+
 async function latestPodcastFromYouTube(): Promise<HomePodcastItem | null> {
   try {
     const videos = await fetchYouTubeVideos(80, { revalidateSeconds: 120 });
     const video = videos.find(isFullPodcastEpisode);
-    if (!video) return null;
-    return {
-      id: video.id,
-      title: video.title || "Último episodio",
-      caption: video.description || null,
-      source_url: `https://www.youtube.com/watch?v=${video.id}`,
-      media_url: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`,
-      posted_at: video.publishedAt || null,
-      platform: "YouTube",
-      metrics: {
-        views: video.viewCount || 0,
-        likes: video.likeCount || 0,
-        comments: video.commentCount || 0,
-        durationSeconds: video.durationSeconds || 0,
-        isShort: false
-      }
-    };
+    if (video) return podcastFromVideo(video);
+  } catch {
+    // Data API can hit quota or temporary provider errors. Fall through to the public channel feed.
+  }
+
+  try {
+    const feedEpisode = await fetchLatestYouTubeEpisodeFromFeed({ revalidateSeconds: 120 });
+    return feedEpisode ? podcastFromVideo(feedEpisode) : null;
   } catch {
     return null;
   }
@@ -183,11 +193,7 @@ export default async function HomePage() {
       {hasFreshTrending ? (
         <section className="section spm-section-breathe">
           <div className="container">
-            <TrendingBlock
-              enTendencia={freshTrending.enTendencia}
-              subiendo={freshTrending.subiendo}
-              viral={freshTrending.viral}
-            />
+            <TrendingBlock enTendencia={freshTrending.enTendencia} subiendo={freshTrending.subiendo} viral={freshTrending.viral} />
           </div>
         </section>
       ) : null}
@@ -200,17 +206,13 @@ export default async function HomePage() {
 
       {podcastEditorials.length ? (
         <section className="section spm-editorial-zone spm-section-breathe">
-          <div className="container">
-            <FromMicBlock posts={podcastEditorials} />
-          </div>
+          <div className="container"><FromMicBlock posts={podcastEditorials} /></div>
         </section>
       ) : null}
 
       {hasFreshRegions ? (
         <section className="section spm-section-breathe">
-          <div className="container">
-            <RegionNews regions={freshRegions} />
-          </div>
+          <div className="container"><RegionNews regions={freshRegions} /></div>
         </section>
       ) : null}
 
@@ -222,56 +224,38 @@ export default async function HomePage() {
 
       <section className="section spm-feed-zone spm-section-breathe">
         <div className="container">
-          <FeedCentral
-            initialItems={feed.items}
-            initialCursor={feed.nextCursor}
-            initialHasMore={feed.hasMore}
-            excludeIds={feedExcludeIds}
-          />
+          <FeedCentral initialItems={feed.items} initialCursor={feed.nextCursor} initialHasMore={feed.hasMore} excludeIds={feedExcludeIds} />
         </div>
       </section>
 
       {overview.flags.showCommunity ? (
         <>
           <section className="section spm-ad-zone spm-section-breathe" aria-label="Community Partner">
-            <div className="container">
-              <MidContentAdSlot placement="community_partner" section="home" className="home-mid-ad-slot" compact />
-            </div>
+            <div className="container"><MidContentAdSlot placement="community_partner" section="home" className="home-mid-ad-slot" compact /></div>
           </section>
           <section className="section spm-community-zone spm-section-breathe">
-            <div className="container">
-              <CommunityPreview threads={overview.community.threads} fallbackTopics={overview.community.fallbackTopics} />
-            </div>
+            <div className="container"><CommunityPreview threads={overview.community.threads} fallbackTopics={overview.community.fallbackTopics} /></div>
           </section>
         </>
       ) : null}
 
       {overview.flags.showEvents ? (
         <section className="section spm-events-zone spm-section-breathe">
-          <div className="container">
-            <EventsPreview events={overview.events} />
-          </div>
+          <div className="container"><EventsPreview events={overview.events} /></div>
         </section>
       ) : null}
 
       <section className="section spm-newsletter-zone spm-section-breathe">
         <div className="container">
           <div className="home-media-newsletter-wrap">
-            <NewsletterForm
-              variant="cta"
-              title="Lo bueno no debería depender del algoritmo"
-              subtitle="Episodios, historias y lo que de verdad vale la pena — directo a tu correo."
-              buttonLabel="QUIERO ESTAR AL DÍA"
-            />
+            <NewsletterForm variant="cta" title="Lo bueno no debería depender del algoritmo" subtitle="Episodios, historias y lo que de verdad vale la pena — directo a tu correo." buttonLabel="QUIERO ESTAR AL DÍA" />
           </div>
         </div>
       </section>
 
       {overview.flags.showPromotions ? (
         <section className="section spm-sponsor-zone spm-section-breathe">
-          <div className="container">
-            <SponsorBlock title="CON LOS QUE CREEN EN ESTO" sponsor={overview.sponsors.footer} slot="footer" />
-          </div>
+          <div className="container"><SponsorBlock title="CON LOS QUE CREEN EN ESTO" sponsor={overview.sponsors.footer} slot="footer" /></div>
         </section>
       ) : null}
 
