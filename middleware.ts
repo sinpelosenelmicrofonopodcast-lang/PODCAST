@@ -18,6 +18,7 @@ const SOCIAL_STAFF_APIS = new Set([
   "/api/social/meta/instagram/post-blog"
 ]);
 const SOCIAL_ADMIN_APIS = new Set(["/api/social/meta/facebook/diagnose"]);
+const LEGACY_EDITORIAL_PATH = /^\/noticias\/editorial-([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/?$/i;
 
 type AccessInfo = {
   userId: string;
@@ -184,6 +185,47 @@ function shouldCanonicalRedirect(request: NextRequest) {
   return changed ? url : null;
 }
 
+async function legacyEditorialRedirect(request: NextRequest) {
+  const match = request.nextUrl.pathname.match(LEGACY_EDITORIAL_PATH);
+  if (!match?.[1]) return null;
+
+  const id = match[1];
+  const baseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const anonKey = String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? "").trim();
+
+  if (baseUrl && anonKey) {
+    try {
+      const endpoint = new URL(`${baseUrl}/rest/v1/news_items`);
+      endpoint.searchParams.set("id", `eq.${id}`);
+      endpoint.searchParams.set("select", "slug");
+      endpoint.searchParams.set("limit", "1");
+      const res = await fetch(endpoint.toString(), {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+          Accept: "application/json"
+        },
+        cache: "no-store"
+      });
+      if (res.ok) {
+        const rows = (await res.json().catch(() => [])) as Array<{ slug?: string | null }>;
+        const slug = String(rows?.[0]?.slug ?? "").trim();
+        if (slug) {
+          const destination = request.nextUrl.clone();
+          destination.pathname = `/noticias/${slug}`;
+          return NextResponse.redirect(destination, 301);
+        }
+      }
+    } catch {
+      // The article route can still resolve the UUID if the lookup is temporarily unavailable.
+    }
+  }
+
+  const fallback = request.nextUrl.clone();
+  fallback.pathname = `/noticias/${id}`;
+  return NextResponse.redirect(fallback, 301);
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (isAssetPath(pathname)) return NextResponse.next();
@@ -191,6 +233,9 @@ export async function middleware(request: NextRequest) {
   // Vercel invokes cron routes on the deployment hostname. Let each route
   // validate CRON_SECRET directly instead of redirecting and dropping auth.
   if (pathname.startsWith("/api/cron/")) return NextResponse.next();
+
+  const editorialRedirect = await legacyEditorialRedirect(request);
+  if (editorialRedirect) return editorialRedirect;
 
   const redirectTo = shouldCanonicalRedirect(request);
   if (redirectTo) return NextResponse.redirect(redirectTo, 308);
