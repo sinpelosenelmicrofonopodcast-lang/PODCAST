@@ -12,6 +12,7 @@ import { FeedCentral } from "@/components/home/FeedCentral";
 import { CommunityPreview } from "@/components/home/CommunityPreview";
 import { EventsPreview } from "@/components/home/EventsPreview";
 import { SponsorBlock } from "@/components/home/SponsorBlock";
+import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import {
   queryHomepageFeedPage,
   queryHomepageOverview,
@@ -28,7 +29,7 @@ const CURRENT_NEWS_MAX_AGE_DAYS = 7;
 export const metadata: Metadata = {
   title: "Sin Pelos en el Micrófono | Conversaciones que se quedan contigo",
   description:
-    "Podcast, historias y editoriales nacidas de conversaciones reales. Lo que nos impactó, lo que aprendimos y lo que vale la pena seguir hablando.",
+    "Podcast, historias, noticias y editoriales nacidas de conversaciones reales. Puerto Rico, Texas y el mundo con contexto claro y sin libreto.",
   alternates: { canonical: "/" }
 };
 
@@ -84,7 +85,6 @@ export default async function HomePage() {
     mundo: overview.regions.mundo.filter(isFreshApprovedNews)
   };
 
-  // A stale featured pick must not leave the hero empty when current stories exist.
   const freshCandidates = [
     ...approvedHeroTrending,
     ...freshRegions.puertoRico,
@@ -145,14 +145,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {podcastEditorials.length ? (
-        <section className="section spm-editorial-zone spm-section-breathe">
-          <div className="container">
-            <FromMicBlock posts={podcastEditorials} />
-          </div>
-        </section>
-      ) : null}
-
       {overview.flags.showLatestNews && hasFreshCoverage ? (
         <section className="section spm-news-zone spm-section-breathe">
           <div className="container">
@@ -179,6 +171,20 @@ export default async function HomePage() {
         </section>
       ) : null}
 
+      <section className="section spm-ad-zone spm-section-breathe" aria-label="Sponsor destacado">
+        <div className="container">
+          <MidContentAdSlot placement="home_featured" section="home" className="home-featured-ad-slot" />
+        </div>
+      </section>
+
+      {podcastEditorials.length ? (
+        <section className="section spm-editorial-zone spm-section-breathe">
+          <div className="container">
+            <FromMicBlock posts={podcastEditorials} />
+          </div>
+        </section>
+      ) : null}
+
       {hasFreshRegions ? (
         <section className="section spm-section-breathe">
           <div className="container">
@@ -186,6 +192,12 @@ export default async function HomePage() {
           </div>
         </section>
       ) : null}
+
+      <section className="section spm-ad-zone spm-section-breathe" aria-label="Patrocinador">
+        <div className="container">
+          <MidContentAdSlot placement="home_mid" section="home" className="home-mid-ad-slot" compact />
+        </div>
+      </section>
 
       <section className="section spm-feed-zone spm-section-breathe">
         <div className="container">
