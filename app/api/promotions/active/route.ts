@@ -5,6 +5,10 @@ export const revalidate = 0;
 
 type Promotion = {
   id: string;
+  title?: string | null;
+  cta_url?: string | null;
+  campaign_id?: string | null;
+  creative_id?: string | null;
   display_order?: number | null;
   weight?: number | null;
   frequency_cap?: number | null;
@@ -59,6 +63,35 @@ function rotateByPriority<T extends Promotion>(items: T[], limit: number) {
 
 function normalizeTarget(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
+}
+
+function slugToken(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90);
+}
+
+function decorateCta(promo: Promotion, placement: string) {
+  const raw = String(promo.cta_url ?? "").trim();
+  if (!/^https?:\/\//i.test(raw)) return raw || null;
+  try {
+    const target = new URL(raw);
+    if (!target.searchParams.has("utm_source")) target.searchParams.set("utm_source", "sinpelos");
+    if (!target.searchParams.has("utm_medium")) target.searchParams.set("utm_medium", placement || "website");
+    if (!target.searchParams.has("utm_campaign")) {
+      target.searchParams.set("utm_campaign", slugToken(promo.campaign_id || promo.title || promo.id) || promo.id);
+    }
+    if (!target.searchParams.has("utm_content")) {
+      target.searchParams.set("utm_content", slugToken(promo.creative_id || promo.id) || promo.id);
+    }
+    return target.toString();
+  } catch {
+    return raw;
+  }
 }
 
 function requestDevice(request: NextRequest) {
@@ -187,8 +220,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const selected = rotateByPriority(items, limit).map((promo) => ({
+      ...promo,
+      cta_url: decorateCta(promo, placement)
+    }));
+
     return NextResponse.json(
-      { ok: true, items: rotateByPriority(items, limit) },
+      { ok: true, items: selected },
       {
         headers: {
           "Cache-Control": "private, no-store, max-age=0",
