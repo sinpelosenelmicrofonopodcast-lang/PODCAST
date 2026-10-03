@@ -4,6 +4,7 @@ import "./home-rebrand.css";
 import "./spm-polish.css";
 import "./site-refresh.css";
 import "./news-refresh.css";
+import "./audit-fixes.css";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { Bebas_Neue, Manrope } from "next/font/google";
