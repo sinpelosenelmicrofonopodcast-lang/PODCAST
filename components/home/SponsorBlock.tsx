@@ -1,6 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import type { HomeSponsor } from "@/lib/homepageQueries";
 import { SafeImage } from "@/components/home/SafeImage";
+import { trackPromoEvent } from "@/lib/promoTracking";
 
 function cleanText(value: unknown) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
@@ -28,6 +33,33 @@ export function SponsorBlock({
   sponsor: HomeSponsor | null;
   slot: "mid" | "footer";
 }) {
+  const pathname = usePathname() ?? "/";
+  const sentImpression = useRef(false);
+  const placement = slot === "footer" ? "home_footer_sponsor" : "home_mid_sponsor";
+
+  useEffect(() => {
+    if (!sponsor?.id || sentImpression.current) return;
+    sentImpression.current = true;
+    trackPromoEvent({
+      promotionId: sponsor.id,
+      placement,
+      event: "impression",
+      path: pathname,
+      promoType: "sponsor"
+    });
+  }, [sponsor?.id, pathname, placement]);
+
+  const onSponsorClick = () => {
+    if (!sponsor?.id) return;
+    trackPromoEvent({
+      promotionId: sponsor.id,
+      placement,
+      event: "click",
+      path: pathname,
+      promoType: "sponsor"
+    });
+  };
+
   return (
     <section className={`home-media-section home-sponsor-block ${slot === "footer" ? "footer" : "mid"}`} aria-label={title}>
       <div className="home-media-section-head">
@@ -42,11 +74,14 @@ export function SponsorBlock({
         ) : null}
 
         <div className="home-sponsor-body">
+          <div className="muted" style={{ fontSize: 12, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 8 }}>
+            Patrocinado
+          </div>
           <h3>{sponsor?.title ?? "Espacio patrocinado disponible"}</h3>
           <p>{sponsorDescription(sponsor?.description)}</p>
 
           {sponsor?.cta_url ? (
-            <a className="button" href={sponsor.cta_url} target="_blank" rel="noreferrer">
+            <a className="button" href={sponsor.cta_url} target="_blank" rel="noreferrer" onClick={onSponsorClick}>
               {sponsorCtaLabel(sponsor.cta_label)}
             </a>
           ) : (
