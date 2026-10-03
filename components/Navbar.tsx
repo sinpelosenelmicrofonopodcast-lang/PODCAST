@@ -93,11 +93,6 @@ export function Navbar() {
         setIsStaff(Boolean(json?.isStaff));
         return;
       }
-      if (res.status === 403) {
-        setIsAdmin(false);
-        setIsStaff(false);
-        return;
-      }
       setIsAdmin(false);
       setIsStaff(false);
     };
@@ -131,9 +126,9 @@ export function Navbar() {
       setCommunityOpen(false);
     };
     const onPointerDown = (e: MouseEvent | TouchEvent) => {
-      const t = e.target as Node | null;
-      const inMenu = menuRef.current && t ? menuRef.current.contains(t) : false;
-      const inCommunity = communityRef.current && t ? communityRef.current.contains(t) : false;
+      const target = e.target as Node | null;
+      const inMenu = menuRef.current && target ? menuRef.current.contains(target) : false;
+      const inCommunity = communityRef.current && target ? communityRef.current.contains(target) : false;
       if (inMenu || inCommunity) return;
       setMenuOpen(false);
       setCommunityOpen(false);
@@ -153,6 +148,7 @@ export function Navbar() {
   const matchesAny = (hrefs: string[]) => hrefs.some((href) => isPathActive(href));
   const communityAreaActive = matchesAny(["/community", "/comunidad", "/foro", "/confesionario", "/teorias"]);
   const discoverAreaActive = matchesAny([
+    "/feed",
     "/blog",
     "/musica",
     "/emprendimiento",
@@ -164,20 +160,22 @@ export function Navbar() {
     "/terminos"
   ]);
   const communityLinks: { href: Route; label: string }[] = [
+    { href: "/community", label: lang === "es" ? "Comunidad" : "Community" },
     { href: "/foro", label: t.forum },
     { href: "/confesionario", label: t.confessional },
     { href: "/teorias", label: t.theories }
   ];
   const discoverLinks: { href: Route; label: string }[] = [
-    { href: "/blog", label: t.blog },
+    { href: "/blog", label: lang === "es" ? "Desde el Micrófono" : "From the Mic" },
+    { href: "/feed", label: lang === "es" ? "Descubrir" : "Discover" },
+    { href: "/eventos", label: t.events },
     { href: "/musica", label: t.music },
     { href: "/emprendimiento", label: t.entrepreneurship },
-    { href: "/eventos", label: t.events },
-    { href: "/rss", label: "RSS (Audio)" },
+    { href: "/rss", label: "RSS / Audio" },
     { href: "/mic-brawl", label: "Mic Brawl" },
     { href: "/publicidad", label: t.ads },
     { href: "/quiero-salir", label: t.guest },
-    { href: "/terminos", label: "Términos" }
+    { href: "/terminos", label: lang === "es" ? "Términos" : "Terms" }
   ];
 
   const handleSignOut = async () => {
@@ -194,31 +192,24 @@ export function Navbar() {
   return (
     <nav className="nav">
       <div className="container nav-inner">
-        <Link className="brand" href="/">
+        <Link className="brand" href="/" aria-label="Sin Pelos en el Micrófono — Inicio">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Logo size={44} animated />
+            <Logo size={44} animated={false} />
             <span>Sin Pelos</span>
           </div>
         </Link>
+
         <div className="nav-mid">
           <div className={`nav-tabs${isOverlayOpen ? " is-overlay-open" : ""}`} role="navigation" aria-label="Navegación principal">
-            <Link className={`nav-link${isPathActive("/") ? " active" : ""}`} href="/">
-              {t.home}
-            </Link>
-            <Link className={`nav-link${isPathActive("/noticias") ? " active" : ""}`} href="/noticias">
-              {t.news}
-            </Link>
-            <Link className={`nav-link${isPathActive("/feed") ? " active" : ""}`} href="/feed">
-              {t.feed}
-            </Link>
-            <Link className={`nav-link${isPathActive("/podcast") ? " active" : ""}`} href="/podcast">
-              {t.podcast}
+            <Link className={`nav-link${isPathActive("/") ? " active" : ""}`} href="/">{t.home}</Link>
+            <Link className={`nav-link${isPathActive("/podcast") ? " active" : ""}`} href="/podcast">{t.podcast}</Link>
+            <Link className={`nav-link${isPathActive("/noticias") ? " active" : ""}`} href="/noticias">{t.news}</Link>
+            <Link className={`nav-link${isPathActive("/blog") ? " active" : ""}`} href="/blog">
+              {lang === "es" ? "Desde el Micrófono" : "From the Mic"}
             </Link>
 
             <div className="nav-submenu" ref={communityRef}>
-              <Link className={`nav-link${communityAreaActive ? " active" : ""}`} href="/community">
-                {t.community}
-              </Link>
+              <Link className={`nav-link${communityAreaActive ? " active" : ""}`} href="/community">{t.community}</Link>
               <button
                 className={`nav-link nav-submenu-btn${communityAreaActive ? " active" : ""}`}
                 type="button"
@@ -226,7 +217,7 @@ export function Navbar() {
                 aria-expanded={communityOpen}
                 aria-label={`${t.community}: abrir submenú`}
                 onClick={() => {
-                  setCommunityOpen((v) => !v);
+                  setCommunityOpen((value) => !value);
                   setMenuOpen(false);
                 }}
               >
@@ -249,9 +240,7 @@ export function Navbar() {
               ) : null}
             </div>
 
-            <Link className={`nav-link nav-link-raw${isPathActive("/zona-cruda") ? " active" : ""}`} href="/zona-cruda">
-              {t.rawZone}
-            </Link>
+            <Link className={`nav-link nav-link-raw${isPathActive("/zona-cruda") ? " active" : ""}`} href="/zona-cruda">{t.rawZone}</Link>
 
             <div className="nav-menu" ref={menuRef}>
               <button
@@ -259,7 +248,10 @@ export function Navbar() {
                 type="button"
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-                onClick={() => setMenuOpen((v) => !v)}
+                onClick={() => {
+                  setMenuOpen((value) => !value);
+                  setCommunityOpen(false);
+                }}
               >
                 {t.menu}
               </button>
@@ -299,9 +291,7 @@ export function Navbar() {
           <LanguageToggle />
           {nickname ? (
             <div className="nav-user">
-              <Link href="/perfil" className="muted nav-profile-link">
-                {t.profile}
-              </Link>
+              <Link href="/perfil" className="muted nav-profile-link">{t.profile}</Link>
               <div className="nav-avatar">
                 <img
                   src={avatarSrc}
@@ -314,70 +304,33 @@ export function Navbar() {
                 />
               </div>
               <span className="muted nav-hello">{t.hello}, {nickname}</span>
-              {isStaff ? (
-                <Link className="button secondary nav-admin-quick" href="/admin">
-                  {t.dashboard}
-                </Link>
-              ) : null}
-              <button className="button secondary" type="button" onClick={handleSignOut}>
-                {t.logout}
-              </button>
+              {isStaff ? <Link className="button secondary nav-admin-quick" href="/admin">{t.dashboard}</Link> : null}
+              <button className="button secondary" type="button" onClick={handleSignOut}>{t.logout}</button>
             </div>
           ) : (
             <>
-              <Link className="button secondary" href="/login">
-                {t.login}
-              </Link>
-              <Link className="button" href="/register">
-                {t.join}
-              </Link>
+              <Link className="button secondary" href="/login">{t.login}</Link>
+              <Link className="button" href="/register">{t.join}</Link>
             </>
           )}
         </div>
       </div>
+
       <TopBannerPromo />
       <div className="social-strip" role="complementary" aria-label="Redes sociales oficiales">
         <div className="container social-strip-inner">
           <span className="social-strip-label">Síguenos:</span>
-          <a
-            className="social-strip-link"
-            href="https://www.facebook.com/sinpelosenelmicrofono"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Facebook Sin Pelos en el Micrófono"
-          >
-            <SocialBrandIcon network="facebook" />
-            <span>Facebook</span>
+          <a className="social-strip-link" href="https://www.facebook.com/sinpelosenelmicrofono" target="_blank" rel="noreferrer" aria-label="Facebook Sin Pelos en el Micrófono">
+            <SocialBrandIcon network="facebook" /><span>Facebook</span>
           </a>
-          <a
-            className="social-strip-link"
-            href="https://www.instagram.com/sinpelosenelmicrofono"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Instagram Sin Pelos en el Micrófono"
-          >
-            <SocialBrandIcon network="instagram" />
-            <span>Instagram</span>
+          <a className="social-strip-link" href="https://www.instagram.com/sinpelosenelmicrofono" target="_blank" rel="noreferrer" aria-label="Instagram Sin Pelos en el Micrófono">
+            <SocialBrandIcon network="instagram" /><span>Instagram</span>
           </a>
-          <a
-            className="social-strip-link"
-            href="https://www.tiktok.com/@sinpelosenelmicrofono"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="TikTok Sin Pelos en el Micrófono"
-          >
-            <SocialBrandIcon network="tiktok" />
-            <span>TikTok</span>
+          <a className="social-strip-link" href="https://www.tiktok.com/@sinpelosenelmicrofono" target="_blank" rel="noreferrer" aria-label="TikTok Sin Pelos en el Micrófono">
+            <SocialBrandIcon network="tiktok" /><span>TikTok</span>
           </a>
-          <a
-            className="social-strip-link"
-            href="https://www.youtube.com/@SinPelosEnElMicrofono"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="YouTube Sin Pelos en el Micrófono"
-          >
-            <SocialBrandIcon network="youtube" />
-            <span>YouTube</span>
+          <a className="social-strip-link" href="https://www.youtube.com/@SinPelosEnElMicrofono" target="_blank" rel="noreferrer" aria-label="YouTube Sin Pelos en el Micrófono">
+            <SocialBrandIcon network="youtube" /><span>YouTube</span>
           </a>
         </div>
       </div>
