@@ -9,7 +9,18 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/entrar", "/unirme", "/community", "/comunidad", "/zona-cruda", "/dashboard", "/admin", "/api"]
+        disallow: [
+          "/entrar",
+          "/unirme",
+          "/login",
+          "/register",
+          "/community",
+          "/comunidad",
+          "/zona-cruda",
+          "/dashboard",
+          "/admin",
+          "/api"
+        ]
       }
     ],
     sitemap: [`${siteUrl}/sitemap.xml`],
