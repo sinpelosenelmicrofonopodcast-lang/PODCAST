@@ -3,6 +3,8 @@ import { supabaseServer } from "@/lib/supabaseServer";
 
 export const revalidate = 0;
 
+const VALID_EVENTS = new Set(["impression", "click", "dismiss"]);
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null);
@@ -11,16 +13,14 @@ export async function POST(request: NextRequest) {
     const event = String(body?.event ?? "").trim();
     const path = String(body?.path ?? "").trim();
     const sessionId = String(body?.sessionId ?? "").trim();
-    const promoType = body?.promoType ? String(body.promoType).trim() : null;
 
-    if (!promotionId || !placement || !event || !path || !sessionId) {
+    if (!promotionId || !placement || !event || !path || !sessionId || !VALID_EVENTS.has(event)) {
       return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
     }
 
     const supabase = supabaseServer();
     const { error } = await supabase.from("promotion_events").insert({
       promotion_id: promotionId,
-      promo_type: promoType,
       placement,
       event,
       path,
@@ -28,12 +28,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      // Best-effort. Don't fail UX if tracking fails.
-      return NextResponse.json({ ok: true });
+      console.error("promotion analytics insert failed", {
+        promotionId,
+        placement,
+        event,
+        path,
+        error: error.message
+      });
+      return NextResponse.json({ ok: false, error: "Tracking unavailable" }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ ok: true });
+  } catch (error: any) {
+    console.error("promotion analytics route failed", error?.message ?? error);
+    return NextResponse.json({ ok: false, error: "Tracking unavailable" }, { status: 500 });
   }
 }
