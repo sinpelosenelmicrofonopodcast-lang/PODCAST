@@ -66,7 +66,14 @@ function cleanEpisodeDescription(value?: string | null) {
     if (index > 0) cleaned = cleaned.slice(0, index);
   }
 
-  cleaned = cleaned.replace(/https?:\/\/\S+/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  const separatorIndex = cleaned.search(/\n\s*_{12,}\s*(?:\n|$)/);
+  if (separatorIndex > 0) cleaned = cleaned.slice(0, separatorIndex);
+
+  cleaned = cleaned
+    .replace(/^\s*[_=-]{12,}\s*$/gm, "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   return cleaned.length > 1500 ? `${cleaned.slice(0, 1497).trimEnd()}…` : cleaned;
 }
 
