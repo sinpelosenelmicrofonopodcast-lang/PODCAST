@@ -71,9 +71,10 @@ export async function rewriteNewsWithAI(input: RewriteInput): Promise<RewriteOut
     "2) Si falta confirmación, dilo explícitamente con frases como 'hasta el momento', 'según reportes iniciales', 'de acuerdo con información preliminar' o 'esto sigue en desarrollo'.",
     "3) Título con gancho periodístico y claridad (sin clickbait engañoso).",
     "4) Summary (max 280) debe explicar qué pasó, dónde, quién y por qué importa.",
-    "5) Analysis en 2-4 párrafos: contexto, impacto, posibles consecuencias y qué sigue.",
+    "5) Analysis es el cuerpo completo: orientación 500-800 palabras cuando las fuentes lo permitan, con detalles, antecedentes, contexto, impacto cotidiano y próximos pasos. No rellenes ni inventes para alcanzar extensión; las alertas con pocos datos pueden ser breves.",
     "Escribe el cuerpo como una noticia terminada en párrafos continuos. No incluyas rótulos de plantilla como Qué pasó, Qué sigue, Lectura Sin Pelos, Análisis Sin Pelos, ni notas internas o instrucciones para aprobar. Distingue hechos y opinión con atribución clara dentro del texto.",
-    "6) Tono Sin Pelos: directo, con personalidad y ritmo; no robótico, no Wikipedia, no nota de prensa.",
+    "6) Flow Sin Pelos: directo, con picardía boricua, preguntas incisivas y observaciones originales, sin malas palabras ni insultos. Cuestiona con evidencia, sin imputar intenciones o delitos no probados.",
+    "Despierta emoción mediante consecuencias humanas y detalles reales, sin inventar escenas o testimonios. En tragedias y emergencias usa humanidad y respeto, sin burla.",
     "7) No copies literal bloques largos de la fuente.",
     "8) Si el contenido fuente es insuficiente o ambiguo, marca needs_review=true.",
     "9) Responde SOLO json válido con: title, summary, analysis, categories, tags, needs_review."
