@@ -59,6 +59,17 @@ function safeArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+function normalizeQuotes(value: unknown): EpisodeEditorialQuote[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item: any) => ({
+      quote: String(item?.quote ?? item?.text ?? "").trim(),
+      speaker: item?.speaker ? String(item.speaker).trim() : null,
+      timestamp: item?.timestamp ? String(item.timestamp).trim() : null
+    }))
+    .filter((item) => item.quote.length > 0);
+}
+
 function normalize(row: any): EpisodeEditorial {
   return {
     id: String(row.id),
@@ -74,7 +85,7 @@ function normalize(row: any): EpisodeEditorial {
     impact_summary: row.impact_summary ?? null,
     lessons: safeArray<EpisodeEditorialLesson>(row.lessons),
     host_points: safeArray<EpisodeEditorialPoint>(row.host_points),
-    quotes: safeArray<EpisodeEditorialQuote>(row.quotes),
+    quotes: normalizeQuotes(row.quotes),
     closing_reflection: row.closing_reflection ?? null,
     status: "published",
     published_at: row.published_at ?? null,
