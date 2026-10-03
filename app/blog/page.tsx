@@ -11,8 +11,8 @@ import { createClient } from "@supabase/supabase-js";
 
 export const revalidate = 300;
 export const metadata: Metadata = {
-  title: "Blog | Sin Pelos en el Micrófono",
-  description: "Análisis, opinión y cultura en formato editorial con estilo Sin Pelos.",
+  title: "Desde el Micrófono | Sin Pelos en el Micrófono",
+  description: "Historias nacidas de nuestras conversaciones, análisis con contexto y editoriales de la comunidad. La conversación sigue después de apagar los micrófonos.",
   alternates: { canonical: "/blog" }
 };
 
@@ -27,11 +27,30 @@ type BlogPost = {
   reading_time_minutes?: number | null;
   categories?: string[] | null;
   tags?: string[] | null;
+  editorial_type?: string | null;
+  source_label?: string | null;
 };
 
 function postHref(post: { id: string; slug?: string | null }) {
   const slug = String(post.slug ?? "").trim();
   return `/blog/${slug || post.id}` as any;
+}
+
+function editorialLabel(type?: string | null) {
+  switch (String(type ?? "").trim()) {
+    case "podcast_archive":
+      return "Desde el podcast";
+    case "verified_analysis":
+      return "Verificado";
+    case "context_analysis":
+      return "Análisis con contexto";
+    case "community_editorial":
+      return "Comunidad";
+    case "music_feature":
+      return "Música · seguimiento";
+    default:
+      return "Editorial Sin Pelos";
+  }
 }
 
 function supabaseService() {
@@ -67,7 +86,7 @@ export default async function BlogIndexPage({
   const pageNum = Number.isFinite(pageNumRaw) ? Math.max(1, Math.floor(pageNumRaw)) : 1;
   const perPage = 12;
 
-  const selectPrimary = "id, slug, title, excerpt, meta_description, cover_url, created_at, reading_time_minutes, categories, tags";
+  const selectPrimary = "id, slug, title, excerpt, meta_description, cover_url, created_at, reading_time_minutes, categories, tags, editorial_type, source_label";
   const selectFallback = "id, title, excerpt, cover_url, created_at";
   const mapPost = (p: BlogPost): BlogPost => ({
     ...p,
@@ -98,7 +117,7 @@ export default async function BlogIndexPage({
     if (cat) query = query.contains("categories", [cat]);
     let { data, error, count } = await query;
 
-    if (error && /(slug|meta_description|reading_time_minutes|categories|tags)/i.test(error.message)) {
+    if (error && /(slug|meta_description|reading_time_minutes|categories|tags|editorial_type|source_label)/i.test(error.message)) {
       const fallback = await supabase
         .from("blog_posts")
         .select(selectFallback, { count: "exact" })
@@ -117,7 +136,7 @@ export default async function BlogIndexPage({
       supabase.from("blog_posts").select(selectCols).order("created_at", { ascending: false }).limit(120);
 
     let { data, error } = await run(selectPrimary);
-    if (error && /(slug|meta_description|reading_time_minutes|categories|tags)/i.test(error.message)) {
+    if (error && /(slug|meta_description|reading_time_minutes|categories|tags|editorial_type|source_label)/i.test(error.message)) {
       const fallback = await run(selectFallback);
       data = fallback.data as any;
       error = fallback.error as any;
@@ -200,14 +219,14 @@ export default async function BlogIndexPage({
         <div className="container blog-container">
           <div className="mag-blog-head-inner">
             <div className="mag-blog-title">
-              <div className="mag-kicker">Editorial</div>
-              <h1 className="mag-h1">Blog</h1>
-              <p className="mag-sub">Análisis, cultura y medios en formato revista. Enfoque PR · TX · USA.</p>
+              <div className="mag-kicker">SIN PELOS · HISTORIAS · IDEAS</div>
+              <h1 className="mag-h1">Desde el Micrófono</h1>
+              <p className="mag-sub">Historias que nacen en la mesa, análisis con contexto y conversaciones que siguen vivas después de apagar los micrófonos.</p>
             </div>
 
             <div className="mag-blog-tools">
               <form className="mag-search" action="/blog" method="get">
-                <input className="mag-input" name="q" defaultValue={q} placeholder="Buscar tema, nombre o frase..." />
+                <input className="mag-input" name="q" defaultValue={q} placeholder="Buscar episodio, persona, tema o frase..." />
                 {cat ? <input type="hidden" name="cat" value={cat} /> : null}
                 <input type="hidden" name="sort" value={sort} />
                 <input type="hidden" name="page" value="1" />
@@ -224,14 +243,14 @@ export default async function BlogIndexPage({
                   Tendencia
                 </Link>
                 {cat ? (
-                  <Link className="mag-chip" href={buildHref({ cat: "", page: "1" })} title="Quitar categoria">
+                  <Link className="mag-chip" href={buildHref({ cat: "", page: "1" })} title="Quitar categoría">
                     {cat} ✕
                   </Link>
                 ) : null}
               </div>
 
               {categories.length ? (
-                <div className="mag-cats" aria-label="Categorias">
+                <div className="mag-cats" aria-label="Categorías">
                   {categories.map((c) => (
                     <Link key={c} className={cat === c ? "mag-chip active" : "mag-chip"} href={buildHref({ cat: c, page: "1" })}>
                       {c}
@@ -251,7 +270,7 @@ export default async function BlogIndexPage({
             <div className="mag-blog-main">
               <div className="mag-results">
                 <span className="mag-small">
-                  Mostrando {posts.length} de {total} artículos
+                  {total} historias, análisis y conversaciones en el archivo
                 </span>
               </div>
               {featured ? (
@@ -262,6 +281,7 @@ export default async function BlogIndexPage({
                     <div className="mag-hero-content">
                       <div className="mag-hero-top">
                         <div className="mag-cat-row">
+                          <span className="mag-cat">{editorialLabel(featured.editorial_type)}</span>
                           {(featured.categories ?? []).slice(0, 1).map((c) => (
                             <span key={c} className={`mag-cat ${c === "Zona Cruda" ? "mag-cat-cruda" : ""}`}>
                               {c}
@@ -281,13 +301,13 @@ export default async function BlogIndexPage({
                   </Link>
                   <div className="mag-hero-actions-row">
                     <Link className="mag-btn mag-btn-primary" href={postHref(featured)}>
-                      Leer ahora
+                      Entrar a la historia
                     </Link>
                     <ShareButtons path={postHref(featured)} text={featured.title} />
                   </div>
                 </article>
               ) : (
-                <div className="mag-empty">Aun no hay articulos.</div>
+                <div className="mag-empty">Todavía no hay historias publicadas.</div>
               )}
 
               {rest.length ? (
@@ -301,11 +321,14 @@ export default async function BlogIndexPage({
                         </Link>
                         <div className="mag-card-body">
                           <div className="mag-card-top">
-                            {(post.categories ?? []).slice(0, 1).map((c) => (
-                              <span key={c} className={`mag-cat ${c === "Zona Cruda" ? "mag-cat-cruda" : ""}`}>
-                                {c}
-                              </span>
-                            ))}
+                            <div className="mag-cat-row">
+                              <span className="mag-cat">{editorialLabel(post.editorial_type)}</span>
+                              {(post.categories ?? []).slice(0, 1).map((c) => (
+                                <span key={c} className={`mag-cat ${c === "Zona Cruda" ? "mag-cat-cruda" : ""}`}>
+                                  {c}
+                                </span>
+                              ))}
+                            </div>
                             <div className="mag-meta">
                               <span>{formatDate(post.created_at)}</span>
                               <span className="dot">·</span>
@@ -320,7 +343,7 @@ export default async function BlogIndexPage({
                           </p>
                           <div className="mag-card-actions">
                             <Link className="mag-btn mag-btn-ghost" href={postHref(post)}>
-                              Leer artículo
+                              Leer historia
                             </Link>
                           </div>
                         </div>
@@ -347,25 +370,25 @@ export default async function BlogIndexPage({
 
             <aside className="mag-blog-aside">
               <div className="mag-side">
-                <div className="mag-side-title">Trending esta semana</div>
+                <div className="mag-side-title">Lo que se está leyendo</div>
                 {trending.length ? (
                   <div className="mag-side-list">
                     {trending.map((p) => (
                       <Link key={p.id} href={postHref(p)} className="mag-side-item">
                         <span className="clamp-2">{p.title}</span>
-                        <span className="mag-small">{p.reading_time_minutes} min</span>
+                        <span className="mag-small">{editorialLabel(p.editorial_type)} · {p.reading_time_minutes} min</span>
                       </Link>
                     ))}
                   </div>
                 ) : (
-                  <p className="mag-small">Sin datos aún.</p>
+                  <p className="mag-small">Todavía no hay datos de lectura.</p>
                 )}
               </div>
 
               <div className="mag-side">
-                <div className="mag-side-title">Suscríbete</div>
+                <div className="mag-side-title">Que el algoritmo no decida por ti</div>
                 <p className="mag-small" style={{ marginTop: 10 }}>
-                  Sin spam. Solo lo que vale.
+                  Episodios, historias y lo que de verdad vale la pena — directo a tu correo.
                 </p>
                 <NewsletterForm />
               </div>
