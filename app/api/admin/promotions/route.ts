@@ -18,31 +18,65 @@ type PromotionPayload = {
   starts_at?: string | null;
   ends_at?: string | null;
   updated_at?: string;
+  campaign_id?: string | null;
+  advertiser?: string | null;
+  creative_id?: string | null;
+  weight?: number;
+  frequency_cap?: number | null;
+  max_impressions?: number | null;
+  daily_cap?: number | null;
+  target_region?: string | null;
+  device_target?: string | null;
+  revenue_cents?: number;
 };
+
+const SELECT_COLUMNS = [
+  "id",
+  "title",
+  "description",
+  "image_url",
+  "image_path",
+  "cta_label",
+  "cta_url",
+  "promo_type",
+  "target_sections",
+  "placement",
+  "display_order",
+  "is_active",
+  "starts_at",
+  "ends_at",
+  "campaign_id",
+  "advertiser",
+  "creative_id",
+  "weight",
+  "frequency_cap",
+  "max_impressions",
+  "daily_cap",
+  "target_region",
+  "device_target",
+  "revenue_cents"
+].join(", ");
+
+function nullablePositiveNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.floor(parsed);
+}
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireStaffApi(request, "manage_promotions");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
-    const primary = await auth.service
+    const response = await auth.service
       .from("promotions")
-      .select("id, title, description, image_url, image_path, cta_label, cta_url, promo_type, target_sections, placement, display_order, is_active, starts_at, ends_at")
+      .select(SELECT_COLUMNS)
       .order("display_order", { ascending: true })
       .order("created_at", { ascending: false });
 
-    if (primary.error && /(promo_type|target_sections)/i.test(primary.error.message)) {
-      const fallback = await auth.service
-        .from("promotions")
-        .select("id, title, description, image_url, image_path, cta_label, cta_url, placement, display_order, is_active, starts_at, ends_at")
-        .order("display_order", { ascending: true })
-        .order("created_at", { ascending: false });
-      if (fallback.error) return NextResponse.json({ ok: false, error: fallback.error.message }, { status: 400 });
-      return NextResponse.json({ ok: true, items: fallback.data ?? [] });
-    }
-
-    if (primary.error) return NextResponse.json({ ok: false, error: primary.error.message }, { status: 400 });
-    return NextResponse.json({ ok: true, items: primary.data ?? [] });
+    if (response.error) return NextResponse.json({ ok: false, error: response.error.message }, { status: 400 });
+    return NextResponse.json({ ok: true, items: response.data ?? [] });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });
   }
@@ -62,6 +96,9 @@ export async function POST(request: NextRequest) {
       ? Array.from(new Set(payload.target_sections.map((x) => String(x).trim()).filter(Boolean)))
       : null;
 
+    const weight = Math.max(1, Math.min(10000, Math.floor(Number(payload.weight ?? 100) || 100)));
+    const revenueCents = Math.max(0, Math.floor(Number(payload.revenue_cents ?? 0) || 0));
+
     const writePayload: Record<string, any> = {
       title,
       description: payload.description ?? null,
@@ -76,18 +113,22 @@ export async function POST(request: NextRequest) {
       ends_at: payload.ends_at ?? null,
       updated_at: payload.updated_at ?? new Date().toISOString(),
       promo_type: payload.promo_type ?? "sponsor",
-      target_sections: normalizedSections
+      target_sections: normalizedSections,
+      campaign_id: String(payload.campaign_id ?? "").trim() || null,
+      advertiser: String(payload.advertiser ?? "").trim() || null,
+      creative_id: String(payload.creative_id ?? "").trim() || null,
+      weight,
+      frequency_cap: nullablePositiveNumber(payload.frequency_cap),
+      max_impressions: nullablePositiveNumber(payload.max_impressions),
+      daily_cap: nullablePositiveNumber(payload.daily_cap),
+      target_region: String(payload.target_region ?? "").trim() || null,
+      device_target: String(payload.device_target ?? "all").trim().toLowerCase() || "all",
+      revenue_cents: revenueCents
     };
 
     const id = String(payload.id ?? "").trim();
     if (id) {
-      let updateResp = await auth.service.from("promotions").update(writePayload).eq("id", id).select("*").single();
-      if (updateResp.error && /(promo_type|target_sections)/i.test(updateResp.error.message)) {
-        const fallbackPayload = { ...writePayload };
-        delete fallbackPayload.promo_type;
-        delete fallbackPayload.target_sections;
-        updateResp = await auth.service.from("promotions").update(fallbackPayload).eq("id", id).select("*").single();
-      }
+      const updateResp = await auth.service.from("promotions").update(writePayload).eq("id", id).select("*").single();
       if (updateResp.error) return NextResponse.json({ ok: false, error: updateResp.error.message }, { status: 400 });
 
       await logAdminAudit(auth.service, {
@@ -95,20 +136,24 @@ export async function POST(request: NextRequest) {
         action: "admin.promotions.update",
         targetTable: "promotions",
         targetId: id,
-        meta: { placement: writePayload.placement, is_active: writePayload.is_active, has_image: Boolean(writePayload.image_url) },
+        meta: {
+          placement: writePayload.placement,
+          is_active: writePayload.is_active,
+          has_image: Boolean(writePayload.image_url),
+          campaign_id: writePayload.campaign_id,
+          advertiser: writePayload.advertiser,
+          weight: writePayload.weight,
+          frequency_cap: writePayload.frequency_cap,
+          max_impressions: writePayload.max_impressions,
+          daily_cap: writePayload.daily_cap
+        },
         ...reqMeta
       });
 
       return NextResponse.json({ ok: true, item: updateResp.data });
     }
 
-    let insertResp = await auth.service.from("promotions").insert(writePayload).select("*").single();
-    if (insertResp.error && /(promo_type|target_sections)/i.test(insertResp.error.message)) {
-      const fallbackPayload = { ...writePayload };
-      delete fallbackPayload.promo_type;
-      delete fallbackPayload.target_sections;
-      insertResp = await auth.service.from("promotions").insert(fallbackPayload).select("*").single();
-    }
+    const insertResp = await auth.service.from("promotions").insert(writePayload).select("*").single();
     if (insertResp.error) return NextResponse.json({ ok: false, error: insertResp.error.message }, { status: 400 });
 
     await logAdminAudit(auth.service, {
@@ -116,7 +161,14 @@ export async function POST(request: NextRequest) {
       action: "admin.promotions.create",
       targetTable: "promotions",
       targetId: String((insertResp.data as any)?.id ?? ""),
-      meta: { placement: writePayload.placement, is_active: writePayload.is_active, has_image: Boolean(writePayload.image_url) },
+      meta: {
+        placement: writePayload.placement,
+        is_active: writePayload.is_active,
+        has_image: Boolean(writePayload.image_url),
+        campaign_id: writePayload.campaign_id,
+        advertiser: writePayload.advertiser,
+        weight: writePayload.weight
+      },
       ...reqMeta
     });
 
@@ -125,4 +177,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });
   }
 }
-
