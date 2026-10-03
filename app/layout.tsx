@@ -45,6 +45,25 @@ const oneSignalSafariWebId = String(
   process.env.NEXT_PUBLIC_ONESIGNAL_SAFARI_WEB_ID ?? process.env.ONESIGNAL_SAFARI_WEB_ID ?? ""
 ).trim();
 
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "@id": `${siteUrl}/#organization`,
+  name: "Sin Pelos en el Micrófono",
+  legalName: "B&B Entertainment Hub LLC",
+  url: siteUrl,
+  logo: {
+    "@type": "ImageObject",
+    url: iconImage
+  },
+  sameAs: [
+    "https://www.facebook.com/sinpelosenelmicrofono",
+    "https://www.instagram.com/sinpelosenelmicrofono",
+    "https://www.tiktok.com/@sinpelosenelmicrofono",
+    "https://www.youtube.com/@SinPelosEnElMicrofono"
+  ]
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "Sin Pelos en el Micrófono",
@@ -83,37 +102,6 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`${displayFont.variable} ${bodyFont.variable}`}>
-      <head>
-        {oneSignalAppId ? (
-          <>
-            <script id="onesignal-sdk-head" src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer />
-            <script
-              id="onesignal-init-head"
-              dangerouslySetInnerHTML={{
-                __html: `window.OneSignalDeferred = window.OneSignalDeferred || [];
-window.__spmOneSignalInitQueued = true;
-OneSignalDeferred.push(async function(OneSignal) {
-  try {
-    await OneSignal.init({
-      appId: "${oneSignalAppId}",
-      serviceWorkerPath: "/OneSignalSDKWorker.js",
-      serviceWorkerUpdaterPath: "/OneSignalSDKUpdaterWorker.js",
-      serviceWorkerParam: { scope: "/" },
-      notifyButton: { enable: true, position: "bottom-right" }${oneSignalSafariWebId ? `,\n      safari_web_id: "${oneSignalSafariWebId}"` : ""}
-    });
-    window.__spmOneSignalInitialized = true;
-    window.__spmOneSignalInitError = undefined;
-  } catch (e) {
-    window.__spmOneSignalInitialized = false;
-    window.__spmOneSignalInitQueued = false;
-    window.__spmOneSignalInitError = String((e && e.message) || e || "OneSignal init failed");
-  }
-});`
-              }}
-            />
-          </>
-        ) : null}
-      </head>
       <body>
         <a className="skip-link" href="#main-content">Saltar al contenido</a>
         <PageViewTracker />
@@ -124,6 +112,10 @@ OneSignalDeferred.push(async function(OneSignal) {
         <PromoPopup />
         <Toaster />
         <div id="main-content">{children}</div>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
       </body>
     </html>
   );
