@@ -20,14 +20,22 @@ type MidContentAdSlotProps = {
   section?: PromoSection;
   className?: string;
   compact?: boolean;
+  houseFallback?: boolean;
 };
 
-export function MidContentAdSlot({ placement = "mid_content", section, className, compact = false }: MidContentAdSlotProps = {}) {
+export function MidContentAdSlot({
+  placement = "mid_content",
+  section,
+  className,
+  compact = false,
+  houseFallback = true
+}: MidContentAdSlotProps = {}) {
   const pathname = usePathname() ?? "/";
   const currentSection = section ?? promoSectionFromPath(pathname);
   const ref = useRef<HTMLDivElement | null>(null);
   const [promo, setPromo] = useState<Promo | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [resolved, setResolved] = useState(false);
   const [animate, setAnimate] = useState(false);
   const sentImpression = useRef(false);
 
@@ -41,7 +49,7 @@ export function MidContentAdSlot({ placement = "mid_content", section, className
         obs.disconnect();
         if (!loaded) setLoaded(true);
       },
-      { rootMargin: "200px 0px" }
+      { rootMargin: "320px 0px" }
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -49,22 +57,29 @@ export function MidContentAdSlot({ placement = "mid_content", section, className
 
   useEffect(() => {
     if (!loaded) return;
+    let active = true;
     const run = async () => {
       const sid = getSessionId();
       const res = await fetch(
         `/api/promotions/active?placement=${encodeURIComponent(placement)}&limit=1&section=${encodeURIComponent(currentSection)}&sid=${encodeURIComponent(sid)}`,
         { cache: "no-store" }
       ).catch(() => null);
+      if (!active) return;
       if (!res?.ok) {
         setPromo(null);
+        setResolved(true);
         return;
       }
       const json = await res.json().catch(() => null);
       const item = (json?.items?.[0] ?? null) as Promo | null;
       setPromo(item);
+      setResolved(true);
       sentImpression.current = false;
     };
     run();
+    return () => {
+      active = false;
+    };
   }, [loaded, currentSection, placement]);
 
   useEffect(() => {
@@ -99,7 +114,7 @@ export function MidContentAdSlot({ placement = "mid_content", section, className
   };
 
   return (
-    <div ref={ref} className={`mid-ad-slot ${className ?? ""}`.trim()} aria-label="Promoción">
+    <div ref={ref} className={`mid-ad-slot mid-ad-reserved ${compact ? "mid-ad-slot-compact" : ""} ${className ?? ""}`.trim()} aria-label="Promoción">
       {promo ? (
         <div className={`card mid-ad ${compact ? "mid-ad-compact" : ""} ${animate ? "promo-animate-in" : ""}`} data-type={promo.promo_type ?? "sponsor"}>
           <div className="mid-ad-top">
@@ -120,7 +135,16 @@ export function MidContentAdSlot({ placement = "mid_content", section, className
             </a>
           ) : null}
         </div>
-      ) : null}
+      ) : resolved && houseFallback ? (
+        <a className={`card mid-ad mid-ad-house ${compact ? "mid-ad-compact" : ""}`} href="/publicidad">
+          <div className="mid-ad-top"><span className="badge">ANÚNCIATE</span></div>
+          <div className="mid-ad-title">Tu marca puede ocupar este espacio.</div>
+          <div className="muted mid-ad-desc">Campañas en Sin Pelos con ubicación clara, impresiones, clics y CTR medibles.</div>
+          <span className="button secondary">VER OPCIONES</span>
+        </a>
+      ) : (
+        <div className="mid-ad-loading" aria-hidden="true" />
+      )}
     </div>
   );
 }
