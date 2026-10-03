@@ -5,6 +5,19 @@ import { supabaseService } from "@/lib/supabaseService";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const SELLABLE_PLACEMENTS = [
+  "top_banner",
+  "home_featured",
+  "home_mid",
+  "section_header",
+  "mid_content",
+  "article_inline_2",
+  "side_sticky",
+  "podcast_sponsor",
+  "community_partner",
+  "bottom_sticky",
+];
+
 type Promotion = {
   id: string;
   title: string;
@@ -13,6 +26,14 @@ type Promotion = {
   is_active: boolean;
   starts_at: string | null;
   ends_at: string | null;
+  campaign_id: string | null;
+  advertiser: string | null;
+  creative_id: string | null;
+  weight: number | null;
+  frequency_cap: number | null;
+  max_impressions: number | null;
+  daily_cap: number | null;
+  revenue_cents: number | null;
 };
 
 type PromoEvent = {
@@ -32,9 +53,13 @@ type CampaignMetric = {
   placements: Set<string>;
 };
 
-function pct(clicks: number, impressions: number) {
-  if (!impressions) return "0.00%";
-  return `${((clicks / impressions) * 100).toFixed(2)}%`;
+function pct(value: number, total: number) {
+  if (!total) return "0.00%";
+  return `${((value / total) * 100).toFixed(2)}%`;
+}
+
+function money(cents: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }
 
 function dateLabel(value: string | null) {
@@ -52,7 +77,7 @@ export default async function PromotionsReportPage() {
   const [promosResp, eventsResp] = await Promise.all([
     service
       .from("promotions")
-      .select("id,title,placement,promo_type,is_active,starts_at,ends_at")
+      .select("id,title,placement,promo_type,is_active,starts_at,ends_at,campaign_id,advertiser,creative_id,weight,frequency_cap,max_impressions,daily_cap,revenue_cents")
       .order("is_active", { ascending: false })
       .order("display_order", { ascending: true }),
     service
@@ -60,7 +85,7 @@ export default async function PromotionsReportPage() {
       .select("promotion_id,placement,event,session_id,created_at")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
-      .limit(50000)
+      .limit(50000),
   ]);
 
   const promotions = (promosResp.data ?? []) as Promotion[];
@@ -74,7 +99,7 @@ export default async function PromotionsReportPage() {
       clicks: 0,
       dismissals: 0,
       sessions: new Set<string>(),
-      placements: new Set<string>()
+      placements: new Set<string>(),
     });
   });
 
@@ -96,6 +121,10 @@ export default async function PromotionsReportPage() {
   const totalImpressions = rows.reduce((sum, row) => sum + row.impressions, 0);
   const totalClicks = rows.reduce((sum, row) => sum + row.clicks, 0);
   const totalSessions = new Set(events.map((event) => event.session_id).filter(Boolean)).size;
+  const totalRevenueCents = promotions.reduce((sum, promo) => sum + Number(promo.revenue_cents ?? 0), 0);
+  const activePlacements = new Set(promotions.filter((promo) => promo.is_active && SELLABLE_PLACEMENTS.includes(promo.placement)).map((promo) => promo.placement));
+  const inventoryOccupancy = pct(activePlacements.size, SELLABLE_PLACEMENTS.length);
+  const realizedCpm = totalImpressions > 0 ? (totalRevenueCents / 100 / totalImpressions) * 1000 : 0;
 
   return (
     <main className="admin-page">
@@ -103,11 +132,12 @@ export default async function PromotionsReportPage() {
         <div>
           <p className="page-kicker">MONETIZACIÓN · ÚLTIMOS 30 DÍAS</p>
           <h1>Reporte de sponsors</h1>
-          <p className="muted">Impresiones, clics, CTR, sesiones y placements registrados por campaña.</p>
+          <p className="muted">Impresiones, clics, CTR, sesiones, revenue y ocupación de inventario por campaña.</p>
         </div>
         <div className="admin-item-actions">
-          <Link className="button secondary" href="/admin/promotions">Gestionar promociones</Link>
-          <Link className="button secondary" href="/publicidad">Ver landing comercial</Link>
+          <Link className="button secondary" href="/admin/promotions">Gestionar campañas</Link>
+          <a className="button secondary" href="/api/admin/promotions/report?format=csv">Exportar CSV</a>
+          <Link className="button secondary" href="/publicidad">Landing comercial</Link>
         </div>
       </div>
 
@@ -118,37 +148,46 @@ export default async function PromotionsReportPage() {
         </div>
       ) : null}
 
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 14, marginBottom: 24 }}>
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginBottom: 24 }}>
         <article className="card"><p className="muted">Impresiones</p><h2>{totalImpressions.toLocaleString()}</h2></article>
         <article className="card"><p className="muted">Clics</p><h2>{totalClicks.toLocaleString()}</h2></article>
         <article className="card"><p className="muted">CTR global</p><h2>{pct(totalClicks, totalImpressions)}</h2></article>
-        <article className="card"><p className="muted">Sesiones alcanzadas</p><h2>{totalSessions.toLocaleString()}</h2></article>
+        <article className="card"><p className="muted">Sesiones</p><h2>{totalSessions.toLocaleString()}</h2></article>
+        <article className="card"><p className="muted">Revenue contratado</p><h2>{money(totalRevenueCents)}</h2></article>
+        <article className="card"><p className="muted">Ocupación inventario</p><h2>{inventoryOccupancy}</h2><small className="muted">{activePlacements.size}/{SELLABLE_PLACEMENTS.length} placements con campaña activa</small></article>
+        <article className="card"><p className="muted">CPM contractual aprox.</p><h2>${realizedCpm.toFixed(2)}</h2><small className="muted">Revenue contratado / impresiones registradas</small></article>
       </section>
 
       <section className="card" style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1180 }}>
           <thead>
             <tr style={{ textAlign: "left" }}>
               <th style={{ padding: 12 }}>Campaña</th>
+              <th style={{ padding: 12 }}>Advertiser</th>
               <th style={{ padding: 12 }}>Estado</th>
               <th style={{ padding: 12 }}>Placement</th>
               <th style={{ padding: 12 }}>Impresiones</th>
               <th style={{ padding: 12 }}>Clics</th>
               <th style={{ padding: 12 }}>CTR</th>
               <th style={{ padding: 12 }}>Sesiones</th>
+              <th style={{ padding: 12 }}>Caps</th>
+              <th style={{ padding: 12 }}>Revenue</th>
               <th style={{ padding: 12 }}>Periodo</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.promotion.id} style={{ borderTop: "1px solid rgba(255,255,255,.08)" }}>
-                <td style={{ padding: 12 }}><strong>{row.promotion.title}</strong><div className="muted" style={{ fontSize: 12 }}>{row.promotion.promo_type ?? "sponsor"}</div></td>
+                <td style={{ padding: 12 }}><strong>{row.promotion.title}</strong><div className="muted" style={{ fontSize: 12 }}>{row.promotion.campaign_id || "Sin campaign ID"} · {row.promotion.creative_id || "Sin creative ID"}</div></td>
+                <td style={{ padding: 12 }}>{row.promotion.advertiser || "—"}</td>
                 <td style={{ padding: 12 }}>{row.promotion.is_active ? "Activa" : "Inactiva"}</td>
                 <td style={{ padding: 12 }}>{Array.from(row.placements).join(", ") || row.promotion.placement}</td>
                 <td style={{ padding: 12 }}>{row.impressions.toLocaleString()}</td>
                 <td style={{ padding: 12 }}>{row.clicks.toLocaleString()}</td>
                 <td style={{ padding: 12 }}>{pct(row.clicks, row.impressions)}</td>
                 <td style={{ padding: 12 }}>{row.sessions.size.toLocaleString()}</td>
+                <td style={{ padding: 12 }}><small>sesión {row.promotion.frequency_cap ?? "∞"}<br />día {row.promotion.daily_cap ?? "∞"}<br />total {row.promotion.max_impressions ?? "∞"}</small></td>
+                <td style={{ padding: 12 }}>{money(Number(row.promotion.revenue_cents ?? 0))}</td>
                 <td style={{ padding: 12 }}>{dateLabel(row.promotion.starts_at)} → {dateLabel(row.promotion.ends_at)}</td>
               </tr>
             ))}
