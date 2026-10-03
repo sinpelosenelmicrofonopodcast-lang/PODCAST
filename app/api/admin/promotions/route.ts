@@ -54,7 +54,8 @@ const SELECT_COLUMNS = [
   "daily_cap",
   "target_region",
   "device_target",
-  "revenue_cents"
+  "revenue_cents",
+  "report_token"
 ].join(", ");
 
 function nullablePositiveNumber(value: unknown) {
