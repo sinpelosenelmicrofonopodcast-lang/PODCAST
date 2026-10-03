@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { trackPromoEvent } from "@/lib/promoTracking";
+import { getSessionId, trackPromoEvent } from "@/lib/promoTracking";
 import { promoSectionFromPath, type PromoSection } from "@/lib/promoSection";
 
 type Promo = {
@@ -23,10 +23,15 @@ export function DesktopSideAdSlot({ section }: { section?: PromoSection }) {
 
   useEffect(() => {
     const run = async () => {
-      const res = await fetch(`/api/promotions/active?placement=mid_content&limit=1&section=${encodeURIComponent(currentSection)}`, {
-        cache: "no-store"
-      }).catch(() => null);
-      if (!res?.ok) return;
+      const sid = getSessionId();
+      const res = await fetch(
+        `/api/promotions/active?placement=side_sticky&limit=1&section=${encodeURIComponent(currentSection)}&sid=${encodeURIComponent(sid)}`,
+        { cache: "no-store" }
+      ).catch(() => null);
+      if (!res?.ok) {
+        setPromo(null);
+        return;
+      }
       const json = await res.json().catch(() => null);
       setPromo((json?.items?.[0] ?? null) as Promo | null);
       sentImpression.current = false;
@@ -35,8 +40,7 @@ export function DesktopSideAdSlot({ section }: { section?: PromoSection }) {
   }, [currentSection]);
 
   useEffect(() => {
-    if (!promo) return;
-    if (sentImpression.current) return;
+    if (!promo || sentImpression.current) return;
     sentImpression.current = true;
     trackPromoEvent({
       promotionId: promo.id,
@@ -67,7 +71,7 @@ export function DesktopSideAdSlot({ section }: { section?: PromoSection }) {
           {promo.promo_type === "internal" ? "SPM" : promo.promo_type === "affiliate" ? "Recomendado" : "Sponsor"}
         </span>
         <div className="news-side-ad-media">
-          <img src={promo.image_url || "/logo.png"} alt={promo.title} loading="lazy" decoding="async" />
+          <img src={promo.image_url || "/logo.png"} alt={promo.title} width={300} height={600} loading="lazy" decoding="async" />
         </div>
         <div className="news-side-ad-title clamp-2">{promo.title}</div>
         <span className="news-side-ad-cta">{promo.cta_label ?? "Ver"}</span>
@@ -75,4 +79,3 @@ export function DesktopSideAdSlot({ section }: { section?: PromoSection }) {
     </aside>
   );
 }
-
