@@ -195,6 +195,67 @@ export async function fetchYouTubeVideos(limit = 25, options?: FetchYouTubeVideo
     });
 }
 
+function decodeXml(value: string) {
+  return String(value ?? "")
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'");
+}
+
+function xmlTag(entry: string, tag: string) {
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return decodeXml(entry.match(new RegExp(`<${escaped}[^>]*>([\\s\\S]*?)<\\/${escaped}>`, "i"))?.[1] ?? "").trim();
+}
+
+function looksLikeFullEpisodeTitle(title: string) {
+  const text = String(title ?? "").trim();
+  if (!text) return false;
+  if (/\b(shorts?|reel|clip)\b/i.test(text) || /#shorts?\b/i.test(text)) return false;
+  return /\bEP\s*#?\s*\d{2,3}\b/i.test(text) || /\bepisodio\s*#?\s*\d{2,3}\b/i.test(text) || /\bsin pelos en el micr[oó]fono\b/i.test(text);
+}
+
+/**
+ * Quota-free freshness fallback. YouTube's Atom feed exposes the latest channel uploads
+ * without using the Data API quota. We intentionally use it only for the newest full
+ * episode candidate because it does not provide duration/statistics for the entire archive.
+ */
+export async function fetchLatestYouTubeEpisodeFromFeed(options?: FetchYouTubeVideosOptions): Promise<YouTubeVideo | null> {
+  const channelId = requireEnv("YOUTUBE_CHANNEL_ID");
+  const feedUrl = new URL("https://www.youtube.com/feeds/videos.xml");
+  feedUrl.searchParams.set("channel_id", channelId);
+  const response = await fetch(feedUrl.toString(), fetchOptionsFor(options));
+  if (!response.ok) throw new Error(`YouTube feed request failed (${response.status}).`);
+  const xml = await response.text();
+  const entries = xml.match(/<entry>[\s\S]*?<\/entry>/gi) ?? [];
+
+  const candidates = entries
+    .map((entry) => {
+      const id = xmlTag(entry, "yt:videoId");
+      const title = xmlTag(entry, "title");
+      const publishedAt = xmlTag(entry, "published");
+      const description = xmlTag(entry, "media:description");
+      if (!/^[A-Za-z0-9_-]{11}$/.test(id) || !looksLikeFullEpisodeTitle(title)) return null;
+      return {
+        id,
+        title,
+        description,
+        publishedAt,
+        thumbnailUrl: `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`,
+        viewCount: 0,
+        likeCount: 0,
+        commentCount: 0,
+        durationSeconds: 0
+      } satisfies YouTubeVideo;
+    })
+    .filter((item): item is YouTubeVideo => Boolean(item))
+    .sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
+
+  return candidates[0] ?? null;
+}
+
 export function getYouTubeVideoId(input?: string | null): string | null {
   if (!input) return null;
   const raw = String(input).trim();
