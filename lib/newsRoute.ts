@@ -1,4 +1,5 @@
 export const NEWS_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const LEGACY_EDITORIAL_RE = /^editorial-([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
 
 export type NewsRouteRef = {
   id: string;
@@ -10,7 +11,9 @@ export function isUuid(value: string | null | undefined) {
 }
 
 export function normalizeNewsKey(value: string | null | undefined) {
-  return decodeURIComponent(String(value ?? "").trim()).replace(/\/+$/, "");
+  const clean = decodeURIComponent(String(value ?? "").trim()).replace(/\/+$/, "");
+  const legacy = clean.match(LEGACY_EDITORIAL_RE);
+  return legacy?.[1] ?? clean;
 }
 
 export function newsPathKey(input: Pick<NewsRouteRef, "id" | "slug">) {
