@@ -75,14 +75,30 @@ export default async function HomePage() {
   ]);
 
   const featuredPodcast = livePodcast ?? overview.podcast.featured;
-  const freshHeroLead = isFreshApprovedNews(overview.hero.lead) ? overview.hero.lead : null;
-  const freshHeroTrending = overview.hero.trending.filter(isFreshApprovedNews);
+  const approvedHeroLead = isFreshApprovedNews(overview.hero.lead) ? overview.hero.lead : null;
+  const approvedHeroTrending = overview.hero.trending.filter(isFreshApprovedNews);
   const freshRegions = {
     puertoRico: overview.regions.puertoRico.filter(isFreshApprovedNews),
     texas: overview.regions.texas.filter(isFreshApprovedNews),
     usa: overview.regions.usa.filter(isFreshApprovedNews),
     mundo: overview.regions.mundo.filter(isFreshApprovedNews)
   };
+
+  // A stale featured pick must not leave the hero empty when current stories exist.
+  const freshCandidates = [
+    ...approvedHeroTrending,
+    ...freshRegions.puertoRico,
+    ...freshRegions.texas,
+    ...freshRegions.usa,
+    ...freshRegions.mundo
+  ].sort((a, b) => new Date(b.published_at ?? "").getTime() - new Date(a.published_at ?? "").getTime());
+  const freshHeroLead = approvedHeroLead ?? freshCandidates[0] ?? null;
+  const seenHeroIds = new Set<string>(freshHeroLead ? [freshHeroLead.id] : []);
+  const freshHeroTrending = [...approvedHeroTrending, ...freshCandidates].filter((item) => {
+    if (seenHeroIds.has(item.id)) return false;
+    seenHeroIds.add(item.id);
+    return true;
+  }).slice(0, 3);
 
   const freshNewsIds = new Set<string>();
   if (freshHeroLead?.id) freshNewsIds.add(freshHeroLead.id);
