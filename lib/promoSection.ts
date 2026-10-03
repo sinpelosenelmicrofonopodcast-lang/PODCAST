@@ -1,5 +1,6 @@
 export type PromoSection =
   | "home"
+  | "podcast"
   | "blog"
   | "musica"
   | "emprendimiento"
@@ -18,6 +19,7 @@ export type PromoSection =
 export const PROMO_TARGET_SECTIONS: Array<{ id: PromoSection | "all"; label: string }> = [
   { id: "all", label: "Global (All)" },
   { id: "home", label: "Home" },
+  { id: "podcast", label: "Podcast" },
   { id: "blog", label: "Blog" },
   { id: "musica", label: "Música" },
   { id: "emprendimiento", label: "Emprendimiento" },
@@ -36,6 +38,7 @@ export const PROMO_TARGET_SECTIONS: Array<{ id: PromoSection | "all"; label: str
 export function promoSectionFromPath(pathname: string): PromoSection {
   const p = String(pathname ?? "").trim() || "/";
   if (p === "/") return "home";
+  if (p.startsWith("/podcast")) return "podcast";
   if (p.startsWith("/blog")) return "blog";
   if (p.startsWith("/musica")) return "musica";
   if (p.startsWith("/emprendimiento")) return "emprendimiento";
