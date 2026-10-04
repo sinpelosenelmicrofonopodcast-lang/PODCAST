@@ -115,6 +115,27 @@ export default async function PodcastEpisodePage({ params }: { params: { slug: s
   const related = allEpisodes.filter((row) => catalogKey(row) !== currentKey).slice(0, 4);
   const duration = formatDuration(episode.duration_seconds);
   const heroDescription = cleanEpisodeDescription(episode.description);
+  const episodeCodeMatch = episode.title.match(/(?:EP(?:ISODIO)?\s*#?\s*)(\d+)/i);
+  const effectiveEditorial = editorial ?? {
+    id: `fallback-${episode.id}`,
+    episode_key: currentKey,
+    episode_slug: episode.slug,
+    episode_code: episodeCodeMatch ? `EP${episodeCodeMatch[1]}` : null,
+    youtube_url: episode.youtube_url ?? null,
+    title: "Después del Micrófono",
+    guest_name: null,
+    episode_type: "mixed" as const,
+    intro: heroDescription,
+    person_story: heroDescription,
+    impact_summary: null,
+    lessons: [],
+    host_points: [],
+    quotes: [],
+    closing_reflection: "Cada episodio de Sin Pelos en el Micrófono queda documentado aquí como parte de nuestro archivo. Cuando exista material editorial verificado para esta conversación, esta misma página lo incorpora sin cambiar su dirección ni su estructura.",
+    status: "published" as const,
+    published_at: episode.published_at ?? null,
+    updated_at: episode.published_at ?? new Date(0).toISOString()
+  };
 
   const schema = buildPodcastEpisodeJsonLd({
     canonicalPath: `/podcast/${encodeURIComponent(episode.slug)}`,
@@ -166,13 +187,11 @@ export default async function PodcastEpisodePage({ params }: { params: { slug: s
         </div>
       </section>
 
-      {editorial ? (
-        <section className="episode-editorial-zone">
-          <div className="container">
-            <EpisodeEditorial editorial={editorial} />
-          </div>
-        </section>
-      ) : null}
+      <section className="episode-editorial-zone">
+        <div className="container">
+          <EpisodeEditorial editorial={effectiveEditorial} />
+        </div>
+      </section>
 
       <section className="episode-navigation-zone">
         <div className="container">
