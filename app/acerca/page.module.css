@@ -1,0 +1,21 @@
+.hostIntro {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: clamp(24px, 4vw, 44px);
+  align-items: center;
+}
+.portrait { margin: 0; min-width: 0; }
+.photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.portrait figcaption { margin-top: 12px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.bioIntro { min-width: 0; }
+.bioIntro h2 { margin-top: 0; }
+@media (max-width: 640px) {
+  .hostIntro { grid-template-columns: minmax(0, 1fr); }
+  .portrait { width: min(100%, 420px); margin-inline: auto; }
+}

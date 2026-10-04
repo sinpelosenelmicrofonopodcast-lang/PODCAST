@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Image from "next/image";
+import styles from "./page.module.css";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { buildSeoMetadata } from "@/lib/seo/meta";
@@ -45,12 +47,28 @@ export default function AcercaPage() {
             <a className="button" href="#bito">Conoce a Bito</a>
             <a className="button secondary" href="#bebo">Bebo, al otro lado de la mesa</a>
           </nav>
+          <section className={styles.hostIntro} aria-labelledby="bito">
+            <figure className={styles.portrait}>
+              <Image
+                src="/images/hosts/bito-sin-pelos-en-el-microfono.webp"
+                alt="Bito, co-host de Sin Pelos en el Micrófono, con traje oscuro y una sonrisa de complicidad"
+                width={1122}
+                height={1402}
+                sizes="(max-width: 640px) 100vw, 360px"
+                priority
+                className={styles.photo}
+              />
+              <figcaption>Bito · Co-host de Sin Pelos en el Micrófono</figcaption>
+            </figure>
+            <div className={styles.bioIntro}>
           <h2 id="bito" style={{ scrollMarginTop: 180 }}>Bito: lo bueno, lo malo y lo feo</h2>
           <p className="muted" style={{ fontSize: 18, lineHeight: 1.75, maxWidth: 820 }}>
             Bito es de esos tipos que pueden estar hablando de relaciones, masculinidad, dinero, música o sociedad y,
             cinco minutos después, convertir la conversación más seria del mundo en un vacilón que probablemente no
             debía decirse frente a un micrófono.
           </p>
+            </div>
+          </section>
 
           <div
             className="grid"
