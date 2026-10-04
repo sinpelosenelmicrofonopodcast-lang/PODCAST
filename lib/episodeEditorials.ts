@@ -94,7 +94,7 @@ function normalize(row: any): EpisodeEditorial {
 }
 
 export async function getPublishedEpisodeEditorial(
-  episode: Pick<SeoEpisode, "id" | "slug" | "youtube_url">
+  episode: Pick<SeoEpisode, "id" | "slug" | "youtube_url" | "title">
 ): Promise<EpisodeEditorial | null> {
   const supabase = supabaseServer();
   const keys = candidateKeys(episode);
