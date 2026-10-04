@@ -200,15 +200,93 @@ export default function AcercaPage() {
             </p>
           </aside>
 
-          <section className="card" style={{ marginTop: 28 }}>
-            <span className="badge">El otro lado de la mesa</span>
-            <h2 id="bebo" style={{ marginBottom: 8, scrollMarginTop: 180 }}>Bebo</h2>
-            <p className="muted" style={{ marginBottom: 0, lineHeight: 1.7 }}>
-              Host principal de Sin Pelos en el Micrófono y compañero de Bito en la mesa. Juntos llevan la conversación
-              entre historias, opiniones y vacilón. Para conocer cómo se complementan, hay que escuchar la conversación
-              completa: treinta segundos de un clip rara vez cuentan toda la historia.
-            </p>
+          <section className={styles.hostIntro} aria-labelledby="bebo" style={{ marginTop: 44 }}>
+            <figure className={styles.portrait}>
+              <Image
+                src="/images/hosts/bebo-sin-pelos-en-el-microfono.webp"
+                alt="Bebo, host principal de Sin Pelos en el Micrófono, vestido con traje rojo de estampado salvaje, gafas y cadenas"
+                width={520}
+                height={650}
+                sizes="(max-width: 640px) 100vw, 360px"
+                className={styles.photo}
+              />
+              <figcaption>Bebo · Host principal de Sin Pelos en el Micrófono</figcaption>
+            </figure>
+            <div className={styles.bioIntro}>
+              <span className="badge">El otro lado de la mesa</span>
+              <h2 id="bebo" style={{ marginTop: 14, scrollMarginTop: 180 }}>Bebo: presencia, vacilón y cero miedo al micrófono</h2>
+              <p className="muted" style={{ fontSize: 18, lineHeight: 1.75 }}>
+                Bebo es la voz que abre la puerta y hace que la conversación arranque. Tiene presencia, calle, humor y
+                esa habilidad de hablar con un invitado como si llevaran años conociéndose. Puede llevar una entrevista,
+                soltar el comentario que rompe la tensión y, segundos después, entrar de lleno en un tema serio.
+              </p>
+            </div>
           </section>
+
+          <article className="card" style={{ marginTop: 28, padding: "clamp(22px, 4vw, 40px)" }}>
+            <div style={{ display: "grid", gap: 22 }}>
+              <section>
+                <h2>El que prende la mesa</h2>
+                <p className="muted" style={{ lineHeight: 1.8 }}>
+                  Como host principal, Bebo marca buena parte del ritmo de Sin Pelos. No necesita convertir cada
+                  conversación en un interrogatorio. Prefiere provocar historias, dejar espacio para el vacilón y hacer
+                  que el invitado baje la guardia. Cuando eso pasa, empiezan a salir las conversaciones que no caben en
+                  una biografía de Instagram.
+                </p>
+              </section>
+              <section>
+                <h2>Lo bueno</h2>
+                <p className="muted" style={{ lineHeight: 1.8 }}>
+                  Es social, espontáneo y sabe conectar con gente muy distinta. Tiene energía de anfitrión: recibe,
+                  conversa, jode y mantiene viva la mesa. Su fortaleza no está solamente en hacer preguntas, sino en
+                  conseguir que la gente quiera contestarlas.
+                </p>
+              </section>
+              <section>
+                <h2>Lo malo</h2>
+                <p className="muted" style={{ lineHeight: 1.8 }}>
+                  El mismo impulso que hace que una conversación se sienta natural también puede mandarla por una
+                  tangente monumental. Si aparece una historia buena, un chisme, una opinión caliente o una oportunidad
+                  perfecta para joder a Bito, el libreto puede esperar.
+                </p>
+              </section>
+              <section>
+                <h2>Lo feo</h2>
+                <p className="muted" style={{ lineHeight: 1.8 }}>
+                  Bebo puede echarle gasolina a un tema solamente para ver hasta dónde llega. Le gusta el vacilón, no
+                  siempre abandona una provocación cuando debería y tiene la peligrosa costumbre de disfrutar demasiado
+                  cuando la mesa se descarrila. Para efectos del podcast, eso suele ser exactamente lo que necesitaba el
+                  episodio.
+                </p>
+              </section>
+              <section>
+                <h2>Bebo + Bito</h2>
+                <p className="muted" style={{ lineHeight: 1.8 }}>
+                  La química funciona porque no son el mismo personaje. Bebo empuja desde la conversación y la presencia;
+                  Bito cuestiona, contradice, analiza y mete el fuete desde otro ángulo. A veces están de acuerdo. A veces
+                  parece que ninguno escuchó al otro. Y muchas veces de esa fricción sale lo mejor de Sin Pelos.
+                </p>
+              </section>
+            </div>
+          </article>
+
+          <aside
+            className="card"
+            style={{
+              marginTop: 28,
+              borderColor: "rgba(255, 204, 51, 0.45)",
+              background:
+                "linear-gradient(135deg, rgba(255, 59, 59, 0.08), rgba(255, 204, 51, 0.08)), var(--panel)"
+            }}
+          >
+            <span className="badge">Antes de que formen un revolú</span>
+            <h2 style={{ marginBottom: 10 }}>Bebo también es un personaje.</h2>
+            <p className="muted" style={{ fontSize: 18, lineHeight: 1.8, marginBottom: 0 }}>
+              El Bebo que aparece frente al micrófono es una versión amplificada para Sin Pelos: más suelto, más
+              provocador y listo para entretener. ¿El Bebo real es más tranquilo? ¿Más peligroso? Eso se queda fuera de
+              cámara. Por ahora.
+            </p>
+          </aside>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 28 }}>
             <a className="button" href="/podcast">
