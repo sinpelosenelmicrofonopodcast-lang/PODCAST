@@ -9,3 +9,5 @@ La selección y caption quedan vinculados a un hash de aprobación. Hay una entr
 Las credenciales de Meta se transfieren desde la conexión del propietario en Social Manager al servicio editorial mediante el puente autenticado y quedan cifradas. El cron existente comprueba Drive cada minuto. No depende de una sesión de ChatGPT.
 
 Portadas: una plantilla 16:9 negra y naranja, logo oficial sin fondo, región, titular corto y subtítulo; imágenes conceptuales señaladas como «Ilustración editorial». No presentar una ilustración generada como fotografía del suceso.
+
+La portada es necesaria para aprobar desde la web, el agente o Drive. Una portada nueva vuelve a revisión; si la noticia ya estaba publicada, conserva su versión pública hasta aprobar la actualización. El panel avisa cuando la revisión abierta quedó desactualizada.

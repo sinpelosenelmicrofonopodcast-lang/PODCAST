@@ -47,13 +47,13 @@ export function MidContentAdSlot({
         const first = entries[0];
         if (!first?.isIntersecting) return;
         obs.disconnect();
-        if (!loaded) setLoaded(true);
+        setLoaded(true);
       },
       { rootMargin: "320px 0px" }
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [loaded]);
+  }, []);
 
   useEffect(() => {
     if (!loaded) return;
@@ -71,6 +71,7 @@ export function MidContentAdSlot({
         return;
       }
       const json = await res.json().catch(() => null);
+      if (!active) return;
       const item = (json?.items?.[0] ?? null) as Promo | null;
       setPromo(item);
       setResolved(true);
@@ -86,21 +87,35 @@ export function MidContentAdSlot({
     if (!promo) return;
     const key = `spm_promo_seen_${placement}_${currentSection}_${promo.id}`;
     const seen = sessionStorage.getItem(key) === "1";
-    if (!seen) {
-      sessionStorage.setItem(key, "1");
-      setAnimate(true);
-      window.setTimeout(() => setAnimate(false), 420);
-    }
-    if (sentImpression.current) return;
-    sentImpression.current = true;
-    trackPromoEvent({
-      promotionId: promo.id,
-      placement,
-      event: "impression",
-      path: pathname,
-      promoType: promo.promo_type ?? null
-    });
-  }, [promo, pathname, currentSection, placement]);
+    if (seen) return;
+    sessionStorage.setItem(key, "1");
+    setAnimate(true);
+    const timer = window.setTimeout(() => setAnimate(false), 420);
+    return () => window.clearTimeout(timer);
+  }, [promo, currentSection, placement]);
+
+  useEffect(() => {
+    if (!promo || sentImpression.current || !ref.current) return;
+    const el = ref.current;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (!first?.isIntersecting || first.intersectionRatio < 0.5 || sentImpression.current) return;
+        sentImpression.current = true;
+        trackPromoEvent({
+          promotionId: promo.id,
+          placement,
+          event: "impression",
+          path: pathname,
+          promoType: promo.promo_type ?? null
+        });
+        obs.disconnect();
+      },
+      { threshold: [0.5] }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [promo, pathname, placement]);
 
   const onClick = () => {
     if (!promo) return;
@@ -112,6 +127,8 @@ export function MidContentAdSlot({
       promoType: promo.promo_type ?? null
     });
   };
+
+  const outboundRel = promo?.promo_type === "internal" ? "noopener noreferrer" : "sponsored noopener noreferrer";
 
   return (
     <div ref={ref} className={`mid-ad-slot mid-ad-reserved ${compact ? "mid-ad-slot-compact" : ""} ${className ?? ""}`.trim()} aria-label="Promoción">
@@ -130,7 +147,7 @@ export function MidContentAdSlot({
           <div className="mid-ad-title clamp-2">{promo.title}</div>
           {promo.description ? <div className="muted mid-ad-desc clamp-3">{promo.description}</div> : null}
           {promo.cta_url ? (
-            <a className="button secondary" href={promo.cta_url} target="_blank" rel="noreferrer" onClick={onClick}>
+            <a className="button secondary" href={promo.cta_url} target="_blank" rel={outboundRel} onClick={onClick}>
               {promo.cta_label ?? "Ver"}
             </a>
           ) : null}
