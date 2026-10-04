@@ -1,3 +1,4 @@
+import { getPublishedEpisodes } from "@/lib/seo/content";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabaseServer";
@@ -747,23 +748,12 @@ function latestEpisodeCandidate(rows: ExternalPostRow[]) {
   return sorted.find((row) => isEpisodePost(row)) ?? sorted.find((row) => !isShortPost(row)) ?? null;
 }
 
-async function resolveLatestFeaturedEpisode(podcastRows: ExternalPostRow[]): Promise<HomePodcastItem | null> {
-  const syncedCandidate = latestEpisodeCandidate(podcastRows);
-
-  try {
-    const liveVideos = await fetchYouTubeVideos(25, { noStore: true });
-    const latestFullEpisode = [...liveVideos]
-      .filter((video) => !isShorts(video.durationSeconds))
-      .sort((a, b) => new Date(b.publishedAt ?? 0).getTime() - new Date(a.publishedAt ?? 0).getTime())[0];
-
-    if (latestFullEpisode) {
-      return youtubeVideoToHomePodcastItem(latestFullEpisode);
-    }
-  } catch {
-    // Fallback to synced rows below.
-  }
-
-  return syncedCandidate ? mapPodcastRow(syncedCandidate) : null;
+async function resolveLatestFeaturedEpisode(_podcastRows: ExternalPostRow[]): Promise<HomePodcastItem | null> {
+  const episode = (await getPublishedEpisodes(1))[0];
+  if (!episode) return null;
+  return { id: episode.slug, title: episode.title, caption: episode.description, media_url: episode.thumbnail_url,
+    source_url: episode.youtube_url, posted_at: episode.published_at, platform: "YouTube",
+    metrics: { durationSeconds: episode.duration_seconds ?? 0, isShort: false } };
 }
 
 function sponsorCandidate(row: PromotionRow) {

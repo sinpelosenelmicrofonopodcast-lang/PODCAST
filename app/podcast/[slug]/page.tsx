@@ -1,3 +1,4 @@
+import { comparePodcastEpisodes } from "@/lib/podcastOrder";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,7 +12,7 @@ import { resolveEpisodeBySlug } from "@/lib/episodeResolver";
 import { getPublishedEpisodeEditorial } from "@/lib/episodeEditorials";
 import { buildPodcastEpisodeJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
 import { DEFAULT_OG_IMAGE } from "@/lib/seo/constants";
-import { fetchYouTubeVideos, getYouTubeVideoId, isFullPodcastEpisode } from "@/lib/youtube";
+import { getYouTubeVideoId } from "@/lib/youtube";
 
 export const revalidate = 120;
 
@@ -72,41 +73,7 @@ function catalogKey(episode: Pick<SeoEpisode, "id" | "slug" | "youtube_url">) {
 }
 
 async function getCurrentCatalog(): Promise<SeoEpisode[]> {
-  const [stored, liveVideos] = await Promise.all([
-    getPublishedEpisodes(180),
-    fetchYouTubeVideos(180, { revalidateSeconds: 120 }).catch(() => [])
-  ]);
-  const live = liveVideos.filter(isFullPodcastEpisode);
-  const storedByVideo = new Map<string, SeoEpisode>();
-  stored.forEach((item) => {
-    const key = getYouTubeVideoId(item.youtube_url) || (/^[A-Za-z0-9_-]{11}$/.test(item.slug) ? item.slug : null);
-    if (key) storedByVideo.set(key, item);
-  });
-
-  const mergedByKey = new Map<string, SeoEpisode>();
-  live.forEach((video) => {
-    const saved = storedByVideo.get(video.id);
-    mergedByKey.set(video.id, {
-      id: saved?.id || video.id,
-      slug: saved?.slug || video.id,
-      title: video.title || saved?.title || "Episodio",
-      description: video.description || saved?.description || null,
-      youtube_url: `https://www.youtube.com/watch?v=${video.id}`,
-      audio_url: saved?.audio_url || null,
-      thumbnail_url: video.thumbnailUrl || saved?.thumbnail_url || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`,
-      duration_seconds: video.durationSeconds || saved?.duration_seconds || null,
-      is_published: true,
-      published_at: video.publishedAt || saved?.published_at || null,
-      updated_at: saved?.updated_at || video.publishedAt || null
-    });
-  });
-
-  stored.forEach((item) => {
-    const key = catalogKey(item);
-    if (!mergedByKey.has(key)) mergedByKey.set(key, item);
-  });
-
-  return [...mergedByKey.values()].sort((a, b) => safeTs(b.published_at) - safeTs(a.published_at));
+  return getPublishedEpisodes(1200);
 }
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
@@ -139,7 +106,7 @@ export default async function PodcastEpisodePage({ params }: { params: { slug: s
   const currentKey = catalogKey(episode);
   const allEpisodes = catalog.some((row) => catalogKey(row) === currentKey)
     ? catalog
-    : [episode, ...catalog].sort((a, b) => safeTs(b.published_at) - safeTs(a.published_at));
+    : [episode, ...catalog].sort(comparePodcastEpisodes);
   const idx = allEpisodes.findIndex((row) => catalogKey(row) === currentKey);
 
   // Catalog is newest -> oldest. "Anterior" means the older episode; "Siguiente" means the newer episode.

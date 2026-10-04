@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/seo-daily",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/youtube-sync",
+      "schedule": "20 */6 * * *"
     }
   ]
 }

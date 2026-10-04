@@ -1,4 +1,5 @@
 "use client";
+import { comparePodcastEpisodes } from "@/lib/podcastOrder";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -162,7 +163,7 @@ export function PodcastHubClient({
 
   const latestEpisode = useMemo(() => {
     if (enriched.length === 0) return null;
-    const sorted = [...enriched].sort((a, b) => b.publishedTs - a.publishedTs);
+    const sorted = [...enriched].sort(comparePodcastEpisodes);
     if (featuredEpisodeId) {
       return sorted.find((episode) => episode.id === featuredEpisodeId) ?? sorted[0];
     }
@@ -219,18 +220,18 @@ export function PodcastHubClient({
 
     const sorted = [...rows];
     if (sort === "oldest") {
-      sorted.sort((a, b) => a.publishedTs - b.publishedTs);
+      sorted.sort((a,b) => comparePodcastEpisodes(b,a));
     } else if (sort === "views") {
       const hasViews = sorted.some((episode) => Number(episode.viewCount ?? 0) > 0);
       if (hasViews) {
         sorted.sort((a, b) => Number(b.viewCount ?? 0) - Number(a.viewCount ?? 0));
       } else {
-        sorted.sort((a, b) => b.publishedTs - a.publishedTs);
+        sorted.sort(comparePodcastEpisodes);
       }
     } else if (sort === "featured") {
       sorted.sort((a, b) => b.featuredScore - a.featuredScore);
     } else {
-      sorted.sort((a, b) => b.publishedTs - a.publishedTs);
+      sorted.sort(comparePodcastEpisodes);
     }
     return sorted;
   }, [category, enriched, latestEpisode, month, query, sort, year]);

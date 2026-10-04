@@ -22,7 +22,7 @@ import {
 } from "@/lib/homepageQueries";
 import { queryPodcastEditorialPosts } from "@/lib/homeEditorialQueries";
 import { getPublishedEpisodes } from "@/lib/seo/content";
-import { fetchLatestYouTubeEpisodeFromFeed, fetchYouTubeVideos, isFullPodcastEpisode, type YouTubeVideo } from "@/lib/youtube";
+
 
 export const revalidate = 120;
 const CURRENT_NEWS_MAX_AGE_DAYS = 7;
@@ -42,42 +42,6 @@ function isFreshApprovedNews(item: HomeNewsItem | null | undefined) {
   return ageMs >= 0 && ageMs <= CURRENT_NEWS_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 }
 
-function podcastFromVideo(video: YouTubeVideo): HomePodcastItem {
-  return {
-    id: video.id,
-    title: video.title || "Último episodio",
-    caption: video.description || null,
-    source_url: `https://www.youtube.com/watch?v=${video.id}`,
-    media_url: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`,
-    posted_at: video.publishedAt || null,
-    platform: "YouTube",
-    metrics: {
-      views: video.viewCount || 0,
-      likes: video.likeCount || 0,
-      comments: video.commentCount || 0,
-      durationSeconds: video.durationSeconds || 0,
-      isShort: false
-    }
-  };
-}
-
-async function latestPodcastFromYouTube(): Promise<HomePodcastItem | null> {
-  try {
-    const videos = await fetchYouTubeVideos(80, { revalidateSeconds: 120 });
-    const video = videos.find(isFullPodcastEpisode);
-    if (video) return podcastFromVideo(video);
-  } catch {
-    // Data API can hit quota or temporary provider errors. Fall through to the public channel feed.
-  }
-
-  try {
-    const feedEpisode = await fetchLatestYouTubeEpisodeFromFeed({ revalidateSeconds: 120 });
-    return feedEpisode ? podcastFromVideo(feedEpisode) : null;
-  } catch {
-    return null;
-  }
-}
-
 async function latestStoredPodcast(): Promise<HomePodcastItem | null> {
   try {
     const episode = (await getPublishedEpisodes(1))[0];
@@ -88,7 +52,7 @@ async function latestStoredPodcast(): Promise<HomePodcastItem | null> {
       caption: episode.description || null,
       source_url: episode.youtube_url || episode.audio_url || `/podcast/${encodeURIComponent(episode.slug || episode.id)}`,
       media_url: episode.thumbnail_url || null,
-      posted_at: episode.published_at || episode.updated_at || null,
+      posted_at: episode.published_at || null,
       platform: episode.youtube_url ? "YouTube" : episode.audio_url ? "Podcast" : "Sin Pelos",
       metrics: episode.duration_seconds ? { durationSeconds: episode.duration_seconds, isShort: false } : null
     };
@@ -98,15 +62,14 @@ async function latestStoredPodcast(): Promise<HomePodcastItem | null> {
 }
 
 export default async function HomePage() {
-  const [overview, trending, podcastEditorials, livePodcast, storedPodcast] = await Promise.all([
+  const [overview, trending, podcastEditorials, storedPodcast] = await Promise.all([
     queryHomepageOverview(),
     queryHomepageTrending(),
     queryPodcastEditorialPosts(3),
-    latestPodcastFromYouTube(),
     latestStoredPodcast()
   ]);
 
-  const featuredPodcast = livePodcast ?? overview.podcast.featured ?? storedPodcast;
+  const featuredPodcast = storedPodcast;
   const approvedHeroLead = isFreshApprovedNews(overview.hero.lead) ? overview.hero.lead : null;
   const approvedHeroTrending = overview.hero.trending.filter(isFreshApprovedNews);
   const freshRegions = {

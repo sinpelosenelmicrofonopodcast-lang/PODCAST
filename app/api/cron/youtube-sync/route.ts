@@ -17,7 +17,6 @@ function isCronAuthorized(request: NextRequest) {
   if (auth === secret) return true;
   if (auth === `Bearer ${secret}`) return true;
   if ((request.headers.get("x-cron-secret") ?? "") === secret) return true;
-  if ((request.nextUrl.searchParams.get("secret") ?? "") === secret) return true;
   return false;
 }
 
@@ -80,3 +79,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: error?.message ?? "Unknown error" }, { status: 500 });
   }
 }
+
+export const GET = POST;

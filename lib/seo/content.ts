@@ -1,5 +1,6 @@
+import { comparePodcastEpisodes } from "@/lib/podcastOrder";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { getYouTubeVideoId } from "@/lib/youtube";
+import { isFullPodcastEpisode, getYouTubeVideoId } from "@/lib/youtube";
 
 export type SeoPost = {
   id: string;
@@ -128,7 +129,7 @@ async function getExternalPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> 
     if (!videoId) continue;
     const duration = Number(row?.metrics?.durationSeconds ?? 0);
     const isShort = row?.metrics?.isShort === true || (duration > 0 && duration <= 180) || sourceUrl.includes("/shorts/");
-    if (isShort) continue;
+    if (isShort || row.metrics?.visibility === "members" || !isFullPodcastEpisode({ title: row.title, description: row.caption, durationSeconds: duration }) || safeTimestamp(row.posted_at) > Date.now()) continue;
     const slug = maybeSlugFromSource(sourceUrl, String(row.id));
     if (seen.has(slug)) continue;
     seen.add(slug);
@@ -290,7 +291,7 @@ export async function getPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> {
           getYouTubeVideoId(episode.youtube_url) ??
           (/^[a-zA-Z0-9_-]{11}$/.test(String(episode.slug ?? "")) ? String(episode.slug) : null);
         const youtubePostedAt = byYoutubeId ? postedAtByVideoId.get(byYoutubeId) ?? null : null;
-        const effectivePublishedAt = youtubePostedAt ?? episode.published_at ?? episode.updated_at ?? null;
+        const effectivePublishedAt = episode.published_at ?? youtubePostedAt ?? null;
         return {
           ...episode,
           published_at: effectivePublishedAt
@@ -299,7 +300,7 @@ export async function getPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> {
       .sort((a, b) => {
         const byPublished = safeTimestamp(b.published_at) - safeTimestamp(a.published_at);
         if (byPublished !== 0) return byPublished;
-        return safeTimestamp(b.updated_at) - safeTimestamp(a.updated_at);
+        return String(a.slug).localeCompare(String(b.slug));
       });
   }
 
@@ -314,11 +315,8 @@ export async function getPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> {
   });
 
   return merged
-    .sort((a, b) => {
-      const byPublished = safeTimestamp(b.published_at) - safeTimestamp(a.published_at);
-      if (byPublished !== 0) return byPublished;
-      return safeTimestamp(b.updated_at) - safeTimestamp(a.updated_at);
-    })
+    .filter((episode) => !episode.published_at || safeTimestamp(episode.published_at) <= Date.now())
+    .sort(comparePodcastEpisodes)
     .slice(0, desiredLimit);
 }
 

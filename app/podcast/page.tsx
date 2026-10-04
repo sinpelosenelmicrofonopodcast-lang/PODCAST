@@ -1,3 +1,4 @@
+import { comparePodcastEpisodes } from "@/lib/podcastOrder";
 import { ListenLinks } from "@/components/podcast/ListenLinks";
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
@@ -8,7 +9,7 @@ import { getPublishedEpisodes } from "@/lib/seo/content";
 import { buildPodcastSeriesJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
 import { DEFAULT_OG_IMAGE } from "@/lib/seo/constants";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { fetchYouTubeVideos, getYouTubeVideoId, isFullPodcastEpisode } from "@/lib/youtube";
+import { getYouTubeVideoId } from "@/lib/youtube";
 import { PodcastHubClient, type PodcastEpisodeCardData } from "@/components/podcast/PodcastHubClient";
 
 export const revalidate = 120;
@@ -64,31 +65,20 @@ function cleanDescription(title: string, value?: string | null) {
   return raw || "Una conversación real, sin libreto y sin filtro.";
 }
 
-async function getLiveEpisodes() {
-  try {
-    const videos = await fetchYouTubeVideos(2500, { revalidateSeconds: 3600 });
-    return videos.filter(isFullPodcastEpisode);
-  } catch {
-    return [];
-  }
-}
-
 export async function generateMetadata(): Promise<Metadata> {
-  const live = await getLiveEpisodes();
-  const stored = live.length === 0 ? (await getPublishedEpisodes(1))[0] : null;
-  const latest = live[0];
+  const stored = (await getPublishedEpisodes(1))[0];
   return buildSeoMetadata({
     title: "Podcast | Episodios Sin Pelos en el Micrófono",
     description:
       "Todos los episodios completos de Sin Pelos en el Micrófono: conversaciones reales, invitados, historias y debates sin libreto.",
     path: "/podcast",
-    image: latest?.thumbnailUrl || stored?.thumbnail_url || DEFAULT_OG_IMAGE
+    image: stored?.thumbnail_url || DEFAULT_OG_IMAGE
   });
 }
 
 export default async function PodcastPage() {
   const supabase = supabaseServer();
-  const [storedEpisodes, liveEpisodes] = await Promise.all([getPublishedEpisodes(400), getLiveEpisodes()]);
+  const storedEpisodes = await getPublishedEpisodes(1200);
 
   const { data: metricsRows } = await supabase
     .from("external_posts")
@@ -106,7 +96,6 @@ export default async function PodcastPage() {
     if (!Number.isFinite(views) || views <= 0) return;
     viewsByVideoId.set(id, Math.max(viewsByVideoId.get(id) ?? 0, views));
   });
-  liveEpisodes.forEach((video) => viewsByVideoId.set(video.id, video.viewCount));
 
   const byVideoId = new Map<string, PodcastEpisodeCardData>();
   const noVideoId: PodcastEpisodeCardData[] = [];
@@ -120,7 +109,7 @@ export default async function PodcastPage() {
       slug: episode.slug,
       title: episode.title,
       description: cleanDescription(episode.title, episode.description),
-      publishedAt: episode.published_at ?? episode.updated_at ?? null,
+      publishedAt: episode.published_at ?? null,
       thumbnailUrl: episode.thumbnail_url || fallbackThumbnail(youtubeId),
       youtubeUrl: episode.youtube_url || (youtubeId ? `https://www.youtube.com/watch?v=${youtubeId}` : null),
       audioUrl: episode.audio_url,
@@ -131,28 +120,12 @@ export default async function PodcastPage() {
     else noVideoId.push(item);
   });
 
-  liveEpisodes.forEach((video) => {
-    const stored = byVideoId.get(video.id);
-    byVideoId.set(video.id, {
-      id: stored?.id || video.id,
-      slug: stored?.slug || video.id,
-      title: video.title || stored?.title || "Episodio",
-      description: cleanDescription(video.title || stored?.title || "Episodio", video.description || stored?.description),
-      publishedAt: video.publishedAt || stored?.publishedAt || null,
-      thumbnailUrl: video.thumbnailUrl || stored?.thumbnailUrl || fallbackThumbnail(video.id),
-      youtubeUrl: `https://www.youtube.com/watch?v=${video.id}`,
-      audioUrl: stored?.audioUrl || null,
-      durationSeconds: video.durationSeconds || stored?.durationSeconds || null,
-      viewCount: video.viewCount || stored?.viewCount || null
-    });
-  });
-
   const uiEpisodes = [...byVideoId.values(), ...noVideoId]
     .filter((episode, index, rows) => {
       const key = String(episode.slug || episode.id).trim();
       return key && rows.findIndex((candidate) => String(candidate.slug || candidate.id).trim() === key) === index;
     })
-    .sort((a, b) => safeDateToTs(b.publishedAt) - safeDateToTs(a.publishedAt));
+    .sort(comparePodcastEpisodes);
 
   const featured = uiEpisodes[0] ?? null;
   const seriesSchema = buildPodcastSeriesJsonLd({

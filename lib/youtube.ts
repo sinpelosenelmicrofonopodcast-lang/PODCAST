@@ -1,3 +1,4 @@
+import { supabaseServer } from "@/lib/supabaseServer";
 export type YouTubeVideo = {
   id: string;
   title: string;
@@ -38,7 +39,11 @@ function fetchOptionsFor(options?: FetchYouTubeVideosOptions) {
 
 async function fetchJson(url: URL, options?: FetchYouTubeVideosOptions) {
   const res = await fetch(url.toString(), fetchOptionsFor(options));
-  if (!res.ok) throw new Error(`YouTube request failed (${res.status}).`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const reason = String(body?.error?.errors?.[0]?.reason ?? "providerError");
+    throw new YouTubeProviderError(reason, res.status);
+  }
   return res.json();
 }
 
@@ -60,7 +65,7 @@ async function fetchUploadIds(
 
   const ids: string[] = [];
   let nextPageToken = "";
-  while (ids.length < maxResults) {
+  { // One uploads page per guarded sync; never run a full archive scan.
     const playlistUrl = new URL("https://www.googleapis.com/youtube/v3/playlistItems");
     playlistUrl.searchParams.set("key", apiKey);
     playlistUrl.searchParams.set("playlistId", uploadsPlaylistId);
@@ -80,45 +85,9 @@ async function fetchUploadIds(
     }
 
     nextPageToken = String(playlistJson?.nextPageToken ?? "").trim();
-    if (!nextPageToken || batchIds.length === 0) break;
+
   }
 
-  return ids;
-}
-
-async function fetchSearchIds(
-  apiKey: string,
-  channelId: string,
-  maxResults: number,
-  options?: FetchYouTubeVideosOptions
-): Promise<string[]> {
-  // Defensive fallback in case a channel account does not expose the uploads playlist.
-  const ids: string[] = [];
-  let nextPageToken = "";
-  while (ids.length < maxResults) {
-    const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
-    searchUrl.searchParams.set("key", apiKey);
-    searchUrl.searchParams.set("channelId", channelId);
-    searchUrl.searchParams.set("part", "snippet");
-    searchUrl.searchParams.set("order", "date");
-    searchUrl.searchParams.set("type", "video");
-    searchUrl.searchParams.set("maxResults", String(Math.min(50, maxResults - ids.length)));
-    if (nextPageToken) searchUrl.searchParams.set("pageToken", nextPageToken);
-
-    const searchJson = await fetchJson(searchUrl, options);
-    const items = Array.isArray(searchJson?.items) ? searchJson.items : [];
-    const batchIds = items
-      .map((item: any) => String(item?.id?.videoId ?? "").trim())
-      .filter((id: string) => /^[A-Za-z0-9_-]{11}$/.test(id));
-
-    for (const id of batchIds) {
-      if (!ids.includes(id)) ids.push(id);
-      if (ids.length >= maxResults) break;
-    }
-
-    nextPageToken = String(searchJson?.nextPageToken ?? "").trim();
-    if (!nextPageToken || batchIds.length === 0) break;
-  }
   return ids;
 }
 
@@ -135,17 +104,12 @@ export function isFullPodcastEpisode(video: Pick<YouTubeVideo, "title" | "descri
   return duration >= 8 * 60 && /\b(ep(?:isodio)?\.?\s*#?\s*\d+|podcast|sin pelos en el micr[oó]fono)\b/i.test(text);
 }
 
-export async function fetchYouTubeVideos(limit = 25, options?: FetchYouTubeVideosOptions): Promise<YouTubeVideo[]> {
+export async function fetchYouTubeVideosForSync(limit = 25, options?: FetchYouTubeVideosOptions): Promise<YouTubeVideo[]> {
   const apiKey = requireEnv("YOUTUBE_API_KEY");
   const channelId = requireEnv("YOUTUBE_CHANNEL_ID");
-  const maxResults = Math.min(Math.max(1, Math.floor(Number(limit) || 25)), 2500);
+  const maxResults = Math.min(Math.max(1, Math.floor(Number(limit) || 25)), 50);
 
-  let ids: string[] = [];
-  try {
-    ids = await fetchUploadIds(apiKey, channelId, maxResults, options);
-  } catch {
-    ids = await fetchSearchIds(apiKey, channelId, maxResults, options);
-  }
+  const ids = await fetchUploadIds(apiKey, channelId, maxResults, options);
 
   if (ids.length === 0) return [];
 
@@ -288,4 +252,22 @@ export function getYouTubeVideoId(input?: string | null): string | null {
   }
 
   return null;
+}
+
+export class YouTubeProviderError extends Error {
+  constructor(public reason: string, public status: number) { super(`YouTube: ${reason} (${status})`); }
+  get quotaExhausted() { return /quotaExceeded|dailyLimitExceeded|rateLimitExceeded/i.test(this.reason); }
+}
+
+/** Public readers use durable synchronized state. Only the guarded worker calls YouTube. */
+export async function fetchYouTubeVideos(limit = 25, _options?: FetchYouTubeVideosOptions): Promise<YouTubeVideo[]> {
+  const { data, error } = await supabaseServer().from("external_posts")
+    .select("external_id,title,caption,media_url,posted_at,metrics")
+    .eq("platform", "YouTube").order("posted_at", { ascending: false }).limit(Math.min(2500, Math.max(1, limit)));
+  if (error) throw new Error(error.message);
+  return (data ?? []).filter((v: any) => v.metrics?.visibility !== "members" && new Date(v.posted_at).getTime() <= Date.now()).map((v: any) => ({
+    id: v.external_id, title: v.title ?? "", description: v.caption ?? "", publishedAt: v.posted_at ?? "",
+    thumbnailUrl: v.media_url ?? "", durationSeconds: Number(v.metrics?.durationSeconds ?? 0),
+    viewCount: Number(v.metrics?.views ?? 0), likeCount: Number(v.metrics?.likes ?? 0), commentCount: Number(v.metrics?.comments ?? 0)
+  }));
 }

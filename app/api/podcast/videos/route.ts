@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchYouTubeVideos, isShorts } from "@/lib/youtube";
+import { getPublishedEpisodes } from "@/lib/seo/content";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,17 +10,16 @@ function clean(value: unknown, max = 4000) {
 
 export async function GET() {
   try {
-    const videos = await fetchYouTubeVideos(250, { noStore: true });
+    const videos = await getPublishedEpisodes(1200);
     const episodes = videos
-      .filter((video) => !isShorts(video.durationSeconds))
       .map((video) => ({
-        id: video.id,
+        id: video.slug,
         title: clean(video.title, 300),
         description: clean(video.description, 4000),
-        publishedAt: video.publishedAt,
-        durationSeconds: video.durationSeconds,
-        thumbnailUrl: video.thumbnailUrl,
-        youtubeUrl: `https://www.youtube.com/watch?v=${video.id}`
+        publishedAt: video.published_at,
+        durationSeconds: video.duration_seconds,
+        thumbnailUrl: video.thumbnail_url,
+        youtubeUrl: video.youtube_url
       }));
 
     return NextResponse.json(
