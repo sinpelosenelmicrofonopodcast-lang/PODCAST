@@ -43,7 +43,7 @@ export type EpisodeEditorial = {
   updated_at: string;
 };
 
-function candidateKeys(episode: Pick<SeoEpisode, "id" | "slug" | "youtube_url">) {
+function candidateKeys(episode: Pick<SeoEpisode, "id" | "slug" | "youtube_url" | "title">) {
   const out = new Set<string>();
   const videoId = getYouTubeVideoId(episode.youtube_url);
   if (videoId) out.add(`yt:${videoId}`);
@@ -112,6 +112,22 @@ export async function getPublishedEpisodeEditorial(
       .maybeSingle();
 
     if (!byKey.error && byKey.data) return normalize(byKey.data);
+  }
+
+  const episodeCodeMatch = String(episode.title ?? "").match(/(?:EP(?:ISODIO)?\s*#?\s*)(\d+)/i);
+  if (episodeCodeMatch) {
+    const byCode = await supabase
+      .from("episode_editorials")
+      .select(
+        "id, episode_key, episode_slug, episode_code, youtube_url, title, guest_name, episode_type, intro, person_story, impact_summary, lessons, host_points, quotes, closing_reflection, status, published_at, updated_at"
+      )
+      .eq("status", "published")
+      .eq("episode_code", `EP${episodeCodeMatch[1]}`)
+      .order("published_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!byCode.error && byCode.data) return normalize(byCode.data);
   }
 
   if (episode.slug) {
