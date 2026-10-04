@@ -166,6 +166,7 @@ export function Navbar() {
     { href: "/teorias", label: t.theories }
   ];
   const discoverLinks: { href: Route; label: string }[] = [
+    { href: "/acerca", label: lang === "es" ? "Conócenos" : "About us" },
     { href: "/blog", label: lang === "es" ? "Desde el Micrófono" : "From the Mic" },
     { href: "/feed", label: lang === "es" ? "Descubrir" : "Discover" },
     { href: "/eventos", label: t.events },

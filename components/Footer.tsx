@@ -26,6 +26,7 @@ const footerGroups = [
   {
     title: "Sin Pelos",
     links: [
+      { href: "/acerca", label: "Conócenos" },
       { href: "/quiero-salir", label: "Quiero ser invitado" },
       { href: "/publicidad", label: "Publicidad" },
       { href: "/rss", label: "RSS / Audio" },

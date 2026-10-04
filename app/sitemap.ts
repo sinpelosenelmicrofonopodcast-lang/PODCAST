@@ -28,6 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absolute("/musica"), changeFrequency: "weekly", priority: 0.55 },
     { url: absolute("/emprendimiento"), changeFrequency: "weekly", priority: 0.55 },
     { url: absolute("/quiero-salir"), changeFrequency: "monthly", priority: 0.45 },
+    { url: absolute("/acerca"), changeFrequency: "monthly", priority: 0.5 },
     { url: absolute("/publicidad"), changeFrequency: "monthly", priority: 0.4 }
   ];
 
