@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { supabaseService } from "@/lib/supabaseService";
 import { generateText } from "ai";
 import { asString } from "@/lib/validations/common";
 
@@ -77,6 +79,7 @@ async function runDirectOpenAiJson(messages: ChatMessage[]) {
     body: JSON.stringify({
       model: directOpenAiModel(),
       messages,
+      max_completion_tokens: 8000,
       response_format: { type: "json_object" }
     }),
     signal: AbortSignal.timeout(110000),
@@ -94,7 +97,7 @@ async function runDirectOpenAiJson(messages: ChatMessage[]) {
   return parseJsonPayload(text) as Record<string, unknown>;
 }
 
-export async function runJsonChat(messages: ChatMessage[]) {
+async function runProviderJsonChat(messages: ChatMessage[]) {
   const normalized = normalizedMessages(messages);
   const apiKey = String(process.env.OPENAI_API_KEY ?? "").trim();
 
@@ -107,8 +110,35 @@ export async function runJsonChat(messages: ChatMessage[]) {
   const result = await generateText({
     model: gatewayModel(),
     temperature: 0.25,
+    maxRetries: 0,
+    maxOutputTokens: 8000,
     messages: normalized
   });
 
   return parseJsonPayload(result.text) as Record<string, unknown>;
+}
+
+/** One prompt/model identity across jobs, with a durable cap and quota stop. */
+export async function runJsonChat(messages: ChatMessage[]): Promise<Record<string, unknown>> {
+  const service = supabaseService();
+  const key = createHash("sha256").update(JSON.stringify({ messages: normalizedMessages(messages), model: process.env.OPENAI_API_KEY ? directOpenAiModel() : gatewayModel(), provider: process.env.OPENAI_API_KEY ? openAiBaseUrl() : "gateway" })).digest("hex");
+  const { data: cached, error: cacheError } = await service.from("ai_generation_cache").select("response,expires_at").eq("cache_key", key).maybeSingle();
+  if (cacheError) throw new Error(cacheError.message);
+  const saved = cached as { response: Record<string, unknown> | null; expires_at: string } | null;
+  if (saved?.response && Date.parse(saved.expires_at) > Date.now()) return saved.response;
+  const { data: token, error } = await service.rpc("claim_ai_generation", { p_key: key });
+  if (error) throw new Error(error.message);
+  if (!token) throw new Error("Generación en curso o presupuesto preventivo de IA alcanzado. Se conserva el contenido guardado.");
+  try {
+    const result = await runProviderJsonChat(messages) as Record<string, unknown>;
+    const { error: saveError } = await service.rpc("finish_ai_generation", { p_key: key, p_token: token, p_response: result });
+    if (saveError) throw new Error(saveError.message);
+    return result;
+  } catch (error: any) {
+    const message = String(error?.message ?? "");
+    const status = Number(error?.statusCode ?? error?.status ?? 0);
+    const pause = /insufficient_quota|credit|billing|quota_exceeded/i.test(message) ? 86400 : status === 429 || /429|rate.limit/i.test(message) ? 60 : 0;
+    await service.rpc("finish_ai_generation", { p_key: key, p_token: token, p_pause_seconds: pause });
+    throw error;
+  }
 }
