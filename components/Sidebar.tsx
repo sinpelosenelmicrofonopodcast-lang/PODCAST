@@ -6,10 +6,12 @@ import { usePathname } from "next/navigation";
 import { hasAnyPermission, type StaffPermission } from "@/lib/staffPermissions";
 import type { Route } from "next";
 
+type Section = "workspace" | "publish" | "audience" | "insights" | "system";
+
 type LinkItem = {
   href: Route;
   label: string;
-  section: "overview" | "content" | "growth" | "admin";
+  section: Section;
   required?: StaffPermission;
   adminOnly?: boolean;
 };
@@ -20,33 +22,41 @@ type AccessState = {
 };
 
 const links: LinkItem[] = [
-  { href: "/admin", label: "Dashboard", section: "overview" },
-  { href: "/admin/social", label: "Social Hub", section: "overview" },
-  { href: "/admin/home", label: "Home", section: "overview", required: "manage_home" },
-  { href: "/admin/stats", label: "Estadísticas", section: "overview", required: "view_stats" },
-  { href: "/admin/reports", label: "Reportes", section: "overview", required: "view_reports" },
-  { href: "/admin/schedule", label: "Programación", section: "overview", required: "view_schedule" },
-  { href: "/admin/editorial-engine" as Route, label: "Podcast Editorial", section: "content", required: "manage_news" },
-  { href: "/admin/editorial-drive" as Route, label: "Editorial · Drive", section: "content", adminOnly: true },
-  { href: "/admin/news", label: "Noticias publicadas", section: "content", required: "manage_news" },
-  { href: "/admin/blog", label: "Editoriales", section: "content", required: "manage_blog" },
-  { href: "/admin/events", label: "Eventos", section: "content", required: "manage_events" },
-  { href: "/admin/promotions", label: "Promociones", section: "growth", required: "manage_promotions" },
-  { href: "/admin/newsletter", label: "Newsletter", section: "growth", required: "manage_newsletter" },
-  { href: "/admin/guest-requests", label: "Invitados", section: "growth", required: "manage_guest_requests" },
-  { href: "/admin/confessions", label: "Confesiones", section: "growth", required: "moderate_confessions" },
-  { href: "/admin/auto-posts", label: "Auto Posts", section: "admin", adminOnly: true },
-  { href: "/admin/social-replies" as Route, label: "Social Replies", section: "admin", adminOnly: true },
-  { href: "/admin/facebook-fans", label: "Facebook Fans", section: "admin", adminOnly: true },
-  { href: "/admin/mic-brawl", label: "Mic Brawl", section: "admin", adminOnly: true },
-  { href: "/admin/users", label: "Usuarios", section: "admin", adminOnly: true }
+  { href: "/admin", label: "Dashboard", section: "workspace" },
+  { href: "/admin/social", label: "Social Hub", section: "workspace" },
+  { href: "/admin/schedule", label: "Programación", section: "workspace", required: "view_schedule" },
+
+  { href: "/admin/home", label: "Homepage", section: "publish", required: "manage_home" },
+  { href: "/admin/news", label: "Noticias", section: "publish", required: "manage_news" },
+  { href: "/admin/episodes", label: "Episodios", section: "publish", required: "manage_news" },
+  { href: "/admin/blog", label: "Editoriales", section: "publish", required: "manage_blog" },
+  { href: "/admin/editorial-engine" as Route, label: "Podcast Editorial", section: "publish", required: "manage_news" },
+  { href: "/admin/events", label: "Eventos", section: "publish", required: "manage_events" },
+
+  { href: "/admin/promotions", label: "Promociones", section: "audience", required: "manage_promotions" },
+  { href: "/admin/newsletter", label: "Newsletter", section: "audience", required: "manage_newsletter" },
+  { href: "/admin/guest-requests", label: "Invitados", section: "audience", required: "manage_guest_requests" },
+  { href: "/admin/confessions", label: "Confesiones", section: "audience", required: "moderate_confessions" },
+
+  { href: "/admin/stats", label: "Estadísticas", section: "insights", required: "view_stats" },
+  { href: "/admin/reports", label: "Reportes", section: "insights", required: "view_reports" },
+  { href: "/admin/seo", label: "SEO", section: "insights", required: "view_stats" },
+
+  { href: "/admin/news-sources", label: "Fuentes RSS", section: "system", required: "manage_news_sources" },
+  { href: "/admin/editorial-drive" as Route, label: "Editorial · Drive", section: "system", adminOnly: true },
+  { href: "/admin/auto-posts", label: "Auto Posts", section: "system", adminOnly: true },
+  { href: "/admin/social-replies" as Route, label: "Social Replies", section: "system", adminOnly: true },
+  { href: "/admin/facebook-fans", label: "Facebook Fans", section: "system", adminOnly: true },
+  { href: "/admin/mic-brawl", label: "Mic Brawl", section: "system", adminOnly: true },
+  { href: "/admin/users", label: "Usuarios", section: "system", adminOnly: true }
 ];
 
-const sectionLabels: Record<LinkItem["section"], string> = {
-  overview: "Resumen",
-  content: "Contenido",
-  growth: "Audiencia",
-  admin: "Sistema"
+const sectionLabels: Record<Section, string> = {
+  workspace: "Trabajo diario",
+  publish: "Publicación",
+  audience: "Audiencia",
+  insights: "Medición",
+  system: "Sistema"
 };
 
 function isLinkActive(currentPath: string, href: Route) {
@@ -58,7 +68,7 @@ export function Sidebar({ access }: { access: AccessState }) {
   const active = usePathname() ?? "";
   const sections = useMemo(
     () =>
-      (["overview", "content", "growth", "admin"] as const)
+      (["workspace", "publish", "audience", "insights", "system"] as const)
         .map((section) => ({
           section,
           items: links.filter((link) => {
@@ -73,23 +83,35 @@ export function Sidebar({ access }: { access: AccessState }) {
   );
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar admin-sidebar">
       <div className="sidebar-brand">
         <div className="badge">SPM Editorial OS</div>
-        <p className="sidebar-copy muted">Podcast, editoriales, comunidad y distribución desde una sola cabina.</p>
-      </div>
-      {sections.map((group) => (
-        <div key={group.section} className="sidebar-section">
-          <p className="sidebar-heading">{sectionLabels[group.section]}</p>
-          <div className="sidebar-links">
-            {group.items.map((link) => (
-              <Link key={link.href} href={link.href} className={isLinkActive(active, link.href) ? "active" : undefined}>
-                {link.label}
-              </Link>
-            ))}
-          </div>
+        <div className="sidebar-role-row">
+          <strong>{access.isAdmin ? "Administrador" : "Staff"}</strong>
+          <span>{access.isAdmin ? "Acceso completo" : `${access.permissions.length} permisos`}</span>
         </div>
-      ))}
+      </div>
+
+      <nav className="admin-sidebar-nav" aria-label="Navegación del panel administrativo">
+        {sections.map((group) => (
+          <div key={group.section} className="sidebar-section">
+            <p className="sidebar-heading">{sectionLabels[group.section]}</p>
+            <div className="sidebar-links">
+              {group.items.map((link) => (
+                <Link key={link.href} href={link.href} className={isLinkActive(active, link.href) ? "active" : undefined}>
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="admin-sidebar-footer">
+        <Link className="button secondary" href="/">
+          Ver sitio público
+        </Link>
+      </div>
     </aside>
   );
 }
