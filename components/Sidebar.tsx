@@ -23,8 +23,7 @@ type AccessState = {
 
 const links: LinkItem[] = [
   { href: "/admin", label: "Dashboard", section: "workspace" },
-  { href: "/admin/social", label: "Social Hub", section: "workspace" },
-  { href: "/admin/schedule", label: "Programación", section: "workspace", required: "view_schedule" },
+  { href: "/admin/social", label: "Publicar ahora", section: "workspace" },
 
   { href: "/admin/home", label: "Homepage", section: "publish", required: "manage_home" },
   { href: "/admin/news", label: "Noticias", section: "publish", required: "manage_news" },
@@ -42,9 +41,7 @@ const links: LinkItem[] = [
   { href: "/admin/reports", label: "Reportes", section: "insights", required: "view_reports" },
   { href: "/admin/seo", label: "SEO", section: "insights", required: "view_stats" },
 
-  { href: "/admin/news-sources", label: "Fuentes RSS", section: "system", required: "manage_news_sources" },
   { href: "/admin/editorial-drive" as Route, label: "Editorial · Drive", section: "system", adminOnly: true },
-  { href: "/admin/auto-posts", label: "Auto Posts", section: "system", adminOnly: true },
   { href: "/admin/social-replies" as Route, label: "Social Replies", section: "system", adminOnly: true },
   { href: "/admin/facebook-fans", label: "Facebook Fans", section: "system", adminOnly: true },
   { href: "/admin/mic-brawl", label: "Mic Brawl", section: "system", adminOnly: true },
