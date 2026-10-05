@@ -24,7 +24,6 @@ type AccessState = {
 const links: LinkItem[] = [
   { href: "/admin", label: "Dashboard", section: "workspace" },
   { href: "/admin/social", label: "Social Hub", section: "workspace" },
-  { href: "/admin/schedule", label: "Programación", section: "workspace", required: "view_schedule" },
 
   { href: "/admin/home", label: "Homepage", section: "publish", required: "manage_home" },
   { href: "/admin/news", label: "Noticias", section: "publish", required: "manage_news" },
