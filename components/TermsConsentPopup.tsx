@@ -8,7 +8,7 @@ import { APP_LANG_EVENT, readStoredLang, type AppLang } from "@/lib/language";
 const TERMS_GATE_VERSION = "v1";
 const TERMS_GATE_STORAGE_KEY = "spm_terms_gate_ack";
 const BLOCKED_PREFIXES = ["/admin"];
-const SKIP_PATHS = new Set(["/terminos"]);
+const SKIP_PATHS = new Set(["/terminos", "/terms", "/privacy"]);
 
 type GateTexts = {
   title: string;
@@ -103,7 +103,7 @@ export function TermsConsentPopup() {
           <span>{t.terms}</span>
         </label>
         <div className="terms-gate-actions">
-          <Link className="button secondary" href="/terminos" target="_blank" rel="noreferrer">
+          <Link className="button secondary" href="/terms" target="_blank" rel="noreferrer">
             {t.readTerms}
           </Link>
           <button className="button" type="button" disabled={!confirmAge || !confirmTerms} onClick={onAccept}>

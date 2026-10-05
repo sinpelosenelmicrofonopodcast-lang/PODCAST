@@ -30,7 +30,8 @@ const footerGroups = [
       { href: "/quiero-salir", label: "Quiero ser invitado" },
       { href: "/publicidad", label: "Publicidad" },
       { href: "/rss", label: "RSS / Audio" },
-      { href: "/terminos", label: "Términos" }
+      { href: "/terms", label: "Términos" },
+      { href: "/privacy", label: "Privacidad" }
     ]
   }
 ];
