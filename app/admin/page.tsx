@@ -1,48 +1,53 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { StatCard } from "@/components/StatCard";
 import { AdminSyncYouTube } from "@/components/AdminSyncYouTube";
 import { hasAnyPermission, type StaffPermission } from "@/lib/staffPermissions";
 import { requireStaffPageOrRedirect } from "@/lib/adminAuth";
 import { supabaseService } from "@/lib/supabaseService";
 
-type Counts = {
+type DashboardCounts = {
   news: number;
   blogs: number;
   events: number;
   promotions: number;
   guestsNew: number;
   users: number;
+  queuedJobs: number;
+  failedJobs: number;
 };
 
-type ModuleCardProps = {
+type QuickAction = {
   title: string;
   description: string;
-  primaryHref?: Route;
-  primaryLabel?: string;
-  secondaryHref?: Route;
-  secondaryLabel?: string;
+  href: Route;
+  label: string;
 };
 
-function ModuleCard({ title, description, primaryHref, primaryLabel, secondaryHref, secondaryLabel }: ModuleCardProps) {
+type AttentionItem = {
+  label: string;
+  value: number;
+  helper: string;
+  href: Route;
+  tone: "danger" | "warning" | "neutral";
+};
+
+function QuickActionCard({ action }: { action: QuickAction }) {
   return (
-    <div className="card dashboard-module-card">
-      <div className="dashboard-module-copy">
-        <h3>{title}</h3>
-        <p className="muted">{description}</p>
-      </div>
-      <div className="admin-item-actions">
-        {primaryHref && primaryLabel ? (
-          <Link className="button" href={primaryHref}>
-            {primaryLabel}
-          </Link>
-        ) : null}
-        {secondaryHref && secondaryLabel ? (
-          <Link className="button secondary" href={secondaryHref}>
-            {secondaryLabel}
-          </Link>
-        ) : null}
-      </div>
+    <Link className="dashboard-action" href={action.href}>
+      <span className="dashboard-action-copy">
+        <strong>{action.title}</strong>
+        <span>{action.description}</span>
+      </span>
+      <span className="dashboard-action-cta">{action.label} →</span>
+    </Link>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="dashboard-metric">
+      <span>{label}</span>
+      <strong>{value.toLocaleString("es-PR")}</strong>
     </div>
   );
 }
@@ -50,205 +55,246 @@ function ModuleCard({ title, description, primaryHref, primaryLabel, secondaryHr
 export default async function AdminDashboard() {
   const access = await requireStaffPageOrRedirect("/admin");
   const can = (permission: StaffPermission) => hasAnyPermission(access, permission);
+  const service = supabaseService();
 
-  const counts: Counts = {
+  const counts: DashboardCounts = {
     news: 0,
     blogs: 0,
     events: 0,
     promotions: 0,
     guestsNew: 0,
-    users: 0
+    users: 0,
+    queuedJobs: 0,
+    failedJobs: 0
   };
 
-  let status: string | null = null;
+  const statusMessages: string[] = [];
 
   if (can("view_stats")) {
-    const service = supabaseService();
-    const [newsR, blogsR, eventsR, promoR, guestR, usersR] = await Promise.all([
+    const [newsR, blogsR, eventsR, promoR, usersR] = await Promise.all([
       service.from("news_items").select("id", { count: "exact", head: true }),
       service.from("blog_posts").select("id", { count: "exact", head: true }),
       service.from("live_events").select("id", { count: "exact", head: true }),
       service.from("promotions").select("id", { count: "exact", head: true }),
-      service.from("guest_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
       service.from("users").select("id", { count: "exact", head: true })
     ]);
 
-    const error = newsR.error || blogsR.error || eventsR.error || promoR.error || guestR.error || usersR.error;
-    if (error) status = error.message;
+    const error = newsR.error || blogsR.error || eventsR.error || promoR.error || usersR.error;
+    if (error) statusMessages.push(`Métricas: ${error.message}`);
 
     counts.news = newsR.count ?? 0;
     counts.blogs = blogsR.count ?? 0;
     counts.events = eventsR.count ?? 0;
     counts.promotions = promoR.count ?? 0;
-    counts.guestsNew = guestR.count ?? 0;
     counts.users = usersR.count ?? 0;
   }
 
-  const editorialModules: ModuleCardProps[] = [];
-  editorialModules.push({
-    title: "Social Hub",
-    description: "Revisa noticias ingeridas, edítalas, súbeles portada, publícalas y maneja la cola social desde un solo lugar.",
-    primaryHref: "/admin/social",
-    primaryLabel: "Abrir Social Hub",
-    secondaryHref: can("view_schedule") ? "/admin/schedule" : undefined,
-    secondaryLabel: can("view_schedule") ? "Ver cola real" : undefined
-  });
-  if (can("manage_home")) {
-    editorialModules.push({
-      title: "Editar homepage",
-      description: "Ajusta jerarquía editorial, módulos visibles y mensaje principal del home.",
-      primaryHref: "/admin/home",
-      primaryLabel: "Configurar home"
+  if (can("manage_guest_requests") || can("view_stats")) {
+    const guestR = await service.from("guest_requests").select("id", { count: "exact", head: true }).eq("status", "new");
+    if (guestR.error) statusMessages.push(`Invitados: ${guestR.error.message}`);
+    counts.guestsNew = guestR.count ?? 0;
+  }
+
+  if (can("view_schedule")) {
+    const [queuedR, failedR] = await Promise.all([
+      service.from("admin_schedule_jobs").select("id", { count: "exact", head: true }).eq("status", "queued"),
+      service.from("admin_schedule_jobs").select("id", { count: "exact", head: true }).eq("status", "failed")
+    ]);
+    const error = queuedR.error || failedR.error;
+    if (error) statusMessages.push(`Programación: ${error.message}`);
+    counts.queuedJobs = queuedR.count ?? 0;
+    counts.failedJobs = failedR.count ?? 0;
+  }
+
+  const attention: AttentionItem[] = [];
+  if (can("view_schedule") && counts.failedJobs > 0) {
+    attention.push({
+      label: "Automatizaciones fallidas",
+      value: counts.failedJobs,
+      helper: "Revisa el error antes de reintentar o reprogramar.",
+      href: "/admin/schedule",
+      tone: "danger"
+    });
+  }
+  if (can("manage_guest_requests") && counts.guestsNew > 0) {
+    attention.push({
+      label: "Solicitudes de invitados",
+      value: counts.guestsNew,
+      helper: "Hay personas nuevas esperando clasificación.",
+      href: "/admin/guest-requests",
+      tone: "warning"
+    });
+  }
+  if (can("view_schedule") && counts.queuedJobs > 0) {
+    attention.push({
+      label: "Trabajos en cola",
+      value: counts.queuedJobs,
+      helper: "Contenido programado pendiente de ejecución.",
+      href: "/admin/schedule",
+      tone: "neutral"
+    });
+  }
+
+  const quickActions: QuickAction[] = [
+    {
+      title: "Social Hub",
+      description: "Noticias, portadas, publicación y cola social en el flujo principal.",
+      href: "/admin/social",
+      label: "Abrir"
+    }
+  ];
+
+  if (can("view_schedule")) {
+    quickActions.push({
+      title: "Programación",
+      description: "Confirma lo que sale, cuándo sale y si algo falló.",
+      href: "/admin/schedule",
+      label: "Ver cola"
     });
   }
   if (can("manage_news")) {
-    editorialModules.push({
-      title: "Noticias y News Engine",
-      description: "Gestiona publicaciones, pipeline editorial, assets y distribución social desde un mismo flujo.",
-      primaryHref: "/admin/news",
-      primaryLabel: "Gestionar noticias",
-      secondaryHref: "/admin/social",
-      secondaryLabel: "Social Hub"
-    });
-    editorialModules.push({
-      title: "Episodios a Facebook",
-      description: "Publica episodios nuevos o de catálogo con copy propio o extracto automático.",
-      primaryHref: "/admin/episodes",
-      primaryLabel: "Gestionar episodios",
-      secondaryHref: "/admin/social",
-      secondaryLabel: "Social Hub"
-    });
-  }
-  if (can("manage_blog")) {
-    editorialModules.push({
-      title: "Blog",
-      description: "Administra piezas largas, linking editorial y presencia en buscadores.",
-      primaryHref: "/admin/blog",
-      primaryLabel: "Abrir blog",
-      secondaryHref: "/admin/social",
-      secondaryLabel: "Social Hub"
-    });
-  }
-  if (can("manage_events") || can("manage_promotions")) {
-    editorialModules.push({
-      title: "Eventos y promociones",
-      description: "Coordina agenda en vivo y espacios comerciales sin duplicar esfuerzos.",
-      primaryHref: can("manage_events") ? "/admin/events" : "/admin/promotions",
-      primaryLabel: can("manage_events") ? "Gestionar eventos" : "Gestionar promociones",
-      secondaryHref: can("manage_events") && can("manage_promotions") ? "/admin/promotions" : undefined,
-      secondaryLabel: can("manage_events") && can("manage_promotions") ? "Promociones" : undefined
-    });
-  }
-  if (can("manage_guest_requests")) {
-    editorialModules.push({
-      title: "Invitados al programa",
-      description: "Revisa solicitudes nuevas, clasifica leads y mueve cada caso por estado.",
-      primaryHref: "/admin/guest-requests",
-      primaryLabel: "Ver solicitudes"
-    });
-  }
-
-  const operationsModules: ModuleCardProps[] = [];
-  if (can("manage_news_sources") || can("view_schedule")) {
-    operationsModules.push({
-      title: "Fuentes RSS y programación",
-      description: "Controla fuentes, frecuencia de ingesta y la cola de ejecución operativa.",
-      primaryHref: can("manage_news_sources") ? "/admin/news-sources" : "/admin/schedule",
-      primaryLabel: can("manage_news_sources") ? "Gestionar fuentes" : "Ver cola",
-      secondaryHref: can("manage_news_sources") && can("view_schedule") ? "/admin/schedule" : undefined,
-      secondaryLabel: can("manage_news_sources") && can("view_schedule") ? "Ver cola" : undefined
-    });
-  }
-  if (can("view_stats")) {
-    operationsModules.push({
-      title: "SEO y métricas",
-      description: "Supervisa rendimiento técnico, visibilidad orgánica y señales de tráfico del sitio.",
-      primaryHref: "/admin/seo",
-      primaryLabel: "Abrir SEO",
-      secondaryHref: "/admin/stats",
-      secondaryLabel: "Ver estadísticas"
-    });
-  }
-  if (access.isAdmin) {
-    operationsModules.push(
+    quickActions.push(
       {
-        title: "Facebook Fans Activos",
-        description: "Detecta superfans y relaciones de mayor valor con señales sociales reales.",
-        primaryHref: "/admin/facebook-fans",
-        primaryLabel: "Abrir módulo"
+        title: "Noticias",
+        description: "Administra las noticias publicadas y entra al flujo editorial.",
+        href: "/admin/news",
+        label: "Gestionar"
       },
       {
-        title: "Mic Brawl",
-        description: "Monitorea salas, resets, skins y ranking del juego sin salir del admin.",
-        primaryHref: "/admin/mic-brawl",
-        primaryLabel: "Abrir Mic Brawl"
+        title: "Episodios",
+        description: "Mueve episodios del catálogo hacia Facebook sin duplicar trabajo.",
+        href: "/admin/episodes",
+        label: "Gestionar"
       }
     );
   }
+  if (can("manage_blog")) {
+    quickActions.push({
+      title: "Editoriales",
+      description: "Trabaja piezas largas y contenido de Desde el Micrófono.",
+      href: "/admin/blog",
+      label: "Abrir"
+    });
+  }
+  if (can("manage_guest_requests")) {
+    quickActions.push({
+      title: "Invitados",
+      description: "Clasifica solicitudes y mueve cada contacto al próximo paso.",
+      href: "/admin/guest-requests",
+      label: "Revisar"
+    });
+  }
 
   return (
-    <section className="admin-dashboard">
-      <div className="card dashboard-hero">
-        <div className="dashboard-hero-copy">
-          <p className="page-kicker">Resumen operativo</p>
-          <h2 className="section-title">Panel Admin</h2>
-          <p className="muted">
-            Centro de operaciones para contenido, distribución, audiencia y comunidad con acceso controlado por rol.
-          </p>
+    <section className="admin-dashboard admin-dashboard-v2">
+      <header className="dashboard-command">
+        <div>
+          <p className="page-kicker">Cabina de operaciones</p>
+          <h1>Dashboard</h1>
+          <p className="muted">Lo importante primero: pendientes, acciones y estado del contenido.</p>
         </div>
-        <div className="dashboard-hero-meta">
-          <span>{access.isAdmin ? "Administrador" : "Staff"}</span>
-          <span>{access.permissions.length} permisos activos</span>
+        <div className="dashboard-command-meta">
+          <span className="dashboard-role">{access.isAdmin ? "Administrador" : "Staff"}</span>
+          {!access.isAdmin ? <span>{access.permissions.length} permisos activos</span> : <span>Acceso completo</span>}
         </div>
-      </div>
+      </header>
 
-      {status ? (
-        <div className="card state-card compact">
-          <p className="muted">{status}</p>
+      {statusMessages.length > 0 ? (
+        <div className="dashboard-notice" role="status">
+          <strong>Hay datos que no pudieron cargar.</strong>
+          <span>{statusMessages.join(" · ")}</span>
         </div>
       ) : null}
 
-      <div className="admin-grid dashboard-stats">
-        <StatCard label="Noticias" value={String(counts.news)} />
-        <StatCard label="Blogs" value={String(counts.blogs)} />
-        <StatCard label="Eventos" value={String(counts.events)} />
-        <StatCard label="Promociones" value={String(counts.promotions)} />
-        <StatCard label="Solicitudes nuevas" value={String(counts.guestsNew)} />
-        <StatCard label="Usuarios" value={String(counts.users)} />
-      </div>
-
-      {editorialModules.length > 0 ? (
-        <div className="dashboard-section">
-          <div className="dashboard-section-head">
-            <h3>Edición y producto</h3>
-            <p className="muted">Las pantallas críticas para operar portada, contenido y programación editorial.</p>
+      <div className="dashboard-priority-grid">
+        <section className="dashboard-panel dashboard-attention-panel" aria-labelledby="dashboard-attention-title">
+          <div className="dashboard-panel-head">
+            <div>
+              <p className="page-kicker">Prioridad</p>
+              <h2 id="dashboard-attention-title">Necesita atención</h2>
+            </div>
+            <span className="dashboard-panel-count">{attention.length}</span>
           </div>
-          <div className="dashboard-module-grid">
-            {editorialModules.map((module) => (
-              <ModuleCard key={module.title} {...module} />
+
+          <div className="dashboard-attention-list">
+            {attention.length > 0 ? (
+              attention.map((item) => (
+                <Link key={`${item.label}-${item.tone}`} className={`dashboard-attention-item ${item.tone}`} href={item.href}>
+                  <strong>{item.value}</strong>
+                  <span>
+                    <b>{item.label}</b>
+                    <small>{item.helper}</small>
+                  </span>
+                  <em>Revisar →</em>
+                </Link>
+              ))
+            ) : (
+              <div className="dashboard-clear-state">
+                <strong>Sin alertas operativas.</strong>
+                <span>No hay fallos ni pendientes urgentes visibles para tu rol.</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="dashboard-panel" aria-labelledby="dashboard-actions-title">
+          <div className="dashboard-panel-head">
+            <div>
+              <p className="page-kicker">Trabajo diario</p>
+              <h2 id="dashboard-actions-title">Acciones rápidas</h2>
+            </div>
+          </div>
+          <div className="dashboard-action-list">
+            {quickActions.slice(0, 4).map((action) => (
+              <QuickActionCard key={action.href} action={action} />
             ))}
           </div>
-        </div>
-      ) : null}
-
-      <div className="dashboard-section">
-        <div className="dashboard-section-head">
-          <h3>Operación y distribución</h3>
-          <p className="muted">Automatizaciones, fuentes, analítica y mantenimiento del ecosistema.</p>
-        </div>
-        <div className="dashboard-module-grid">
-          {operationsModules.map((module) => (
-            <ModuleCard key={module.title} {...module} />
-          ))}
-          {can("manage_news_sources") ? <AdminSyncYouTube /> : null}
-        </div>
+        </section>
       </div>
 
+      {can("view_stats") ? (
+        <section className="dashboard-panel dashboard-metrics-panel" aria-labelledby="dashboard-metrics-title">
+          <div className="dashboard-panel-head dashboard-panel-head-inline">
+            <div>
+              <p className="page-kicker">Pulso del sitio</p>
+              <h2 id="dashboard-metrics-title">Contenido y audiencia</h2>
+            </div>
+            <Link className="dashboard-text-link" href="/admin/stats">
+              Ver estadísticas →
+            </Link>
+          </div>
+          <div className="dashboard-metrics-grid">
+            <Metric label="Noticias" value={counts.news} />
+            <Metric label="Editoriales" value={counts.blogs} />
+            <Metric label="Eventos" value={counts.events} />
+            <Metric label="Promociones" value={counts.promotions} />
+            <Metric label="Usuarios" value={counts.users} />
+          </div>
+        </section>
+      ) : null}
+
+      {can("manage_news_sources") ? (
+        <section className="dashboard-integration" aria-labelledby="dashboard-integration-title">
+          <div className="dashboard-section-intro">
+            <div>
+              <p className="page-kicker">Integraciones</p>
+              <h2 id="dashboard-integration-title">Mantenimiento manual</h2>
+              <p className="muted">Acciones que sí vale la pena tener en el dashboard porque ejecutan trabajo, no repiten navegación.</p>
+            </div>
+            <Link className="button secondary" href="/admin/news-sources">
+              Fuentes RSS
+            </Link>
+          </div>
+          <div className="dashboard-integration-grid">
+            <AdminSyncYouTube />
+          </div>
+        </section>
+      ) : null}
+
       {!access.isAdmin && access.permissions.length === 0 ? (
-        <div className="card state-card">
-          <p className="muted">
-            Tu cuenta no tiene permisos asignados todavía. Un administrador debe habilitar secciones desde Usuarios.
-          </p>
+        <div className="dashboard-notice">
+          <strong>Tu cuenta todavía no tiene permisos asignados.</strong>
+          <span>Un administrador debe habilitar las áreas que vas a operar.</span>
         </div>
       ) : null}
     </section>
