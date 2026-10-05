@@ -12,8 +12,6 @@ type DashboardCounts = {
   promotions: number;
   guestsNew: number;
   users: number;
-  queuedJobs: number;
-  failedJobs: number;
 };
 
 type QuickAction = {
@@ -63,9 +61,7 @@ export default async function AdminDashboard() {
     events: 0,
     promotions: 0,
     guestsNew: 0,
-    users: 0,
-    queuedJobs: 0,
-    failedJobs: 0
+    users: 0
   };
 
   const statusMessages: string[] = [];
@@ -95,27 +91,7 @@ export default async function AdminDashboard() {
     counts.guestsNew = guestR.count ?? 0;
   }
 
-  if (can("view_schedule")) {
-    const [queuedR, failedR] = await Promise.all([
-      service.from("admin_schedule_jobs").select("id", { count: "exact", head: true }).eq("status", "queued"),
-      service.from("admin_schedule_jobs").select("id", { count: "exact", head: true }).eq("status", "failed")
-    ]);
-    const error = queuedR.error || failedR.error;
-    if (error) statusMessages.push(`Programación: ${error.message}`);
-    counts.queuedJobs = queuedR.count ?? 0;
-    counts.failedJobs = failedR.count ?? 0;
-  }
-
   const attention: AttentionItem[] = [];
-  if (can("view_schedule") && counts.failedJobs > 0) {
-    attention.push({
-      label: "Automatizaciones fallidas",
-      value: counts.failedJobs,
-      helper: "Revisa el error antes de reintentar o reprogramar.",
-      href: "/admin/schedule",
-      tone: "danger"
-    });
-  }
   if (can("manage_guest_requests") && counts.guestsNew > 0) {
     attention.push({
       label: "Solicitudes de invitados",
@@ -125,44 +101,27 @@ export default async function AdminDashboard() {
       tone: "warning"
     });
   }
-  if (can("view_schedule") && counts.queuedJobs > 0) {
-    attention.push({
-      label: "Trabajos en cola",
-      value: counts.queuedJobs,
-      helper: "Contenido programado pendiente de ejecución.",
-      href: "/admin/schedule",
-      tone: "neutral"
-    });
-  }
 
   const quickActions: QuickAction[] = [
     {
-      title: "Social Hub",
-      description: "Noticias, portadas, publicación y cola social en el flujo principal.",
+      title: "Publicar ahora",
+      description: "Publica contenido existente en redes sin programarlo desde la web.",
       href: "/admin/social",
       label: "Abrir"
     }
   ];
 
-  if (can("view_schedule")) {
-    quickActions.push({
-      title: "Programación",
-      description: "Confirma lo que sale, cuándo sale y si algo falló.",
-      href: "/admin/schedule",
-      label: "Ver cola"
-    });
-  }
   if (can("manage_news")) {
     quickActions.push(
       {
         title: "Noticias",
-        description: "Administra las noticias publicadas y entra al flujo editorial.",
+        description: "Revisa y administra noticias que ya existen en el sitio.",
         href: "/admin/news",
         label: "Gestionar"
       },
       {
         title: "Episodios",
-        description: "Mueve episodios del catálogo hacia Facebook sin duplicar trabajo.",
+        description: "Administra el catálogo y publica episodios cuando haga falta.",
         href: "/admin/episodes",
         label: "Gestionar"
       }
@@ -191,7 +150,7 @@ export default async function AdminDashboard() {
         <div>
           <p className="page-kicker">Cabina de operaciones</p>
           <h1>Dashboard</h1>
-          <p className="muted">Lo importante primero: pendientes, acciones y estado del contenido.</p>
+          <p className="muted">Administración y revisión. La generación, ingesta y programación se manejan fuera del panel.</p>
         </div>
         <div className="dashboard-command-meta">
           <span className="dashboard-role">{access.isAdmin ? "Administrador" : "Staff"}</span>
@@ -230,8 +189,8 @@ export default async function AdminDashboard() {
               ))
             ) : (
               <div className="dashboard-clear-state">
-                <strong>Sin alertas operativas.</strong>
-                <span>No hay fallos ni pendientes urgentes visibles para tu rol.</span>
+                <strong>Sin pendientes urgentes.</strong>
+                <span>El panel no muestra colas de programación ni tareas de ingesta.</span>
               </div>
             )}
           </div>
@@ -273,17 +232,14 @@ export default async function AdminDashboard() {
         </section>
       ) : null}
 
-      {can("manage_news_sources") ? (
+      {access.isAdmin ? (
         <section className="dashboard-integration" aria-labelledby="dashboard-integration-title">
           <div className="dashboard-section-intro">
             <div>
               <p className="page-kicker">Integraciones</p>
               <h2 id="dashboard-integration-title">Mantenimiento manual</h2>
-              <p className="muted">Acciones que sí vale la pena tener en el dashboard porque ejecutan trabajo, no repiten navegación.</p>
+              <p className="muted">Solo acciones directas de mantenimiento. Sin generadores, ingesta ni programación de contenido.</p>
             </div>
-            <Link className="button secondary" href="/admin/news-sources">
-              Fuentes RSS
-            </Link>
           </div>
           <div className="dashboard-integration-grid">
             <AdminSyncYouTube />
