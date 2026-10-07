@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
+type CategoryRow = {
+  id: string;
+  name: string;
+};
+
 export function ZonaCrudaComposer() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -12,6 +17,8 @@ export function ZonaCrudaComposer() {
   const [loading, setLoading] = useState(false);
   const [allowed, setAllowed] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [categoryId, setCategoryId] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -19,20 +26,33 @@ export function ZonaCrudaComposer() {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) return;
-      const { data: profile } = await supabase
-        .from("users")
-        .select("is_21_confirmed")
-        .eq("id", userId)
-        .single();
-      const { data: membership } = await supabase
-        .from("memberships")
-        .select("status, plan")
-        .eq("user_id", userId)
-        .single();
+
+      const [{ data: profile }, { data: membership }, { data: categoryRows }] = await Promise.all([
+        supabase
+          .from("users")
+          .select("is_21_confirmed")
+          .eq("id", userId)
+          .single(),
+        supabase
+          .from("memberships")
+          .select("status, plan")
+          .eq("user_id", userId)
+          .single(),
+        supabase
+          .from("categories")
+          .select("id, name")
+          .eq("space", "zona-cruda")
+          .order("name", { ascending: true })
+      ]);
 
       const is21 = profile?.is_21_confirmed === true;
       const paid = membership?.status === "active" && membership?.plan === "paid";
       if (is21 && paid) setAllowed(true);
+
+      const nextCategories = (categoryRows as CategoryRow[]) ?? [];
+      setCategories(nextCategories);
+      const defaultCategory = nextCategories.find((category) => category.name === "Dilemas sin filtro") ?? nextCategories[0];
+      if (defaultCategory) setCategoryId(defaultCategory.id);
     };
 
     loadAccess();
@@ -44,6 +64,11 @@ export function ZonaCrudaComposer() {
 
     if (!confirm) {
       setStatus("Debes confirmar el disclaimer para publicar.");
+      return;
+    }
+
+    if (!categoryId) {
+      setStatus("Escoge un segmento para publicar.");
       return;
     }
 
@@ -62,6 +87,7 @@ export function ZonaCrudaComposer() {
       body,
       author_id: userId,
       space: "zona-cruda",
+      category_id: categoryId,
       visibility: "paid",
       status: "published"
     }).select("id").single();
@@ -150,6 +176,7 @@ export function ZonaCrudaComposer() {
     setTitle("");
     setBody("");
     setFiles([]);
+    setConfirm(false);
     setStatus("Publicado en Zona Cruda.");
     setLoading(false);
     router.refresh();
@@ -167,8 +194,22 @@ export function ZonaCrudaComposer() {
   return (
     <div className="card" style={{ marginTop: 18 }}>
       <h3 style={{ marginTop: 0 }}>Publicar en Zona Cruda</h3>
-      <p className="muted">“Si entras aquí, es bajo tu responsabilidad.”</p>
+      <p className="muted">Escoge el segmento correcto para que el hilo no se pierda en el revolú.</p>
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+        <label style={{ display: "grid", gap: 6 }}>
+          Segmento
+          <select
+            className="input"
+            value={categoryId}
+            onChange={(event) => setCategoryId(event.target.value)}
+            required
+          >
+            <option value="" disabled>Escoge un segmento</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>{category.name}</option>
+            ))}
+          </select>
+        </label>
         <input
           className="input"
           placeholder="Título"
@@ -179,7 +220,7 @@ export function ZonaCrudaComposer() {
         <textarea
           className="textarea"
           rows={4}
-          placeholder="Opinión sin censura..."
+          placeholder="Suelta el tema..."
           value={body}
           onChange={(e) => setBody(e.target.value)}
           required
