@@ -24,6 +24,7 @@ type ThreadRow = {
 
 const SEGMENT_ORDER = [
   "Vacilón de corillo",
+  "Confesiones sin nombre",
   "Relaciones, sexo y exes",
   "Familia y crianza",
   "Dinero, trabajo y vida adulta",
