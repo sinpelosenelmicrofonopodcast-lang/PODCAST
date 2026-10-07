@@ -17,11 +17,24 @@ type ThreadRow = {
   title: string;
   body: string | null;
   created_at: string | null;
+  categories: { name?: string | null } | { name?: string | null }[] | null;
   users: { nickname?: string | null; bio?: string | null; avatar_url?: string | null } | { nickname?: string | null; bio?: string | null; avatar_url?: string | null }[] | null;
   thread_media: Array<{ id: string; storage_path: string; kind: "image" | "video"; mime_type: string | null; created_at: string | null }> | null;
 };
 
+const SEGMENT_ORDER = [
+  "Vacilón de corillo",
+  "Relaciones, sexo y exes",
+  "Familia y crianza",
+  "Dinero, trabajo y vida adulta",
+  "Redes, tecnología y privacidad",
+  "Sociedad, política y religión",
+  "Dilemas sin filtro",
+  "Archivo crudo"
+];
+
 const pickUser = (users: any) => (Array.isArray(users) ? users[0] : users);
+const pickCategory = (categories: any) => (Array.isArray(categories) ? categories[0] : categories);
 
 function formatDate(value: string | null) {
   if (!value) return "Archivo reciente";
@@ -32,11 +45,23 @@ function formatDate(value: string | null) {
   });
 }
 
+function categoryName(thread: ThreadRow) {
+  return pickCategory(thread.categories)?.name || "Dilemas sin filtro";
+}
+
 export default function ZonaCrudaPage() {
   const { checking, userId } = useProtectedUser({ require21: true });
+  const [sharedThreadId, setSharedThreadId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [replyCountByThread, setReplyCountByThread] = useState<Map<string, number>>(new Map());
+  const [activeSegment, setActiveSegment] = useState("Todos");
+  const [copiedThreadId, setCopiedThreadId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setSharedThreadId(new URLSearchParams(window.location.search).get("hilo"));
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -46,10 +71,10 @@ export default function ZonaCrudaPage() {
       setLoading(true);
       const { data } = await supabase
         .from("threads")
-        .select("id, title, body, created_at, users(nickname, bio, avatar_url), thread_media(id, storage_path, kind, mime_type, created_at)")
+        .select("id, title, body, created_at, categories(name), users(nickname, bio, avatar_url), thread_media(id, storage_path, kind, mime_type, created_at)")
         .eq("space", "zona-cruda")
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(100);
 
       if (!mounted) return;
       const items = (data as ThreadRow[]) ?? [];
@@ -66,7 +91,7 @@ export default function ZonaCrudaPage() {
         .from("replies")
         .select("id, thread_id")
         .in("thread_id", ids)
-        .limit(2000);
+        .limit(5000);
 
       if (!mounted) return;
       const counts = new Map<string, number>();
@@ -81,41 +106,95 @@ export default function ZonaCrudaPage() {
     };
   }, [userId]);
 
+  useEffect(() => {
+    if (loading || !sharedThreadId) return;
+    const node = document.getElementById(`hilo-${sharedThreadId}`);
+    if (node) window.setTimeout(() => node.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+  }, [loading, sharedThreadId, threads]);
+
   const totalReplies = useMemo(
     () => Array.from(replyCountByThread.values()).reduce((sum, count) => sum + count, 0),
     [replyCountByThread]
   );
 
-  const featuredThread = useMemo(() => {
-    if (threads.length === 0) return null;
-    return [...threads].sort((a, b) => {
-      const replyDelta = (replyCountByThread.get(b.id) ?? 0) - (replyCountByThread.get(a.id) ?? 0);
-      if (replyDelta !== 0) return replyDelta;
-      return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
-    })[0];
-  }, [threads, replyCountByThread]);
+  const segmentStats = useMemo(() => {
+    const counts = new Map<string, number>();
+    threads.forEach((thread) => {
+      const name = categoryName(thread);
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    });
+    return counts;
+  }, [threads]);
 
-  const remainingThreads = featuredThread ? threads.filter((thread) => thread.id !== featuredThread.id) : threads;
+  const sharedThread = useMemo(
+    () => (sharedThreadId ? threads.find((thread) => thread.id === sharedThreadId) ?? null : null),
+    [threads, sharedThreadId]
+  );
+
+  const groupedThreads = useMemo(() => {
+    if (sharedThread) return [{ name: categoryName(sharedThread), items: [sharedThread] }];
+
+    const candidates = activeSegment === "Todos"
+      ? threads
+      : threads.filter((thread) => categoryName(thread) === activeSegment);
+
+    const names = activeSegment === "Todos"
+      ? [...SEGMENT_ORDER, ...Array.from(new Set(candidates.map(categoryName))).filter((name) => !SEGMENT_ORDER.includes(name))]
+      : [activeSegment];
+
+    return names
+      .map((name) => ({ name, items: candidates.filter((thread) => categoryName(thread) === name) }))
+      .filter((group) => group.items.length > 0);
+  }, [threads, activeSegment, sharedThread]);
+
+  const shareThread = async (thread: ThreadRow) => {
+    if (typeof window === "undefined") return;
+    const url = `${window.location.origin}/zona-cruda?hilo=${thread.id}#hilo-${thread.id}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: thread.title, text: "Debate esto en Zona Cruda de Sin Pelos.", url });
+        return;
+      }
+    } catch {
+      // Si el usuario cierra el menú de compartir, dejamos disponible copiar el enlace.
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedThreadId(thread.id);
+      window.setTimeout(() => setCopiedThreadId((current) => current === thread.id ? null : current), 1800);
+    } catch {
+      window.prompt("Copia este enlace:", url);
+    }
+  };
 
   const renderArchive = (thread: ThreadRow, index: number, featured = false) => {
     const user = pickUser(thread.users);
     const repliesCount = replyCountByThread.get(thread.id) ?? 0;
+    const category = categoryName(thread);
+    const kindLabel = category === "Archivo crudo" ? "Documentado" : category === "Vacilón de corillo" ? "Vacilón" : "Debate";
 
     return (
-      <article key={thread.id} className={`${styles.archiveCard} ${featured ? styles.featuredArchive : ""}`}>
+      <article
+        id={`hilo-${thread.id}`}
+        key={thread.id}
+        className={`${styles.archiveCard} ${featured ? styles.featuredArchive : ""}`}
+        style={{ scrollMarginTop: 120 }}
+      >
         <div className={styles.archiveIndex}>{String(index).padStart(2, "0")}</div>
 
         <div className={styles.archiveInner}>
           <div className={styles.archiveTopline}>
             <div className={styles.badgeRow}>
-              <span className={styles.documentedBadge}>Caso documentado</span>
-              <span className={styles.sensitiveBadge}>Contenido sensible</span>
+              <span className={styles.documentedBadge}>{category}</span>
+              <span className={styles.sensitiveBadge}>{kindLabel}</span>
             </div>
             <span className={styles.date}>{formatDate(thread.created_at)}</span>
           </div>
 
           <div className={styles.archiveContent}>
-            <span className={styles.archiveLabel}>{featured ? "Archivo destacado" : "Expediente Zona Cruda"}</span>
+            <span className={styles.archiveLabel}>{featured ? "Hilo compartido" : "Zona Cruda"}</span>
             <h2>{thread.title}</h2>
             {thread.body ? <p>{thread.body}</p> : null}
           </div>
@@ -137,7 +216,7 @@ export default function ZonaCrudaPage() {
               />
               <div>
                 <strong>{user?.nickname ?? "Anónimo"}</strong>
-                <span>{user?.bio || "Archivo de la comunidad"}</span>
+                <span>{user?.bio || "Comunidad Zona Cruda"}</span>
               </div>
             </div>
             <div className={styles.replyCount}>
@@ -154,6 +233,12 @@ export default function ZonaCrudaPage() {
                 <ReplyComposer threadId={thread.id} />
               </div>
             </details>
+            <button className="button secondary" type="button" onClick={() => shareThread(thread)}>
+              {copiedThreadId === thread.id ? "Link copiado" : "Compartir hilo"}
+            </button>
+            <a className="button secondary" href={`/zona-cruda?hilo=${thread.id}#hilo-${thread.id}`}>
+              Abrir solo este hilo
+            </a>
           </div>
 
           <AdminDeleteButton table="threads" id={thread.id} label="Eliminar thread" />
@@ -172,24 +257,24 @@ export default function ZonaCrudaPage() {
             <div className={styles.heroBadges}>
               <span>21+</span>
               <span>Membresía</span>
-              <span>Archivo incómodo</span>
+              <span>Sin filtro</span>
             </div>
             <h1>Zona Cruda</h1>
             <p>
-              Historias reales que incomodan: abusos institucionales, experimentos humanos, genocidios olvidados y episodios que la historia suele resumir demasiado rápido.
+              Vacilones de corillo, relaciones, familia, dinero, redes, política, dilemas incómodos y archivos que dan para discutir sin el teatro de las redes.
             </p>
             <div className={styles.heroActions}>
-              <a className="button" href="#archivos">Explorar archivos</a>
+              <a className="button" href="#segmentos">Escoger segmento</a>
               <a className="button secondary" href="#publicar-zona-cruda">Publicar</a>
             </div>
           </div>
 
           <div className={styles.warningPanel}>
-            <span className={styles.warningKicker}>Antes de seguir</span>
-            <h2>Esto no es morbo por morbo.</h2>
-            <p>Puede haber lenguaje explícito y descripciones difíciles. El contexto y la veracidad van primero.</p>
+            <span className={styles.warningKicker}>Aquí se viene a hablar</span>
+            <h2>Debate serio o vacilón. Pero con tema.</h2>
+            <p>Cada hilo vive en su propio segmento y tiene enlace individual para compartirlo fuera de la plataforma.</p>
             <div className={styles.warningStats}>
-              <div><strong>{threads.length}</strong><span>archivos</span></div>
+              <div><strong>{threads.length}</strong><span>hilos</span></div>
               <div><strong>{totalReplies}</strong><span>respuestas</span></div>
             </div>
           </div>
@@ -201,29 +286,91 @@ export default function ZonaCrudaPage() {
           <div className={styles.feed} id="archivos">
             <header className={styles.feedHeader}>
               <div>
-                <span className={styles.sectionEyebrow}>Documentado · incómodo · necesario</span>
-                <h2>Archivos que merecen ser leídos</h2>
+                <span className={styles.sectionEyebrow}>{sharedThread ? "Enlace directo · hilo individual" : "Escoge el mood y entra"}</span>
+                <h2>{sharedThread ? "Hilo compartido" : "Zona Cruda por segmentos"}</h2>
               </div>
-              <span className={styles.feedHint}>Lee el contexto antes de reaccionar</span>
+              {sharedThread ? (
+                <a className="button secondary" href="/zona-cruda">Ver todos los segmentos</a>
+              ) : (
+                <span className={styles.feedHint}>No más revolú: cada tema en su esquina</span>
+              )}
             </header>
 
-            {checking || loading ? <div className={styles.stateCard}>Abriendo archivos...</div> : null}
-
-            {!checking && !loading && featuredThread ? (
-              <div className={styles.featuredWrap}>{renderArchive(featuredThread, 1, true)}</div>
+            {!sharedThread ? (
+              <div
+                id="segmentos"
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  marginBottom: 24,
+                  scrollMarginTop: 110
+                }}
+              >
+                <button
+                  className={activeSegment === "Todos" ? "button" : "button secondary"}
+                  type="button"
+                  onClick={() => setActiveSegment("Todos")}
+                >
+                  Todos ({threads.length})
+                </button>
+                {SEGMENT_ORDER.filter((name) => (segmentStats.get(name) ?? 0) > 0).map((name) => (
+                  <button
+                    key={name}
+                    className={activeSegment === name ? "button" : "button secondary"}
+                    type="button"
+                    onClick={() => setActiveSegment(name)}
+                  >
+                    {name} ({segmentStats.get(name) ?? 0})
+                  </button>
+                ))}
+              </div>
             ) : null}
 
-            {!checking && !loading && remainingThreads.length > 0 ? (
-              <div className={styles.archiveList}>
-                {remainingThreads.map((thread, index) => renderArchive(thread, index + 2))}
+            {checking || loading ? <div className={styles.stateCard}>Abriendo Zona Cruda...</div> : null}
+
+            {!checking && !loading && groupedThreads.length > 0 ? (
+              <div style={{ display: "grid", gap: 34 }}>
+                {groupedThreads.map((group) => (
+                  <section key={group.name} aria-label={group.name}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "end",
+                        gap: 12,
+                        marginBottom: 12,
+                        paddingBottom: 10,
+                        borderBottom: "1px solid rgba(255,255,255,.08)"
+                      }}
+                    >
+                      <div>
+                        <span className={styles.sectionEyebrow}>Segmento</span>
+                        <h3 style={{ margin: "6px 0 0", fontSize: "clamp(26px, 3vw, 38px)" }}>{group.name}</h3>
+                      </div>
+                      <span className={styles.feedHint}>{group.items.length} {group.items.length === 1 ? "hilo" : "hilos"}</span>
+                    </div>
+                    <div className={styles.archiveList}>
+                      {group.items.map((thread, index) => renderArchive(thread, index + 1, Boolean(sharedThread)))}
+                    </div>
+                  </section>
+                ))}
               </div>
             ) : null}
 
             {!checking && !loading && threads.length === 0 ? (
               <div className={styles.emptyState}>
-                <span>Archivo vacío</span>
-                <h2>Todavía no hay expedientes publicados.</h2>
-                <p>Zona Cruda funciona mejor cuando el caso tiene contexto, fechas y una pregunta que abra conversación.</p>
+                <span>Zona vacía</span>
+                <h2>Todavía no hay hilos publicados.</h2>
+                <p>Abre una conversación que obligue a la gente a escoger postura, contar una historia o etiquetar mentalmente al pana correcto.</p>
+              </div>
+            ) : null}
+
+            {!checking && !loading && sharedThreadId && !sharedThread ? (
+              <div className={styles.emptyState}>
+                <span>Ese hilo no aparece</span>
+                <h2>Puede haber sido eliminado o ya no estar disponible.</h2>
+                <p><a href="/zona-cruda">Vuelve a Zona Cruda</a> para ver los hilos activos.</p>
               </div>
             ) : null}
           </div>
@@ -232,11 +379,11 @@ export default function ZonaCrudaPage() {
             <div className={styles.codeCard}>
               <span className={styles.sidebarEyebrow}>Código de Zona Cruda</span>
               <h3>Fuerte sí. Falso no.</h3>
-              <p>Opiniones controversiales y lenguaje explícito están permitidos. Doxxing, amenazas reales y contenido ilegal no.</p>
+              <p>Vacila, debate y cuenta experiencias. No doxxing, amenazas reales ni inventar hechos sobre personas.</p>
               <ul>
-                <li>Contexto antes que shock.</li>
-                <li>Hechos antes que conspiración.</li>
-                <li>Discute la idea, no persigas personas.</li>
+                <li>Vacilón sin perseguir a nadie.</li>
+                <li>Opinión fuerte sin fabricar “hechos”.</li>
+                <li>Cada hilo se puede compartir por separado.</li>
               </ul>
             </div>
 
