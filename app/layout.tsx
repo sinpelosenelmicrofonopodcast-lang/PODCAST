@@ -7,6 +7,7 @@ import "./news-refresh.css";
 import "./audit-fixes.css";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
+import Script from "next/script";
 import { Bebas_Neue, Manrope } from "next/font/google";
 import { CANONICAL_SITE_URL } from "@/lib/seo/constants";
 
@@ -112,6 +113,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BottomStickyPromo />
         <PromoPopup />
         <Toaster />
+        <Script
+          id="sin-pelos-tawk-chat"
+          src="https://embed.tawk.to/6ac6ce25d8aab334c85ecdd8/1k4c9agn0"
+          strategy="afterInteractive"
+        />
         <div id="main-content">{children}</div>
         <script
           type="application/ld+json"
