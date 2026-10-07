@@ -115,7 +115,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Toaster />
         <Script
           id="sin-pelos-tawk-chat"
-          src="https://embed.tawk.to/6ac6ce25d8aab334c85ecdd8/1k4c9agn0"
+          src="https://embed.tawk.to/6ac6d67906b5f534c9ea43f2/1k4cbbig4"
           strategy="afterInteractive"
         />
         <div id="main-content">{children}</div>
