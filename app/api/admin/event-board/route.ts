@@ -28,7 +28,7 @@ export async function PATCH(req:NextRequest){
     start_datetime:sub.start_datetime,end_datetime:sub.end_datetime,location_name:sub.location_name,address:sub.address,city:sub.city,state:sub.state,
     organizer_name:sub.organizer_name,flyer_image_url:sub.flyer_image_url,external_url:sub.official_url,source_url:sub.official_url,
     source_checked_at:new Date().toISOString(),category:sub.category,is_published:true,updated_at:new Date().toISOString()};
-   const {data:ev,error}=await s.from("events").upsert(row,{onConflict:"submission_id"}).select("id").single();
+   const {data:ev,error}=await s.from("events").upsert(row,{onConflict:"slug"}).select("id").single();
    if(error||!ev)return NextResponse.json({ok:false,error:"No se pudo publicar."},{status:500});
    const {error:up}=await s.from("community_event_submissions").update({review_status:"approved",published_event_id:ev.id,reviewed_by:a.userId,reviewed_at:new Date().toISOString(),review_notes:note||null}).eq("id",id);
    if(up)return NextResponse.json({ok:false,error:"Publicado; error actualizando revisión. Recarga."},{status:500});
