@@ -71,6 +71,8 @@ export const metadata: Metadata = {
   title: "Sin Pelos en el Micrófono",
   description: "Podcast, historias, noticias y comunidad. Conversación real, sin libreto y sin filtros.",
   applicationName: "Sin Pelos en el Micrófono",
+  // Site ownership for the existing AdSense publisher. This does NOT enable ads.
+  other: { "google-adsense-account": "ca-pub-4245621675541095" },
   category: "entertainment",
   openGraph: {
     title: "Sin Pelos en el Micrófono",

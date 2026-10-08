@@ -89,6 +89,33 @@ export default function PrivacyPage() {
               puede afectar algunas funciones.
             </p>
 
+            <h2>6A. Publicidad de Google y opciones de privacidad</h2>
+            <p>
+              Sin Pelos en el Micrófono puede incorporar publicidad proporcionada por Google AdSense
+              una vez que nuestro dominio haya recibido la aprobación correspondiente. Cuando el
+              servicio esté activo, Google y otros proveedores publicitarios podrán utilizar cookies,
+              balizas web, direcciones IP y otros identificadores para seleccionar, mostrar, limitar
+              y medir anuncios. Los proveedores de terceros podrían almacenar o consultar cookies
+              en tu navegador como resultado de la publicidad en nuestro sitio.
+            </p>
+            <p>
+              Google explica el uso de estos datos en{" "}
+              <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer">
+                Cómo utiliza Google la información de sitios que usan sus servicios
+              </a>.
+              También puedes consultar tus controles publicitarios en{" "}
+              <a href="https://myadcenter.google.com/" target="_blank" rel="noopener noreferrer">
+                Mi centro de anuncios
+              </a>.
+            </p>
+            <p>
+              Cuando se active AdSense, mostraremos los controles de consentimiento y privacidad
+              exigidos por las normativas aplicables, incluyendo una plataforma de gestión de
+              consentimiento certificada para los territorios donde Google la requiere. La presencia
+              de una etiqueta de verificación de AdSense o un archivo ads.txt no significa que
+              actualmente se estén mostrando anuncios de Google.
+            </p>
+
             <h2>7. Retención de datos</h2>
             <p>
               Conservamos la información solo durante el tiempo razonablemente necesario para prestar el servicio, cumplir la finalidad para la
