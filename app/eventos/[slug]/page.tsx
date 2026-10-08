@@ -8,7 +8,7 @@ import { getEventBySlug, getPublishedEvents } from "@/lib/seo/content";
 import { buildEventJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
 import { DEFAULT_OG_IMAGE } from "@/lib/seo/constants";
 
-export const revalidate = 180;
+export const revalidate = 60;
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const event = await getEventBySlug(params.slug);
@@ -31,6 +31,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 function formatDateTime(value?: string | null) {
   if (!value) return "";
   return new Date(value).toLocaleString("es-PR", {
+    timeZone: "America/Chicago",
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -67,6 +68,7 @@ export default async function EventoDetallePage({ params }: { params: { slug: st
             Volver a eventos
           </Link>
           <article className="card" style={{ marginTop: 12, display: "grid", gap: 12 }}>
+            {event.promoted_until&&new Date(event.promoted_until).getTime()>Date.now()?<p style={{color:"#ff6600",fontWeight:900}}>PUBLICIDAD · PATROCINADO</p>:null}
             <h1 style={{ margin: 0 }}>{event.title}</h1>
             {event.flyer_image_url ? (
               <img
@@ -83,6 +85,7 @@ export default async function EventoDetallePage({ params }: { params: { slug: st
               {event.location_name ? <span>Lugar: {event.location_name}</span> : null}
               {event.city ? <span>Ciudad: {event.city}</span> : null}
             </div>
+            {event.source_url?<p className="muted" style={{fontSize:13}}>Fuente: <a href={event.source_url} target="_blank" rel="noopener noreferrer">Consultar publicación original</a>. Confirma cambios con el organizador.</p>:null}
             {event.external_url ? (
               <a className="button secondary" href={event.external_url} target="_blank" rel="noreferrer">
                 Ver enlace oficial

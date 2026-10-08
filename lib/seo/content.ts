@@ -52,6 +52,10 @@ export type SeoEvent = {
   organizer_name: string | null;
   is_published: boolean;
   updated_at: string | null;
+  promoted_until?: string | null;
+  source_url?: string | null;
+  source_checked_at?: string | null;
+  category?: string | null;
 };
 
 export type SeoClip = {
@@ -369,42 +373,25 @@ export async function getPublishedClips(limit = 100): Promise<SeoClip[]> {
   return out;
 }
 
-export async function getPublishedEvents(limit = 100): Promise<SeoEvent[]> {
-  const supabase = supabaseServer();
-  const primary = await supabase
-    .from("events")
-    .select(
-      "id, slug, title, description, start_datetime, end_datetime, location_name, address, city, state, flyer_image_url, external_url, organizer_name, is_published, updated_at"
-    )
-    .eq("is_published", true)
-    .order("start_datetime", { ascending: true })
-    .limit(limit);
-  if (!primary.error && (primary.data ?? []).length > 0) return (primary.data ?? []) as SeoEvent[];
-
-  const fallback = await supabase
-    .from("live_events")
-    .select("id, title, description, starts_at, ends_at, venue_name, address_line, city, flyer_url, info_url, organizer_name, updated_at, visibility")
-    .order("starts_at", { ascending: true })
-    .limit(limit);
-  return ((fallback.data ?? []) as any[])
-    .filter((row) => String(row.visibility ?? "public") === "public")
-    .map((row) => ({
-      id: String(row.id),
-      slug: normalizeSlug(row.slug, String(row.id)),
-      title: String(row.title ?? "Evento"),
-      description: row.description ?? null,
-      start_datetime: row.starts_at,
-      end_datetime: row.ends_at ?? null,
-      location_name: row.venue_name ?? null,
-      address: row.address_line ?? null,
-      city: row.city ?? null,
-      state: row.state ?? null,
-      flyer_image_url: row.flyer_url ?? null,
-      external_url: row.info_url ?? null,
-      organizer_name: row.organizer_name ?? null,
-      is_published: true,
-      updated_at: row.updated_at ?? row.starts_at ?? null
-    }));
+export async function getPublishedEvents(limit=100):Promise<SeoEvent[]>{
+ const db=supabaseServer(),now=Date.now();
+ const {data,error}=await db.from("events").select("id,slug,title,description,start_datetime,end_datetime,location_name,address,city,state,flyer_image_url,external_url,organizer_name,is_published,updated_at,source_url,source_checked_at,category,promoted_until")
+  .eq("is_published",true).order("start_datetime",{ascending:true}).limit(500);
+ const active=(rows:SeoEvent[])=>rows.filter(x=>{
+   const start=new Date(x.start_datetime).getTime(),end=x.end_datetime?new Date(x.end_datetime).getTime():start+86400000;
+   return Number.isFinite(start)&&end>now;
+  }).sort((a,b)=>{
+   const af=a.promoted_until&&new Date(a.promoted_until).getTime()>now?1:0;
+   const bf=b.promoted_until&&new Date(b.promoted_until).getTime()>now?1:0;
+   return bf-af||new Date(a.start_datetime).getTime()-new Date(b.start_datetime).getTime();
+  }).slice(0,limit);
+ if(!error&&(data??[]).length)return active(data as SeoEvent[]);
+ const fallback=await db.from("live_events").select("id,title,description,starts_at,ends_at,venue_name,address_line,city,flyer_url,info_url,organizer_name,updated_at,visibility").order("starts_at",{ascending:true}).limit(500);
+ return active(((fallback.data??[]) as any[]).filter(v=>v.visibility==="public").map(v=>({
+ id:String(v.id),slug:String(v.id),title:String(v.title??"Evento"),description:v.description??null,start_datetime:v.starts_at,end_datetime:v.ends_at??null,
+ location_name:v.venue_name??null,address:v.address_line??null,city:v.city??null,state:"TX",flyer_image_url:v.flyer_url??null,
+ external_url:v.info_url??null,organizer_name:v.organizer_name??null,is_published:true,updated_at:v.updated_at??null,promoted_until:null,source_url:v.info_url??null
+ })));
 }
 
 export async function getEventBySlug(slug: string): Promise<SeoEvent | null> {

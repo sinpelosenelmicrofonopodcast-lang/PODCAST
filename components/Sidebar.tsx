@@ -31,6 +31,7 @@ const links: LinkItem[] = [
   { href: "/admin/blog", label: "Editoriales", section: "publish", required: "manage_blog" },
   { href: "/admin/editorial-engine" as Route, label: "Podcast Editorial", section: "publish", required: "manage_news" },
   { href: "/admin/events", label: "Eventos", section: "publish", required: "manage_events" },
+  { href: "/admin/event-board" as Route, label: "Aprobar eventos y cobros", section: "publish", required: "manage_events" },
 
   { href: "/admin/promotions", label: "Promociones", section: "audience", required: "manage_promotions" },
   { href: "/admin/ad-requests" as Route, label: "Leads patrocinio", section: "audience", required: "manage_promotions" },
