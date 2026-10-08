@@ -773,7 +773,6 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
 
   const newsVisualRows = newsRows.filter((row) => hasImage(row.cover_url));
   const blogVisualRows = blogRows.filter((row) => hasImage(row.cover_url));
-  const eventVisualRows = eventsRows.filter((row) => hasImage(row.flyer_url));
   const sponsorVisualRows = promoRows.filter((row) => hasImage(row.image_url));
   const podcastVisualRows = podcastSourceRows.filter((row) => hasImage(postThumb(row)));
 
@@ -835,7 +834,7 @@ async function queryHomepageOverviewInternal(): Promise<HomepageOverviewData> {
   }
 
   const resolvedEventRows = await Promise.all(
-    eventVisualRows.slice(0, 4).map(async (event) => ({
+    eventsRows.slice(0, 4).map(async (event) => ({
       ...event,
       flyer_url: await resolveFacebookEventImage(event.flyer_url, event.info_url)
     }))
@@ -1128,7 +1127,7 @@ async function queryHomepageFeedPageInternal(
   };
 }
 
-const cachedOverview = unstable_cache(queryHomepageOverviewInternal, ["home-overview-v3"], {
+const cachedOverview = unstable_cache(queryHomepageOverviewInternal, ["home-overview-v4"], {
   revalidate: 120,
   tags: ["home", "home-overview"]
 });
