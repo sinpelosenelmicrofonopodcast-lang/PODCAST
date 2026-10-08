@@ -152,3 +152,69 @@
     animation: none;
   }
 }
+
+/* News articles: prevent grid min-content and long copy from widening mobile cards.
+   Do not hide overflow: text, key points, and links must remain fully readable. */
+.news-article-page .news-article-container,
+.news-article-page .news-article-hero,
+.news-article-page .news-article-hero-content-block,
+.news-article-page .news-article-layout,
+.news-article-page .news-article-main,
+.news-article-page .news-keypoints,
+.news-article-page .news-article-body,
+.news-article-page .news-article-body > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.news-article-page .news-article-main,
+.news-article-page .news-article-body > div,
+.news-article-page .news-keypoints ul {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.news-article-page .news-article-body,
+.news-article-page .news-keypoints {
+  width: 100%;
+}
+
+.news-article-page .news-article-body :is(p, li, h2, blockquote),
+.news-article-page .news-keypoints :is(h2, li),
+.news-article-page .news-article-excerpt,
+.news-article-page .news-article-title {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+@media (max-width: 1120px) {
+  .news-article-page .news-article-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .news-article-page .news-article-main {
+    padding: 12px;
+    gap: 16px;
+  }
+
+  .news-article-page .news-keypoints {
+    padding: 12px;
+  }
+
+  .news-article-page .news-keypoints li {
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .news-article-page .news-article-body p,
+  .news-article-page .news-article-body li {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  .news-article-page .news-article-body h2 {
+    font-size: clamp(21px, 5.5vw, 26px);
+    line-height: 1.25;
+  }
+}
