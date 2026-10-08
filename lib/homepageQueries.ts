@@ -1,4 +1,4 @@
-import { getPublishedEpisodes } from "@/lib/seo/content";
+import { getPublishedEpisodes, getPublishedEvents } from "@/lib/seo/content";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabaseServer";
@@ -62,6 +62,7 @@ export type HomeCommunityThread = {
 };
 
 export type HomeEvent = {
+  promoted_until?: string | null;
   id: string;
   title: string;
   description: string | null;
@@ -521,48 +522,16 @@ async function fetchThreads(supabase: ReturnType<typeof supabaseServer>, limit: 
   );
 }
 
-async function fetchUpcomingEvents(supabase: ReturnType<typeof supabaseServer>, limit: number) {
-  const nowIso = new Date().toISOString();
-
-  const primary = await supabase
-    .from("live_events")
-    .select("id, title, description, starts_at, venue_name, city, flyer_url, join_url, ticket_url, info_url")
-    .gte("starts_at", nowIso)
-    .order("starts_at", { ascending: true })
-    .limit(limit);
-
-  let data: any[] | null = (primary.data as any[] | null) ?? null;
-  let error = primary.error;
-
-  if (error && /venue_name|city|flyer_url|ticket_url|info_url/i.test(error.message ?? "")) {
-    const fallback = await supabase
-      .from("live_events")
-      .select("id, title, description, starts_at, join_url")
-      .gte("starts_at", nowIso)
-      .order("starts_at", { ascending: true })
-      .limit(limit);
-    data = (fallback.data as any[] | null) ?? null;
-    error = fallback.error;
-  }
-
-  if (error || !Array.isArray(data)) return [] as HomeEvent[];
-
-  return uniqById(
-    data
-      .map((row: any) => ({
-        id: cleanText(row.id),
-        title: cleanText(row.title, "Evento"),
-        description: row.description ? String(row.description) : null,
-        starts_at: row.starts_at ? String(row.starts_at) : null,
-        venue_name: row.venue_name ? String(row.venue_name) : null,
-        city: row.city ? String(row.city) : null,
-        flyer_url: normalizeImageUrl(row.flyer_url),
-        join_url: row.join_url ? String(row.join_url) : null,
-        ticket_url: row.ticket_url ? String(row.ticket_url) : null,
-        info_url: row.info_url ? String(row.info_url) : null
-      }))
-      .filter((row) => row.id && row.starts_at)
-  );
+async function fetchUpcomingEvents(_supabase:ReturnType<typeof supabaseServer>,limit:number){
+ const entries=await getPublishedEvents(Math.max(limit,12)).catch(()=>[]);
+ return entries.slice(0,limit).map(e=>({
+  id:e.id,title:e.title,description:e.description,
+  starts_at:e.start_datetime,venue_name:e.location_name,city:e.city,
+  flyer_url:normalizeImageUrl(e.flyer_image_url),
+  join_url:"/eventos/"+encodeURIComponent(e.slug),
+  ticket_url:null,info_url:e.external_url,
+  promoted_until:e.promoted_until??null
+ })) as HomeEvent[];
 }
 
 async function fetchPromotions(supabase: ReturnType<typeof supabaseServer>, limit: number) {

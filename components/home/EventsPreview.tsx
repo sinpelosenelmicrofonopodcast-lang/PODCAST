@@ -18,7 +18,7 @@ function location(event: HomeEvent) {
 }
 
 function eventHref(event: HomeEvent) {
-  return event.ticket_url || event.info_url || event.join_url || `/eventos#evento-${encodeURIComponent(event.id)}`;
+  return event.join_url || event.ticket_url || event.info_url || `/eventos#evento-${encodeURIComponent(event.id)}`;
 }
 
 export function EventsPreview({ events }: { events: HomeEvent[] }) {
@@ -34,11 +34,12 @@ export function EventsPreview({ events }: { events: HomeEvent[] }) {
       <div className="home-events-grid">
         {events.length > 0 ? (
           events.slice(0, 4).map((event) => (
-            <a key={event.id} href={eventHref(event)} className="card home-event-card" target="_blank" rel="noreferrer">
+            <a key={event.id} href={eventHref(event)} className="card home-event-card">
               <div className="home-event-thumb">
                 <SafeImage src={event.flyer_url} alt={event.title} loading="lazy" />
               </div>
               <div className="home-event-body">
+                {event.promoted_until && new Date(event.promoted_until).getTime() > Date.now() ? <p style={{color:"#ff6600",fontWeight:900}}>PUBLICIDAD · PATROCINADO</p> : null}
                 <h3 className="clamp-2">{event.title}</h3>
                 <p>{formatDate(event.starts_at)}</p>
                 <p className="home-muted">{location(event)}</p>
