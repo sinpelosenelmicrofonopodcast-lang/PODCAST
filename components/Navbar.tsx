@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import type { Route } from "next";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -38,6 +39,8 @@ export function Navbar() {
   const [isStaff, setIsStaff] = useState(false);
   const [lang, setLang] = useState<AppLang>("es");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuScrollRef = useRef<HTMLDivElement | null>(null);
   const [communityOpen, setCommunityOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const communityRef = useRef<HTMLDivElement | null>(null);
@@ -113,6 +116,7 @@ export function Navbar() {
   useEffect(() => {
     setMenuOpen(false);
     setCommunityOpen(false);
+    setMobileMenuOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -124,6 +128,7 @@ export function Navbar() {
       if (e.key !== "Escape") return;
       setMenuOpen(false);
       setCommunityOpen(false);
+      setMobileMenuOpen(false);
     };
     const onPointerDown = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node | null;
@@ -142,6 +147,15 @@ export function Navbar() {
       window.removeEventListener("touchstart", onPointerDown as any);
     };
   }, []);
+
+  // Portal the mobile drawer to body so the sticky header never clips the first links.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    if (mobileMenuScrollRef.current) mobileMenuScrollRef.current.scrollTop = 0;
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [mobileMenuOpen]);
 
   const t = navTexts[lang];
   const isPathActive = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
@@ -191,6 +205,7 @@ export function Navbar() {
   const isOverlayOpen = menuOpen || communityOpen;
 
   return (
+    <>
     <nav className="nav">
       <div className="container nav-inner">
         <Link className="brand" href="/" aria-label="Sin Pelos en el Micrófono — Inicio">
@@ -290,6 +305,21 @@ export function Navbar() {
 
         <div className="nav-right">
           <LanguageToggle />
+          <button
+            className="nav-mobile-trigger"
+            type="button"
+            aria-label={lang === "es" ? "Abrir menú de navegación" : "Open navigation menu"}
+            aria-controls="mobile-navigation"
+            aria-expanded={mobileMenuOpen}
+            onClick={() => {
+              setMobileMenuOpen(true);
+              setMenuOpen(false);
+              setCommunityOpen(false);
+            }}
+          >
+            <span aria-hidden="true">☰</span>
+            <span>{t.menu}</span>
+          </button>
           {nickname ? (
             <div className="nav-user">
               <Link href="/perfil" className="muted nav-profile-link">{t.profile}</Link>
@@ -336,5 +366,56 @@ export function Navbar() {
         </div>
       </div>
     </nav>
+    {mobileMenuOpen && typeof document !== "undefined" ? createPortal(
+      <div className="mobile-nav-root" id="mobile-navigation">
+        <button
+          type="button"
+          className="mobile-nav-backdrop"
+          aria-label={lang === "es" ? "Cerrar menú" : "Close menu"}
+          onClick={() => setMobileMenuOpen(false)}
+        />
+        <section className="mobile-nav-drawer" role="dialog" aria-modal="true" aria-label={t.menu}>
+          <div className="mobile-nav-heading">
+            <span>{t.menu}</span>
+            <button type="button" className="mobile-nav-close" onClick={() => setMobileMenuOpen(false)} aria-label={lang === "es" ? "Cerrar menú" : "Close menu"}>✕</button>
+          </div>
+          <div className="mobile-nav-scroll" ref={mobileMenuScrollRef}>
+            <p className="mobile-nav-section-title">{lang === "es" ? "Principal" : "Main"}</p>
+            {([
+              { href: "/" as Route, label: t.home },
+              { href: "/podcast" as Route, label: t.podcast },
+              { href: "/noticias" as Route, label: t.news },
+              { href: "/blog" as Route, label: lang === "es" ? "Desde el Micrófono" : "From the Mic" },
+              { href: "/zona-cruda" as Route, label: t.rawZone }
+            ]).map((link) => (
+              <Link key={link.href} href={link.href} className={`mobile-nav-link${isPathActive(link.href) ? " active" : ""}`} onClick={() => setMobileMenuOpen(false)}>{link.label}</Link>
+            ))}
+            <p className="mobile-nav-section-title">{t.community}</p>
+            {communityLinks.map((link) => (
+              <Link key={link.href} href={link.href} className={`mobile-nav-link${isPathActive(link.href) ? " active" : ""}`} onClick={() => setMobileMenuOpen(false)}>{link.label}</Link>
+            ))}
+            <p className="mobile-nav-section-title">{lang === "es" ? "Explorar" : "Explore"}</p>
+            {discoverLinks.map((link) => (
+              <Link key={link.href} href={link.href} className={`mobile-nav-link${isPathActive(link.href) ? " active" : ""}`} onClick={() => setMobileMenuOpen(false)}>{link.label}</Link>
+            ))}
+            <p className="mobile-nav-section-title">{lang === "es" ? "Cuenta" : "Account"}</p>
+            {nickname ? (
+              <>
+                <Link href="/perfil" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>{t.profile}</Link>
+                {isStaff ? <Link href="/admin" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>{t.dashboard}</Link> : null}
+                <button type="button" className="mobile-nav-link" onClick={() => { setMobileMenuOpen(false); void handleSignOut(); }}>{t.logout}</button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>{t.login}</Link>
+                <Link href="/register" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>{t.join}</Link>
+              </>
+            )}
+          </div>
+        </section>
+      </div>,
+      document.body
+    ) : null}
+    </>
   );
 }
