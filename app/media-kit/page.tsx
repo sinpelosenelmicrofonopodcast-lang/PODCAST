@@ -32,6 +32,7 @@ export default function MediaKit() {
         <article className="card"><h3>Noticias y web</h3><p>Banners, patrocinadores de sección y publicidad diferenciada del contenido periodístico.</p></article>
         <article className="card"><h3>Comunidad</h3><p>Amplificación seleccionada en redes y newsletter, según inventario disponible.</p></article>
       </div>
+      <div className="card" style={{padding:22,marginTop:20,marginBottom:24}}><h2 style={{marginTop:0}}>Otros espacios comerciales</h2><p>Patrocinio de nuestro boletín y colaboraciones con marcas de producción audiovisual. Las menciones son publicidad identificada y sujetas a acuerdo.</p><div style={{display:"flex",gap:12,flexWrap:"wrap"}}><Link href="/newsletter/patrocinios" className="button secondary">Conoce el newsletter</Link><Link href="/setup" className="button secondary">El Setup de Sin Pelos</Link></div></div>
       <h2 style={{marginTop:36}}>Paquetes de lanzamiento</h2>
       <div className="media-kit-pricing" style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:14}}>
         {offers.map(o=><article className="card" key={o.name} style={{padding:22,minWidth:0}}>

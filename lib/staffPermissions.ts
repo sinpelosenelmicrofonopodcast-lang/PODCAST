@@ -80,6 +80,8 @@ export function requiredPermissionForAdminPage(pathname: string): StaffPermissio
   if (pathname.startsWith("/admin/blog")) return "manage_blog";
   if (pathname.startsWith("/admin/events")) return "manage_events";
   if (pathname.startsWith("/admin/promotions")) return "manage_promotions";
+  if (pathname.startsWith("/admin/sponsor-prospects")) return "manage_promotions";
+  if (pathname.startsWith("/admin/newsletter-sponsor")) return "manage_newsletter";
   if (pathname.startsWith("/admin/newsletter")) return "manage_newsletter";
   if (pathname.startsWith("/admin/guest-requests")) return "manage_guest_requests";
   if (pathname.startsWith("/admin/stats")) return "view_stats";

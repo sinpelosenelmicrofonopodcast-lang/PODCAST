@@ -34,6 +34,8 @@ const links: LinkItem[] = [
 
   { href: "/admin/promotions", label: "Promociones", section: "audience", required: "manage_promotions" },
   { href: "/admin/ad-requests" as Route, label: "Leads patrocinio", section: "audience", required: "manage_promotions" },
+  { href: "/admin/sponsor-prospects" as Route, label: "Prospectos comerciales", section: "audience", required: "manage_promotions" },
+  { href: "/admin/newsletter-sponsor" as Route, label: "Newsletter patrocinable", section: "audience", required: "manage_newsletter" },
   { href: "/admin/newsletter", label: "Newsletter", section: "audience", required: "manage_newsletter" },
   { href: "/admin/guest-requests", label: "Invitados", section: "audience", required: "manage_guest_requests" },
   { href: "/admin/confessions", label: "Confesiones", section: "audience", required: "moderate_confessions" },

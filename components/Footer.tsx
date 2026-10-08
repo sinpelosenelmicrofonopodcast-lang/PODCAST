@@ -10,7 +10,8 @@ const footerGroups = [
       { href: "/blog", label: "Desde el Micrófono" },
       { href: "/noticias", label: "Noticias" },
       { href: "/podcast", label: "Catálogo completo" },
-      { href: "/eventos", label: "Eventos" }
+      { href: "/eventos", label: "Eventos" },
+      { href: "/setup", label: "El Setup de Sin Pelos" }
     ]
   },
   {
