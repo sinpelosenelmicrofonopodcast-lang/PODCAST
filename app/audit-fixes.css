@@ -218,3 +218,24 @@
     line-height: 1.25;
   }
 }
+
+/* Phase one mobile polish: never truncate headline words or sponsorship fields. */
+.spm-brand-hero-grid, .spm-brand-hero-copy, .home-media-section, .home-podcast-body,
+.public-sponsor-options > *, .page-header-card { min-width: 0; }
+@media (max-width: 760px) {
+  .spm-brand-hero { min-height: 0; }
+  .spm-brand-hero-grid { padding-block: 36px; }
+  .spm-brand-hero-copy h1 {
+    max-width: 100%; width: 100%; font-size: clamp(32px, 8.6vw, 60px);
+    line-height: .98; letter-spacing: -.01em; overflow-wrap: normal; word-break: normal;
+  }
+  .spm-brand-hero-copy h1 em { max-width: 100%; }
+  .spm-brand-actions { flex-wrap: wrap; }
+  .media-kit-pricing, .public-sponsor-options { grid-template-columns: minmax(0,1fr) !important; }
+  .media-kit-contact .grid { grid-template-columns: minmax(0,1fr) !important; }
+}
+@media print {
+  .media-kit-nav, .media-kit-contact, .media-kit-footer, .media-kit-actions { display: none !important; }
+  .media-kit-page { color: #111 !important; background: white !important; }
+  .media-kit-page .card { color: #111 !important; background: #fff !important; box-shadow: none !important; border: 1px solid #bbb !important; break-inside: avoid; }
+}

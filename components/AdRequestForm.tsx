@@ -37,6 +37,8 @@ export function AdRequestForm() {
       website: String(formData.get("website") ?? "").trim(),
       budget: String(formData.get("budget") ?? "").trim(),
       message: String(formData.get("message") ?? "").trim(),
+      lead_source: new URLSearchParams(window.location.search).get("utm_source")?.slice(0, 100) || (window.location.pathname === "/media-kit" ? "media-kit" : "web"),
+      utm_campaign: new URLSearchParams(window.location.search).get("utm_campaign")?.slice(0, 100) || null,
       updated_at: new Date().toISOString()
     };
 
@@ -76,7 +78,7 @@ export function AdRequestForm() {
         {t.ads.subtitle}
       </p>
 
-      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 12 }}>
         <label>
           Nombre completo
           <input className="input" name="full_name" required />
@@ -87,7 +89,7 @@ export function AdRequestForm() {
         </label>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 12 }}>
         <label>
           Teléfono / WhatsApp
           <input className="input" name="phone" />
@@ -98,7 +100,7 @@ export function AdRequestForm() {
         </label>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 12 }}>
         <label>
           Website / Landing (opcional)
           <input className="input" name="website" placeholder="https://..." />

@@ -93,6 +93,7 @@ export default function PublicidadPage() {
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 20 }}>
               <a className="button" href="#solicitar-campana">Solicitar propuesta</a>
+              <a className="button secondary" href="/media-kit">Ver media kit y paquetes</a>
               <a className="button secondary" href="#inventario">Ver inventario publicitario</a>
             </div>
           </header>
