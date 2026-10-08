@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SPM V3 contract envelope",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "episode",
+    "source",
+    "transcript",
+    "speakers",
+    "cameras",
+    "opening",
+    "master_edit",
+    "sponsors",
+    "editor_notes",
+    "audio",
+    "reels",
+    "subtitle_presets",
+    "youtube",
+    "quality_control",
+    "exports"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "3.0"
+    },
+    "episode": {
+      "type": "object"
+    },
+    "source": {
+      "type": "object"
+    },
+    "transcript": {
+      "type": "object"
+    },
+    "speakers": {
+      "type": "array"
+    },
+    "cameras": {
+      "type": "array"
+    },
+    "opening": {
+      "type": "object"
+    },
+    "master_edit": {
+      "type": "object",
+      "required": [
+        "automatic_silence_removal"
+      ],
+      "properties": {
+        "automatic_silence_removal": {
+          "const": false
+        },
+        "automatic_filler_removal": {
+          "const": false
+        }
+      }
+    },
+    "sponsors": {
+      "type": "array"
+    },
+    "editor_notes": {
+      "type": "array"
+    },
+    "audio": {
+      "type": "object"
+    },
+    "reels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "automatic_silence_removal",
+          "id",
+          "segments",
+          "subtitle_preset"
+        ],
+        "properties": {
+          "automatic_silence_removal": {
+            "const": true
+          }
+        }
+      }
+    },
+    "subtitle_presets": {
+      "type": "object"
+    },
+    "youtube": {
+      "type": "object"
+    },
+    "quality_control": {
+      "type": "object"
+    },
+    "exports": {
+      "type": "object"
+    }
+  }
+}

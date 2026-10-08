@@ -1,0 +1,60 @@
+name: SPM Editor CI
+on:
+  push:
+    branches: ['codex/spm-editor-*']
+    paths: ['tools/spm-editor/**', '.github/workflows/spm-editor-ci.yml']
+  pull_request:
+    paths: ['tools/spm-editor/**', '.github/workflows/spm-editor-ci.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: spm-editor-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  linux-media:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools/spm-editor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install media dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - name: Run contract, simulator and real media tests
+        run: python -m unittest discover -s tests -v
+      - name: Execute JSON CLI
+        run: |
+          python -m spm_editor validate example.contract-test.json
+          python -m spm_editor dry-run example.contract-test.json
+          python -m spm_editor qc example.contract-test.json
+      - name: Publish verification scope
+        run: cat CI_STATUS.md >> "$GITHUB_STEP_SUMMARY"
+  macos-install:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools/spm-editor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile and run adapter tests
+        run: |
+          python -m compileall -q spm_editor
+          python -m unittest discover -s tests -p test_core.py -v
+          python -m unittest discover -s tests -p test_engine.py -v
+      - name: Execute macOS installer and installed CLI
+        run: |
+          bash INSTALL.command
+          "$HOME/Library/Application Support/SPM Podcast Editor/spm-editor" validate "$GITHUB_WORKSPACE/tools/spm-editor/example.contract-test.json" --output "$RUNNER_TEMP/spm-reports"
+      - name: Report native runtime availability
+        run: |
+          python -c 'from pathlib import Path; print("DaVinci Resolve installed:", Path("/Applications/DaVinci Resolve/DaVinci Resolve.app").exists())' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Native integration is not certified by this hosted runner.' >> "$GITHUB_STEP_SUMMARY"

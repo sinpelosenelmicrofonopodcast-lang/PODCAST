@@ -1,0 +1,29 @@
+name: SPM Editor Native Resolve Integration
+on:
+  workflow_dispatch:
+    inputs:
+      manifest_path:
+        description: Absolute path to a verified test manifest on the Mac runner
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  native-resolve:
+    runs-on: [self-hosted, macOS, spm-resolve]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect and execute existing test project
+        working-directory: tools/spm-editor
+        env:
+          SPM_TEST_MANIFEST: ${{ inputs.manifest_path }}
+        run: |
+          python3 -m spm_editor inspect "$SPM_TEST_MANIFEST" --output "$RUNNER_TEMP/spm-native"
+          python3 -m spm_editor run "$SPM_TEST_MANIFEST" --output "$RUNNER_TEMP/spm-native"
+      - name: Publish execution report
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/spm-native/execution.json"; then
+            cat "$RUNNER_TEMP/spm-native/execution.json" >> "$GITHUB_STEP_SUMMARY"
+          fi

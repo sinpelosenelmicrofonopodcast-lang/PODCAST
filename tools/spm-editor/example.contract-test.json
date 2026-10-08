@@ -1,0 +1,62 @@
+{
+  "schema_version": "3.0",
+  "episode": {
+    "id": "DEMO",
+    "title": "Contract test only"
+  },
+  "source": {
+    "timeline_name": "SPM_SOURCE",
+    "synchronized": true,
+    "duration_frames": 2400,
+    "frame_rate": "24/1"
+  },
+  "transcript": {
+    "segments": []
+  },
+  "speakers": [],
+  "cameras": [],
+  "opening": {
+    "hook": {
+      "source_frames": [
+        240,
+        480
+      ]
+    }
+  },
+  "master_edit": {
+    "automatic_silence_removal": false,
+    "automatic_filler_removal": false,
+    "exclusions": [],
+    "camera_decisions": []
+  },
+  "sponsors": [],
+  "editor_notes": [],
+  "audio": {
+    "voice_isolation_amount": 35,
+    "target_lufs": -16,
+    "true_peak_db": -1
+  },
+  "reels": [
+    {
+      "id": "REEL01",
+      "segments": [
+        {
+          "source_frames": [
+            480,
+            960
+          ]
+        }
+      ],
+      "automatic_silence_removal": true,
+      "subtitle_preset": "SPM_BOLD"
+    }
+  ],
+  "subtitle_presets": {
+    "SPM_BOLD": {
+      "font": "Anton"
+    }
+  },
+  "youtube": {},
+  "quality_control": {},
+  "exports": {}
+}

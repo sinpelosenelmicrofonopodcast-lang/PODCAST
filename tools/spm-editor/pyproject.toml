@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spm-podcast-editor"
+version = "3.0.0a1"
+requires-python = ">=3.10"
+description = "SPM contract compiler and Resolve preflight; full execution blocked pending integration"
+
+[project.scripts]
+spm-editor = "spm_editor.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["spm_editor*"]
