@@ -1,0 +1,7 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
+import { NewsletterForm } from "@/components/newsletter/NewsletterForm";
+export const metadata:Metadata={title:"Newsletter de Sin Pelos | Historias sin algoritmo",description:"Recibe episodios, noticias verificadas y novedades del podcast directamente al correo.",alternates:{canonical:"/newsletter"}};
+export default function NewsletterPage(){return <main><Navbar/><section className="section"><div className="container" style={{maxWidth:880}}><header className="page-header-card" style={{padding:"clamp(24px,5vw,60px)"}}><p className="page-kicker">SIN PELOS EN TU CORREO</p><h1 className="section-title">Lo mejor de la semana, sin depender del algoritmo</h1><p className="muted">Episodios, historias, noticias con contexto y actividades de la comunidad. Gratis. Podemos incluir espacios comerciales claramente identificados.</p></header><div style={{maxWidth:640,margin:"22px auto"}}><NewsletterForm variant="cta" title="Únete a la comunidad" subtitle="Recibe novedades cuando haya una edición lista. Puedes darte de baja en cualquier momento." buttonLabel="SUSCRIBIRME GRATIS"/></div><div className="card" style={{padding:20}}><p>¿Tienes un negocio? <Link href="/newsletter/patrocinios">Conoce cómo patrocinar el newsletter</Link>.</p></div></div></section><Footer/></main>}

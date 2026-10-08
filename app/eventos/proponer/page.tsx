@@ -1,0 +1,6 @@
+import type { Metadata } from "next";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
+import { BusinessInquiryForm } from "@/components/commercial/BusinessInquiryForm";
+export const metadata:Metadata={title:"Propón tu evento | Sin Pelos",description:"Envía los datos de un evento para revisión editorial o solicita cobertura audiovisual.",alternates:{canonical:"/eventos/proponer"}};
+export default function EventProposal(){return <main><Navbar/><section className="section"><div className="container" style={{maxWidth:960}}><header className="page-header-card" style={{padding:"clamp(20px,5vw,52px)",marginBottom:25}}><p className="page-kicker">AGENDA · CENTRAL TEXAS Y PUERTO RICO</p><h1 className="section-title">Proponer un evento</h1><p className="muted">Envíanos fecha, lugar, descripción y enlace oficial. Revisamos la información antes de publicarla. Los espacios destacados y servicios de cobertura comercial se cotizan por separado.</p></header><BusinessInquiryForm defaultType="event_listing" heading="Envíanos los datos de tu actividad"/></div></section><Footer/></main>}

@@ -20,7 +20,13 @@ export const PUBLIC_CORE_PAGES = [
   "/podcast",
   "/eventos",
   "/acerca",
-  "/contacto"
+  "/contacto",
+  "/servicios",
+  "/media-kit",
+  "/setup",
+  "/newsletter",
+  "/newsletter/patrocinios",
+  "/eventos/proponer"
 ] as const;
 
 export const DEFAULT_OG_IMAGE = `${CANONICAL_SITE_URL}/og-default.jpg`;

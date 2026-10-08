@@ -47,7 +47,7 @@ export default function SetupPage() {
         <p className="page-kicker">TRANSPARENCIA</p>
         <h2>¿Dónde están los enlaces afiliados?</h2>
         <p>Actualmente esta guía es editorial: no contiene enlaces de comisión ni códigos de descuento patrocinados. Si incorporamos enlaces afiliados o colaboraciones, los identificaremos claramente junto a la recomendación. La inclusión de un modelo no implica patrocinio de su fabricante.</p>
-        <Link href="/media-kit" className="button">Patrocina esta guía</Link>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}><Link href="/media-kit" className="button">Patrocina esta guía</Link><Link href="/servicios" className="button secondary">Contrata producción de podcast</Link></div>
       </section>
     </div></section><Footer/></main>;
 }

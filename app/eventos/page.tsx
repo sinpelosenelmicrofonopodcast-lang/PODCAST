@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { buildSeoMetadata } from "@/lib/seo/meta";
@@ -44,6 +45,12 @@ export default async function EventosPage() {
         <div className="container">
           <h1 className="section-title">Eventos</h1>
           <p className="muted">Agenda pública de la comunidad con fechas y enlaces oficiales.</p>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:16,marginBottom:20}}>
+            <Link className="button" href="/eventos/proponer">PROPONER UN EVENTO</Link>
+            <Link className="button secondary" href="/servicios">CONTRATAR COBERTURA</Link>
+          </div>
+          {events.length===0?<div className="card" style={{padding:24}}><h2>Estamos preparando la agenda.</h2><p>Por ahora no hay eventos verificados publicados. Envíanos una actividad con fecha, lugar y fuente oficial para evaluarla.</p><Link className="button secondary" href="/eventos/proponer">Enviar actividad</Link></div>:null}
+
           <div className="grid" style={{ marginTop: 16, gridTemplateColumns: "repeat(auto-fit,minmax(min(320px,100%),1fr))" }}>
             {events.map((event) => (
               <article key={event.id} className="card" style={{ display: "grid", gap: 10 }}>

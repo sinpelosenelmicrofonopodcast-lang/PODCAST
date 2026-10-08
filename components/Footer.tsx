@@ -11,7 +11,9 @@ const footerGroups = [
       { href: "/noticias", label: "Noticias" },
       { href: "/podcast", label: "Catálogo completo" },
       { href: "/eventos", label: "Eventos" },
-      { href: "/setup", label: "El Setup de Sin Pelos" }
+      { href: "/setup", label: "El Setup de Sin Pelos" },
+      { href: "/servicios", label: "Contrata nuestra producción" },
+      { href: "/newsletter", label: "Newsletter" }
     ]
   },
   {

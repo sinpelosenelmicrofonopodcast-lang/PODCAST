@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
 import { CANONICAL_SITE_URL } from "@/lib/seo/constants";
 import { getPublishedEpisodes } from "@/lib/seo/content";
-import { fetchYouTubeVideos, isFullPodcastEpisode } from "@/lib/youtube";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 export const revalidate = 1800;
@@ -29,13 +28,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absolute("/emprendimiento"), changeFrequency: "weekly", priority: 0.55 },
     { url: absolute("/quiero-salir"), changeFrequency: "monthly", priority: 0.45 },
     { url: absolute("/acerca"), changeFrequency: "monthly", priority: 0.5 },
-    { url: absolute("/publicidad"), changeFrequency: "monthly", priority: 0.4 }
+    { url: absolute("/publicidad"), changeFrequency: "monthly", priority: 0.4 },
+    { url: absolute("/servicios"), changeFrequency: "weekly", priority: 0.85 },
+    { url: absolute("/media-kit"), changeFrequency: "weekly", priority: 0.7 },
+    { url: absolute("/setup"), changeFrequency: "monthly", priority: 0.65 },
+    { url: absolute("/newsletter"), changeFrequency: "weekly", priority: 0.7 },
+    { url: absolute("/eventos/proponer"), changeFrequency: "monthly", priority: 0.4 }
   ];
 
-  const [storedEpisodes, liveVideos] = await Promise.all([
-    getPublishedEpisodes(500).catch(() => []),
-    fetchYouTubeVideos(220, { revalidateSeconds: 1800 }).catch(() => [])
-  ]);
+  // Use the Supabase episode archive only; never spend YouTube API quota in sitemap generation.
+  const storedEpisodes = await getPublishedEpisodes(500).catch(() => []);
 
   const episodeRows = new Map<string, MetadataRoute.Sitemap[number]>();
   storedEpisodes.forEach((episode) => {
@@ -48,19 +50,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.72
     });
   });
-  liveVideos.filter(isFullPodcastEpisode).forEach((video) => {
-    const id = String(video.id).trim();
-    if (!id) return;
-    if (!episodeRows.has(id)) {
-      episodeRows.set(id, {
-        url: absolute(`/podcast/${encodeURIComponent(id)}`),
-        lastModified: dateOrUndefined(video.publishedAt),
-        changeFrequency: "monthly",
-        priority: 0.76
-      });
-    }
-  });
-
   const supabase = supabaseServer();
   const [blogResult, newsResult] = await Promise.all([
     supabase.from("blog_posts").select("id, slug, created_at, updated_at").order("created_at", { ascending: false }).limit(500),

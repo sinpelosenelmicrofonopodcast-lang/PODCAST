@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { NewsletterForm } from "@/components/newsletter/NewsletterForm";
@@ -132,6 +133,20 @@ export default async function HomePage() {
     <main className="app-enter home-media-v6 spm-media-hub">
       <Navbar />
       <BrandHero />
+      <section className="section spm-section-breathe" aria-label="Trabaja con Sin Pelos">
+        <div className="container">
+          <div className="card" style={{padding:"clamp(20px,4vw,34px)"}}>
+            <p className="page-kicker">MÁS QUE UN PODCAST · B&B ENTERTAINMENT HUB</p>
+            <h2 className="section-title">¿TIENES UN NEGOCIO O UN PROYECTO?</h2>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,230px),1fr))",gap:14}}>
+              <div><h3>Producción audiovisual</h3><p className="muted">Videos, fotos, entrevistas y cobertura de eventos.</p><Link className="button" href="/servicios">SOLICITAR COTIZACIÓN</Link></div>
+              <div><h3>Publicidad y patrocinio</h3><p className="muted">Haz que tu marca sea parte de la conversación.</p><Link className="button secondary" href="/media-kit">VER PAQUETES</Link></div>
+              <div><h3>Eventos y comunidad</h3><p className="muted">Comparte tu evento o actividad con nuestro equipo.</p><Link className="button secondary" href="/eventos/proponer">PROPONER EVENTO</Link></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
 
       <section className="section spm-podcast-zone spm-section-breathe">
         <div className="container">

@@ -184,6 +184,8 @@ export function Navbar() {
     { href: "/blog", label: lang === "es" ? "Desde el Micrófono" : "From the Mic" },
     { href: "/feed", label: lang === "es" ? "Descubrir" : "Discover" },
     { href: "/eventos", label: t.events },
+    { href: "/servicios", label: lang === "es" ? "Servicios y cotizaciones" : "Services & quotes" },
+    { href: "/newsletter", label: "Newsletter" },
     { href: "/musica", label: t.music },
     { href: "/emprendimiento", label: t.entrepreneurship },
     { href: "/rss", label: "RSS / Audio" },
