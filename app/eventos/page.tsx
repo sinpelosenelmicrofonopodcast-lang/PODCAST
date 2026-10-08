@@ -63,7 +63,7 @@ export default async function EventosPage() {
                <p style={{color:"#ff6600",fontWeight:900}}>PATROCINADO</p>
                {x.flyer_image_url?<img src={x.flyer_image_url} alt={x.title} loading="lazy" style={{width:"100%",aspectRatio:"16/9",objectFit:"cover",borderRadius:10}}/>:null}
                <p className="muted">{formatDate(x.start_datetime)} · {x.city}</p><h3>{x.title}</h3>
-               <Link className="button" href={"/eventos/"+encodeURIComponent(x.slug)}>Ver evento</Link>
+               <a className="button" href={"/eventos/"+encodeURIComponent(x.slug)}>Ver evento</a>
              </article>)}
             </div></section>:null}
           <section style={{marginTop:25}}><h2>Próximos eventos</h2>
@@ -72,7 +72,7 @@ export default async function EventosPage() {
                {x.flyer_image_url?<img src={x.flyer_image_url} alt={x.title} loading="lazy" style={{width:"100%",aspectRatio:"16/9",objectFit:"cover",borderRadius:10}}/>:null}
                <p className="muted" style={{margin:0}}>{formatDate(x.start_datetime)} · {x.city}</p><h3 style={{margin:0}}>{x.title}</h3>
                <p className="muted">{x.description??"Evento de la comunidad"}</p>
-               <Link className="button secondary" href={"/eventos/"+encodeURIComponent(x.slug)}>Ver detalles y fuente</Link>
+               <a className="button secondary" href={"/eventos/"+encodeURIComponent(x.slug)}>Ver detalles y fuente</a>
              </article>)}
             </div></section>
           <div className="card" style={{padding:20,marginTop:24}}>
