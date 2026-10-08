@@ -79,3 +79,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: error?.message ?? "Unknown error" }, { status: 500 });
   }
 }
+
+// Public page checks are bounded and run four at a time.
+export const maxDuration = 60;

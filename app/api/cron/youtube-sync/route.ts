@@ -81,3 +81,6 @@ export async function POST(request: NextRequest) {
 }
 
 export const GET = POST;
+
+// Public page checks are bounded and run four at a time.
+export const maxDuration = 60;
