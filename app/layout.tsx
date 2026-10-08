@@ -108,6 +108,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className={`${displayFont.variable} ${bodyFont.variable}`}>
       <body>
         <a className="skip-link" href="#main-content">Saltar al contenido</a>
+        <Script
+          id="sin-pelos-google-adsense"
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4245621675541095"
+          strategy="beforeInteractive"
+          crossOrigin="anonymous"
+        />
         <PageViewTracker />
         <OneSignalInit appId={oneSignalAppId} safariWebId={oneSignalSafariWebId} />
         <OneSignalAutoPrompt appId={oneSignalAppId} safariWebId={oneSignalSafariWebId} />
