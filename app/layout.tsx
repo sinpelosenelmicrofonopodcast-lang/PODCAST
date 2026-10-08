@@ -106,14 +106,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`${displayFont.variable} ${bodyFont.variable}`}>
-      <body>
-        <a className="skip-link" href="#main-content">Saltar al contenido</a>
-        <Script
-          id="sin-pelos-google-adsense"
+      <head>
+        {/* Verification requires the literal ad script in the server-rendered HTML <head>.
+            Next Script beforeInteractive only serialized a preload + bootstrap entry. */}
+        <script
+          async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4245621675541095"
-          strategy="beforeInteractive"
           crossOrigin="anonymous"
         />
+      </head>
+      <body>
+        <a className="skip-link" href="#main-content">Saltar al contenido</a>
         <PageViewTracker />
         <OneSignalInit appId={oneSignalAppId} safariWebId={oneSignalSafariWebId} />
         <OneSignalAutoPrompt appId={oneSignalAppId} safariWebId={oneSignalSafariWebId} />
