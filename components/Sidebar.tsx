@@ -26,6 +26,7 @@ const links: LinkItem[] = [
   { href: "/admin/social", label: "Publicar ahora", section: "workspace" },
 
   { href: "/admin/home", label: "Homepage", section: "publish", required: "manage_home" },
+  { href: "/admin/biografias" as Route, label: "Biografías de Bebo y Bito", section: "publish", adminOnly: true },
   { href: "/admin/news", label: "Noticias", section: "publish", required: "manage_news" },
   { href: "/admin/episodes", label: "Episodios", section: "publish", required: "manage_news" },
   { href: "/admin/blog", label: "Editoriales", section: "publish", required: "manage_blog" },
