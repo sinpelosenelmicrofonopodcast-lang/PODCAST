@@ -19,7 +19,11 @@ export default function robots(): MetadataRoute.Robots {
           "/zona-cruda",
           "/dashboard",
           "/admin",
-          "/api"
+          "/api",
+          "/reset",
+          "/perfil",
+          "/newsletter/baja",
+          "/sponsor-report"
         ]
       }
     ],

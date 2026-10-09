@@ -68,8 +68,8 @@ const organizationSchema = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Sin Pelos en el Micrófono",
-  description: "Podcast, historias, noticias y comunidad. Conversación real, sin libreto y sin filtros.",
+  title: "Sin Pelos en el Micrófono | Podcast de Bebo y Bito",
+  description: "Podcast de Bebo y Bito con conversaciones reales, invitados, música, cultura y noticias. Historias de Puerto Rico y Texas, sin libreto.",
   applicationName: "Sin Pelos en el Micrófono",
   // Site ownership for the existing AdSense publisher. This does NOT enable ads.
   other: { "google-adsense-account": "ca-pub-4245621675541095" },

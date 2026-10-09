@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { permanentRedirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
+import { buildSeoMetadata } from "@/lib/seo/meta";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ShareButtons } from "@/components/ShareButtons";
@@ -148,31 +149,21 @@ async function loadPost(idOrSlug: string) {
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const item = await loadPost(params.id);
-  const title = item?.title ?? "Blog";
-  const description = clampMetaDescription(String((item as any)?.meta_description ?? item?.excerpt ?? ""));
-  const image = item?.cover_url ?? "/logo.png";
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const canonical = item ? postHref(item) : "/blog";
-
-  return {
-    title,
-    description,
-    alternates: { canonical },
-    metadataBase: new URL(baseUrl),
-    openGraph: {
-      title,
-      description,
-      type: "article",
-      url: canonical,
-      images: [{ url: image }]
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [image]
-    }
-  };
+  if (!item) {
+    return buildSeoMetadata({
+      title: "Artículo no encontrado",
+      description: "El artículo solicitado no existe.",
+      path: "/blog",
+      noindex: true
+    });
+  }
+  return buildSeoMetadata({
+    title: `${item.title} | Sin Pelos en el Micrófono`,
+    description: clampMetaDescription(String(item.meta_description ?? item.excerpt ?? item.title)),
+    path: postHref(item),
+    image: item.cover_url ?? "/og-default.jpg",
+    type: "article"
+  });
 }
 
 export default async function BlogPostPage({ params }: { params: { id: string } }) {
@@ -183,27 +174,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
     permanentRedirect(postHref(data));
   }
 
-  if (!data) {
-    return (
-      <main>
-        <Navbar />
-        <section className="section">
-          <div className="container">
-            <div className="card">
-              <h1 className="section-title" style={{ marginTop: 0 }}>
-                No encontrado
-              </h1>
-              <p className="muted">Este artículo no existe o fue eliminado.</p>
-              <Link className="button secondary" href="/blog">
-                Volver al blog
-              </Link>
-            </div>
-          </div>
-        </section>
-        <Footer />
-      </main>
-    );
-  }
+  if (!data) notFound();
 
   const canonicalPath = postHref(data);
   const meta = clampMetaDescription(String((data as any).meta_description ?? data.excerpt ?? ""));
