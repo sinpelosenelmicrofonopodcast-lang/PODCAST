@@ -16,3 +16,4 @@ return <section><h1 className="section-title">Biografías · Bebo y Bito</h1><p 
 <label>Ruta de foto (imagen del sitio)<input className="input" value={current.photo_url} onChange={e=>update("photo_url",e.target.value)}/></label>
 <div><button type="button" className="button" disabled={saving} onClick={save}>{saving?"Guardando...":"Guardar y publicar"}</button> <a className="button secondary" href={"/acerca#"+active} target="_blank" rel="noreferrer">Ver en la web</a></div></div>:null}
 {status?<p role="status" className="muted">{status}</p>:null}</section>;
+}
