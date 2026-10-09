@@ -9,6 +9,7 @@ def main():
     parser.add_argument('command',choices=['validate','dry-run','inspect','run','resume','status','qc'])
     parser.add_argument('manifest',nargs='?')
     parser.add_argument('--output',default='SPM_REPORTS')
+    parser.add_argument('--render',help='Actual exported media to measure during qc')
     args=parser.parse_args()
     report=Path(args.output)/'status.json'
     if args.command=='status':
@@ -26,10 +27,17 @@ def main():
             result=Engine(manifest,args.output).run()
             save_json(report,result)
             print(json.dumps(result,ensure_ascii=False,indent=2))
-            return 0 if result.get('complete_product') else 2
+            return 0 if result.get('ready_for_review') else 2
         if args.command=='qc':
             result['qc_scope']='CONTRACT_AND_TIME_MAP_ONLY'
             result['project_qc']='NOT_EXECUTED'
+            if args.render:
+                from .finishing import measure_render
+                result['rendered_audio']=measure_render(args.render,manifest['audio'].get('target_lufs',-16),
+                                                       manifest['audio'].get('true_peak_db',-1))
+                save_json(report,result)
+                print(json.dumps(result,ensure_ascii=False,indent=2))
+                return 0 if result['rendered_audio']['passed'] else 2
         save_json(report,result)
         print(json.dumps(result,ensure_ascii=False,indent=2))
         return 0

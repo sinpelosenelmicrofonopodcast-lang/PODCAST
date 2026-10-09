@@ -66,6 +66,15 @@ def validate(m):
             interval(segment['source_frames'], duration)
         if r.get('subtitle_preset') not in m['subtitle_presets']:
             raise InvalidManifest('Unknown subtitle preset')
+    for sponsor in m['sponsors']:
+        if sponsor.get('mode') not in ['PRE_ROLL','MID_ROLL','POST_ROLL','OVERLAY','LOWER_THIRD','INTERRUPTION']:
+            raise InvalidManifest('Unsupported sponsor mode')
+        n=sponsor.get('duration_frames')
+        if type(n) is not int or n<=0:raise InvalidManifest('Sponsor duration must be a positive frame count')
+        if sponsor['mode'] in ['MID_ROLL','OVERLAY','LOWER_THIRD','INTERRUPTION']:
+            a=sponsor.get('source_frame')
+            if type(a) is not int or not 0<=a<duration:
+                raise InvalidManifest('Sponsor requires a verified source-frame anchor')
     if m['opening'].get('hook'):
         interval(m['opening']['hook']['source_frames'], duration)
     return m
@@ -104,9 +113,13 @@ def compile_plan(m):
         append('hook', interval(hook['source_frames'], m['source']['duration_frames']))
     intro = m['opening'].get('intro')
     if intro:
-        append('intro', length=intro['duration_frames'], identity=intro.get('asset_id'))
+        if intro.get('source_frames'):
+            append('intro',interval(intro['source_frames'],m['source']['duration_frames']))
+        else:append('intro', length=intro['duration_frames'], identity=intro.get('asset_id'))
+    for sponsor in m['sponsors']:
+        if sponsor['mode']=='PRE_ROLL':append('sponsor',length=sponsor['duration_frames'],identity=sponsor['id'])
     # Insertions use source coordinates, so cold-open duplication cannot move their anchors.
-    insertions = sorted((x for x in m['sponsors'] if x['mode'] == 'INTERRUPTION'),
+    insertions = sorted((x for x in m['sponsors'] if x['mode'] in ['INTERRUPTION','MID_ROLL']),
                         key=lambda x: x['source_frame'])
     for a,b in preserved_ranges(m['source']['duration_frames'], m['master_edit'].get('exclusions', [])):
         pos=a
@@ -119,6 +132,11 @@ def compile_plan(m):
                 pos=anchor
         if pos < b:
             append('main', (pos,b))
+    placed={chunk['id'] for chunk in mapping if chunk['kind']=='sponsor'}
+    if any(x['id'] not in placed for x in insertions):
+        raise InvalidManifest('Sponsor insertion anchor lies inside an approved exclusion')
+    for sponsor in m['sponsors']:
+        if sponsor['mode']=='POST_ROLL':append('sponsor',length=sponsor['duration_frames'],identity=sponsor['id'])
     return {'manifest_hash':fingerprint(m), 'frame_rate':m['source']['frame_rate'],
             'master_map':mapping, 'master_duration_frames':cursor,
             'master_pause_policy':'PRESERVE', 'reel_count':len(m['reels']),

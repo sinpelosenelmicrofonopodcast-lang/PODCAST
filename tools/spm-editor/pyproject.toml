@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "spm-podcast-editor"
 version = "3.0.0a1"
 requires-python = ">=3.10"
-description = "SPM contract compiler and Resolve preflight; full execution blocked pending integration"
+description = "Local podcast automation engine and macOS Resolve application"
 
 [project.scripts]
 spm-editor = "spm_editor.__main__:main"

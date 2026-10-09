@@ -1,11 +1,14 @@
 """Native Resolve execution. Checks every mutating API response."""
 import json
 import re
+import time
 from fractions import Fraction
 from pathlib import Path
 from .core import compile_plan, fingerprint, save_json, source_to_output
 from .resolve import connect, ResolveUnavailable
 from .media import protected_reel_ranges, caption_assets
+from .finishing import native_captions, finish_native_audio, queue_exports, source_audio
+from .alignment import ensure_words
 
 def require(value,message):
     if value is None or value is False:
@@ -28,6 +31,13 @@ class Engine:
         self.state={'manifest_hash':fingerprint(manifest),'status':'RUNNING','timelines':{},
                     'review':[],'native_integration_verified':False,'project_modified':False}
         self.assets={};self.source=None;self.item=None
+        self.run_hash=fingerprint(manifest)
+        if self.state_path.is_file():
+            previous=json.loads(self.state_path.read_text())
+            if previous.get('manifest_hash')==self.run_hash:
+                self.state['timelines']=previous.get('timelines',{})
+        self.state['audio_processing']={}
+        self.state['rendered_audio_qc']='REQUIRES_FINAL_RENDER'
 
     def timelines(self):
         return [self.project.GetTimelineByIndex(i) for i in range(1,self.project.GetTimelineCount()+1)]
@@ -57,18 +67,21 @@ class Engine:
         self.media=require(self.item.GetMediaPoolItem(),'Source multicam media unavailable')
         if not self.m['source'].get('multicam_verified'):
             raise ResolveUnavailable('source.multicam_verified must confirm the existing native multicam')
-        if self.m['master_edit'].get('camera_decisions'):
+        if any(c.get('mode','EXACT')=='EXACT' for c in self.m['master_edit'].get('camera_decisions',[])):
             raise ResolveUnavailable('Exact angle instructions need an angle-selection adapter; SmartSwitch cannot certify them')
         if 'PerformMulticamSmartSwitch' not in self.docs:
             raise ResolveUnavailable('Installed documentation does not expose native Multicam SmartSwitch')
         if 'SetVoiceIsolationState' not in self.docs:
             raise ResolveUnavailable('Installed documentation does not expose Voice Isolation')
         for sponsor in self.m['sponsors']:
-            if sponsor['mode'] not in ['INTERRUPTION','OVERLAY','LOWER_THIRD']:
-                raise ResolveUnavailable('Unsupported sponsor placement mode: '+sponsor['mode'])
             self.asset(sponsor['id'],sponsor['asset_path'])
         intro=self.m['opening'].get('intro')
-        if intro:self.asset(intro['asset_id'],intro['asset_path'])
+        if intro and not intro.get('source_frames'):self.asset(intro['asset_id'],intro['asset_path'])
+        analysis_path=source_audio(self)
+        self.m['source']['analysis_audio_path']=analysis_path
+        ensure_words(self.m,analysis_path,self.output/'cache')
+        self.plan=compile_plan(self.m)
+        save_json(self.output/'resolved_manifest.json',self.m)
         # Verify every reel locally before creating any output timelines.
         self.reel_plans={}
         for reel in self.m['reels']:
@@ -90,12 +103,23 @@ class Engine:
         existing=self.find(name)
         if existing:
             markers=existing.GetMarkers() or {}
-            expected='SPM_DONE:'+fingerprint(self.m)
-            if any(v.get('customData')==expected for v in markers.values()):
+            expected='SPM_DONE:'+self.run_hash
+            if any(expected in v.get('customData','').split('|') for v in markers.values()):
+                end=max(int(c.GetEnd()) for kind in ['video','audio']
+                        for i in range(1,existing.GetTrackCount(kind)+1)
+                        for c in sequence(existing.GetItemListInTrack(kind,i)))
+                self.state['timelines'][name]={'assembly':'VERIFIED','duration_frames':end-int(existing.GetStartFrame())}
                 return existing,True
-            raise ResolveUnavailable('Existing incomplete/approved timeline preserved: '+name)
+            owner='SPM_OWNER:'+self.run_hash
+            if any(owner in v.get('customData','').split('|') for v in markers.values()):
+                backup=name+'_RECOVERY_'+str(time.time_ns())
+                require(existing.SetName(backup),'Cannot preserve incomplete timeline for recovery')
+                self.state['review'].append({'category':'recovery','message':'Partial timeline retained: '+backup})
+            else:
+                raise ResolveUnavailable('Existing unowned/approved timeline preserved: '+name)
         timeline=require(self.pool.CreateEmptyTimeline(name),'Cannot create timeline '+name)
         self.state['project_modified']=True
+        self.mark(timeline,0,'SPM_OWNER:'+self.run_hash,'Owned working timeline; source preserved','Blue')
         require(self.project.SetCurrentTimeline(timeline),'Cannot activate timeline')
         require(timeline.SetSetting('useCustomSettings','1'),'Cannot enable custom settings')
         require(timeline.SetSetting('timelineResolutionWidth',str(width)),'Cannot set width')
@@ -136,10 +160,16 @@ class Engine:
         actual=timeline.GetVoiceIsolationState(1)
         if not actual or actual.get('isEnabled') is not True or actual.get('amount')!=amount:
             raise ResolveUnavailable('Voice Isolation readback differs from requested state')
-        self.state['review'].append({'timeline':timeline.GetName(),'category':'audio',
-            'message':'Voice Isolation applied. Speaker balancing, compressor/limiter and rendered LUFS are not verified.'})
+        self.state['audio_processing'][timeline.GetName()]=finish_native_audio(self,timeline)
 
     def mark(self,timeline,frame,identity,message,color='Yellow'):
+        existing=(timeline.GetMarkers() or {}).get(frame)
+        if existing:
+            old=existing.get('customData','')
+            if identity in old.split('|'):return
+            require(timeline.DeleteMarkerAtFrame(frame),'Cannot merge overlapping markers')
+            identity=old+'|'+identity if old else identity
+            message=existing.get('note','')+'\n'+message
         require(timeline.AddMarker(frame,color,identity,message,1,identity),'Cannot save review marker')
 
     def finish(self,timeline,length):
@@ -151,7 +181,7 @@ class Engine:
                 if int(clip.GetStart())!=cursor:raise ResolveUnavailable('Gap/overlap on '+kind+' track')
                 cursor=int(clip.GetEnd())
             if cursor!=start+length:raise ResolveUnavailable('Output duration does not match plan')
-        self.mark(timeline,0,'SPM_DONE:'+fingerprint(self.m),'Assembly verified; see execution report','Green')
+        self.mark(timeline,0,'SPM_DONE:'+self.run_hash,'Assembly verified; see execution report','Green')
         self.state['timelines'][timeline.GetName()]={'assembly':'VERIFIED','duration_frames':length}
         self.checkpoint()
 
@@ -171,7 +201,7 @@ class Engine:
                             audio_track=2 if chunk['kind']=='sponsor' else 1)
                 # Main continuity across ads is checked against all program tracks below.
         for sponsor in self.m['sponsors']:
-            if sponsor['mode']=='INTERRUPTION':continue
+            if sponsor['mode'] not in ['OVERLAY','LOWER_THIRD']:continue
             anchor=source_to_output(self.plan,sponsor['source_frame'])
             n=sponsor['duration_frames']
             if anchor+n>self.plan['master_duration_frames']:raise ResolveUnavailable('Sponsor extends beyond master')
@@ -179,11 +209,20 @@ class Engine:
         for note in self.m['editor_notes']:
             frame=source_to_output(self.plan,note['source_frame'])
             self.mark(timeline,frame,note['id'],note['text'])
+            # Production notes live on a disabled native Text+ track as well as markers.
+            from .finishing import carrier, fusion_comp
+            n=min(96,self.plan['master_duration_frames']-frame)
+            carrier_path=carrier(self.output/'notes',self.m['source']['frame_rate'],n)
+            media=self.asset('NOTES_CARRIER_'+str(n),carrier_path)
+            item=self.append(timeline,media,0,n,start+frame,video_track=3,audio=False)
+            comp_path=self.output/'notes'/(note['id']+'.comp')
+            comp_path.write_text(fusion_comp(note['text'],{'font':'Arial','font_size':40,'margin_bottom':180},1920,1080,n))
+            require(item.ImportFusionComp(str(comp_path)),'Cannot create editor note Text+')
         self.audio(timeline)
         # Sponsors occupy program gaps on their dedicated tracks, so use the plan
         # as the timing proof rather than requiring V1 to cover ad interruptions.
         if any(x['kind']=='sponsor' for x in self.plan['master_map']):
-            self.mark(timeline,0,'SPM_DONE:'+fingerprint(self.m),'Exact insertion frames verified','Green')
+            self.mark(timeline,0,'SPM_DONE:'+self.run_hash,'Exact insertion frames verified','Green')
             self.state['timelines'][name]={'assembly':'VERIFIED','duration_frames':self.plan['master_duration_frames']}
             self.checkpoint()
         else:self.finish(timeline,self.plan['master_duration_frames'])
@@ -203,11 +242,22 @@ class Engine:
                 require(clip.SmartReframe(),'Native vertical SmartReframe failed')
                 cursor+=b-a
             length=cursor-int(timeline.GetStartFrame())
-            caption=self.asset(reel['id']+'_CAPTIONS',spec['caption_path'])
-            self.append(timeline,caption,0,length,int(timeline.GetStartFrame()),video_track=4,audio=False)
+            backend=reel.get('caption_backend','overlay' if reel['subtitle_preset']=='SPM_KARAOKE' else 'fusion')
+            if backend=='fusion':
+                native_captions(self,timeline,reel,spec['captions'])
+            elif backend=='overlay':
+                caption=self.asset(reel['id']+'_CAPTIONS',spec['caption_path'])
+                self.append(timeline,caption,0,length,int(timeline.GetStartFrame()),video_track=4,audio=False)
+                self.state['review'].append({'timeline':name,'category':'captions',
+                    'message':'JSON selected rendered caption overlay; ASS/SRT remain editable.'})
+            else:raise ResolveUnavailable('Unknown caption backend: '+backend)
             self.audio(timeline)
-            self.state['review'].append({'timeline':name,'category':'captions',
-                'message':'Styled caption overlay inserted; editable ASS/SRT provided, not native Text+ captions.'})
+            for clip in sequence(timeline.GetItemListInTrack('audio',1)):
+                if clip.GetEnd()-clip.GetStart()>2:
+                    require(clip.SetFades({'FadeIn':1,'FadeOut':1}),'Cannot smooth reel audio cut')
+                    fades=clip.GetFades() or {}
+                    if fades.get('FadeIn')!=1 or fades.get('FadeOut')!=1:
+                        raise ResolveUnavailable('Reel audio fade readback failed')
             save_json(self.output/(reel['id']+'_silence_log.json'),spec['pause'])
             self.finish(timeline,length)
 
@@ -220,6 +270,8 @@ class Engine:
             chapters.append({'title':c['title'],'output_frame':frame,
                              'time':f'{seconds//3600:02d}:{seconds//60%60:02d}:{seconds%60:02d}'})
         metadata['chapters']=chapters
+        if chapters and chapters[0]['output_frame']!=0:
+            chapters.insert(0,{'title':'Gancho e introducción','output_frame':0,'time':'00:00:00'})
         save_json(self.output/'youtube.json',metadata)
         (self.output/'youtube.txt').write_text(metadata.get('title','')+'\n\n'+metadata.get('description','')+
             '\n\n'+'\n'.join(c['time']+' '+c['title'] for c in chapters))
@@ -227,11 +279,11 @@ class Engine:
     def run(self):
         try:
             self.preflight();self.master();self.reels();self.metadata()
-            self.state['status']='ASSEMBLED_REVIEW_REQUIRED'
-            self.state['native_integration_verified']=True
-            self.state['complete_product']=False
-            self.state['remaining']=['Exact camera-angle adapter','Speaker mixing and loudness verification',
-                                      'Native editable subtitle styling','Export queue preparation']
+            self.state['render_jobs']=queue_exports(self)
+            self.state['status']='REVIEW_READY'
+            self.state['ready_for_review']=True
+            self.state['native_api_operations']='SUCCEEDED_IN_THIS_EXECUTION'
+            self.state['human_editorial_approval']='PENDING'
             self.checkpoint()
             return self.state
         except Exception as exc:

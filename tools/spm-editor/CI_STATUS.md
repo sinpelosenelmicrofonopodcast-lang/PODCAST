@@ -1,15 +1,7 @@
-# Verification boundaries
+# Verification scope
 
-GitHub CI runs the actual Python contract compiler and local FFmpeg operations.
-Native adapter tests use an explicitly named Resolve API simulator.
-An online CI pass does not imply a successful DaVinci Resolve integration.
+Linux executes 29 contract, adapter, alignment, finishing and full-pipeline tests. FFmpeg waveform detection, transparent video captions and loudness measurement use real media. Resolve operations use an explicit API simulator.
 
-Linux: contract tests, adapter tests, actual waveform analysis, actual styled
-caption rendering, alpha channel/frame count inspection, command smoke tests.
-macOS: Python compilation, contract/adapter tests and INSTALL.command execution.
-DaVinci Resolve is not assumed to be installed on a hosted GitHub runner.
+Apple Silicon and Intel macOS jobs execute adapter tests, install the source CLI, build bundled application and PKG artifacts, and check frozen CLI and GUI startup. DaVinci Resolve is not installed or certified by hosted runners.
 
-Native integration can be invoked separately on a self-hosted runner labeled
-spm-resolve with Resolve installed and a test project already open. This is
-manual and not scheduled on every push. No self-hosted runner is claimed to
-exist or to have passed until its actual workflow result confirms that.
+The separate manual self-hosted Resolve workflow is available for a linked real project. Its success is not claimed without a completed native run.
