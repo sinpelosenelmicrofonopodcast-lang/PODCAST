@@ -9,6 +9,9 @@ type Bio = {slug:string;title:string;intro:string;biography:string;photo_url:str
 const defaults: Bio[] = [
 {slug:"bito",title:"Bito: lo bueno, lo malo y lo feo",intro:"Bito es de esos tipos que pueden estar hablando de relaciones, masculinidad, dinero, música o sociedad y, cinco minutos después, convertir la conversación más seria del mundo en un vacilón.",biography:"Boricua, radicado en Texas y co-host de Sin Pelos en el Micrófono. Bito cuestiona todo, produce detrás de las cámaras y mezcla humor, tecnología y conversaciones reales.",photo_url:"/images/hosts/bito-sin-pelos-en-el-microfono.webp"},
 {slug:"bebo",title:"Bebo: presencia, vacilón y cero miedo al micrófono",intro:"Bebo es la voz que abre la puerta y hace que la conversación arranque. Tiene presencia, calle, humor y esa habilidad de hablar con un invitado como si llevaran años conociéndose.",biography:"Host principal de Sin Pelos en el Micrófono. Bebo marca el ritmo de la conversación y mezcla historias, entrevistas y vacilón.",photo_url:"/images/hosts/bebo-sin-pelos-en-el-microfono.webp"}];
+const fallbackPhoto=(slug:string)=>"/images/hosts/"+slug+"-sin-pelos-en-el-microfono.webp";
+const allowedRemotePhoto=(value:string)=>/^https:\/\/bhuophwyhgnqhbstinqw\.supabase\.co\/storage\/v1\/object\/public\//i.test(value);
+const resolvePhoto=(bio:Bio)=>bio.photo_url?.startsWith("/")||allowedRemotePhoto(bio.photo_url)?bio.photo_url:fallbackPhoto(bio.slug);
 export default async function AcercaPage(){
  let bios=defaults;
  const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -18,9 +21,9 @@ export default async function AcercaPage(){
  <span className="badge">Bebo y Bito · Sin Pelos en el Micrófono</span><h1 className="section-title">Conócenos</h1>
  <p className="muted" style={{fontSize:18,lineHeight:1.7}}>Dos boricuas, una mesa y conversaciones sin pelos en la lengua.</p>
  <nav style={{display:"flex",gap:16,marginBottom:30}}><a className="button" href="#bito">Conoce a Bito</a><a className="button secondary" href="#bebo">Conoce a Bebo</a></nav>
- {bios.map(b=><article className="card" key={b.slug} id={b.slug} style={{marginBottom:28,scrollMarginTop:150,padding:24}}>
+ {bios.map(b=>{const photo=resolvePhoto(b);return <article className="card" key={b.slug} id={b.slug} style={{marginBottom:28,scrollMarginTop:150,padding:24}}>
  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:28,alignItems:"start"}}>
- <Image src={b.photo_url.startsWith("/")?b.photo_url:"/images/hosts/"+b.slug+"-sin-pelos-en-el-microfono.webp"} alt={b.slug==="bito"?"Bito":"Bebo"} width={520} height={650} style={{width:"100%",height:"auto",borderRadius:12}}/>
+ <Image src={photo} alt={b.slug==="bito"?"Bito, co-host de Sin Pelos en el Micrófono":"Bebo, host principal de Sin Pelos en el Micrófono"} width={520} height={650} style={{width:"100%",height:"auto",borderRadius:12}}/>
  <div><h2>{b.title}</h2><p style={{fontSize:18,lineHeight:1.75}}>{b.intro}</p><div className="muted" style={{whiteSpace:"pre-line",lineHeight:1.85}}>{b.biography}</div></div>
- </div></article>)}</div></section><Footer/></main>;
+ </div></article>})}</div></section><Footer/></main>;
 }

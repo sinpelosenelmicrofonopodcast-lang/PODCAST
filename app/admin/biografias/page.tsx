@@ -13,7 +13,8 @@ return <section><h1 className="section-title">Biografías · Bebo y Bito</h1><p 
 <label>Título<input className="input" value={current.title} onChange={e=>update("title",e.target.value)}/></label>
 <label>Introducción<textarea className="textarea" rows={5} value={current.intro} onChange={e=>update("intro",e.target.value)}/></label>
 <label>Biografía completa<textarea className="textarea" rows={17} value={current.biography} onChange={e=>update("biography",e.target.value)}/></label>
-<label>Ruta de foto (imagen del sitio)<input className="input" value={current.photo_url} onChange={e=>update("photo_url",e.target.value)}/></label>
+<label>Ruta o URL pública de la foto<input className="input" value={current.photo_url} onChange={e=>update("photo_url",e.target.value)}/></label>
+{current.photo_url?<div><p className="muted" style={{marginBottom:8}}>Vista previa</p><img src={current.photo_url} alt={"Vista previa de "+active} style={{display:"block",width:"min(100%,320px)",height:"auto",borderRadius:12}}/></div>:null}
 <div><button type="button" className="button" disabled={saving} onClick={save}>{saving?"Guardando...":"Guardar y publicar"}</button> <a className="button secondary" href={"/acerca#"+active} target="_blank" rel="noreferrer">Ver en la web</a></div></div>:null}
 {status?<p role="status" className="muted">{status}</p>:null}</section>;
 }
