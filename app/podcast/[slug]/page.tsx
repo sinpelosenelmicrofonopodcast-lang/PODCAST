@@ -82,7 +82,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     return buildSeoMetadata({
       title: "Episodio no encontrado",
       description: "El episodio solicitado no existe.",
-      path: `/podcast/${encodeURIComponent(params.slug)}`
+      path: `/podcast/${encodeURIComponent(params.slug)}`,
+      noindex: true
     });
   }
   const seo = episodeSeoTemplate(episode.title, cleanEpisodeDescription(episode.description));

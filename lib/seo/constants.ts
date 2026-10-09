@@ -18,6 +18,10 @@ export const PUBLIC_CORE_PAGES = [
   "/feed",
   "/noticias",
   "/podcast",
+  "/blog",
+  "/killeen",
+  "/publicidad",
+  "/quiero-salir",
   "/eventos",
   "/acerca",
   "/contacto",
@@ -26,8 +30,7 @@ export const PUBLIC_CORE_PAGES = [
   "/setup",
   "/newsletter",
   "/newsletter/patrocinios",
-  "/eventos/proponer",
-  "/eventos/promocionar"
+  "/eventos/proponer"
 ] as const;
 
 export const DEFAULT_OG_IMAGE = `${CANONICAL_SITE_URL}/og-default.jpg`;

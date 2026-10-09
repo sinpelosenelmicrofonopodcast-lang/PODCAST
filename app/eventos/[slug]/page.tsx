@@ -16,7 +16,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     return buildSeoMetadata({
       title: "Evento no encontrado | Sin Pelos",
       description: "No encontramos el evento solicitado.",
-      path: `/eventos/${encodeURIComponent(params.slug)}`
+      path: `/eventos/${encodeURIComponent(params.slug)}`,
+      noindex: true
     });
   }
   const seo = eventSeoTemplate(event.title, event.description);

@@ -1,6 +1,7 @@
 import { comparePodcastEpisodes } from "@/lib/podcastOrder";
 import { ListenLinks } from "@/components/podcast/ListenLinks";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
@@ -70,7 +71,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return buildSeoMetadata({
     title: "Podcast | Episodios Sin Pelos en el Micrófono",
     description:
-      "Todos los episodios completos de Sin Pelos en el Micrófono: conversaciones reales, invitados, historias y debates sin libreto.",
+      "Episodios completos del podcast de Bebo y Bito desde Killeen y Central Texas: entrevistas, historias de Puerto Rico, música y comunidad.",
     path: "/podcast",
     image: stored?.thumbnail_url || DEFAULT_OG_IMAGE
   });
@@ -140,6 +141,11 @@ export default async function PodcastPage() {
       <Navbar />
       <section className="section podcast-page-section">
         <div className="container">
+          <div className="card" style={{ padding: 20, marginBottom: 20 }}>
+            <h2 style={{ marginTop: 0 }}>Podcast y entrevistas en Killeen y Central Texas</h2>
+            <p className="muted">Escucha conversaciones sobre la comunidad, negocios y vida en Texas con Bebo y Bito.</p>
+            <Link className="button secondary" href="/killeen">Descubre episodios de Killeen y Texas</Link>
+          </div>
           <ListenLinks />
           <MidContentAdSlot placement="podcast_sponsor" section="podcast" className="podcast-sponsor-slot" compact />
           <PodcastHubClient episodes={uiEpisodes} featuredEpisodeId={featured?.id ?? null} />

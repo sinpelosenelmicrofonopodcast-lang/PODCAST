@@ -29,9 +29,9 @@ export const revalidate = 120;
 const CURRENT_NEWS_MAX_AGE_DAYS = 7;
 
 export const metadata: Metadata = {
-  title: "Sin Pelos en el Micrófono | Conversaciones que se quedan contigo",
+  title: "Sin Pelos en el Micrófono | Podcast en Killeen, Texas",
   description:
-    "Podcast, historias, noticias y editoriales nacidas de conversaciones reales. Puerto Rico, Texas y el mundo con contexto claro y sin libreto.",
+    "Podcast de Bebo y Bito desde Killeen, Central Texas. Entrevistas, música, cultura, noticias y vivencias reales de Puerto Rico y Texas.",
   alternates: { canonical: "/" }
 };
 
@@ -133,6 +133,18 @@ export default async function HomePage() {
     <main className="app-enter home-media-v6 spm-media-hub">
       <Navbar />
       <BrandHero />
+      <section className="section spm-section-breathe" aria-labelledby="killeen-local-heading"><div className="container">
+        <div className="card" style={{ padding: "clamp(20px,4vw,32px)" }}>
+          <p className="page-kicker">DESDE KILLEEN · CENTRAL TEXAS</p>
+          <h2 id="killeen-local-heading" className="section-title">PODCAST LATINO EN KILLEEN, TEXAS</h2>
+          <p className="muted">Bebo y Bito conectan historias de Puerto Rico y Texas: entrevistas, negocios, cultura y vivencias de nuestra comunidad en Central Texas.</p>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Link className="button" href="/killeen">CONOCE SIN PELOS EN TEXAS</Link>
+            <Link className="button secondary" href="/podcast/ggVum3q0kss">EL PARCE DE KILLEEN</Link>
+            <Link className="button secondary" href="/podcast/3xo-EI-vzy0">COMPRANDO CASA EN TEXAS</Link>
+          </div>
+        </div>
+      </div></section>
       <section className="section spm-section-breathe" aria-label="Trabaja con Sin Pelos">
         <div className="container">
           <div className="card" style={{padding:"clamp(20px,4vw,34px)"}}>

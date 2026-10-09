@@ -10,6 +10,7 @@ const footerGroups = [
       { href: "/blog", label: "Desde el Micrófono" },
       { href: "/noticias", label: "Noticias" },
       { href: "/podcast", label: "Catálogo completo" },
+      { href: "/killeen", label: "Podcast de Killeen y Central Texas" },
       { href: "/eventos", label: "Eventos" },
       { href: "/setup", label: "El Setup de Sin Pelos" },
       { href: "/servicios", label: "Contrata nuestra producción" },

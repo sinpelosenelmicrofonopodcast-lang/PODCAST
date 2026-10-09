@@ -1,4 +1,4 @@
-import { PUBLISHER_NAME, canonicalUrl } from "@/lib/seo/constants";
+import { PUBLISHER_NAME, SITE_NAME, canonicalUrl } from "@/lib/seo/constants";
 
 const publisherLogo = canonicalUrl("/logo.png");
 const organizationId = canonicalUrl("/#organization");
@@ -102,7 +102,9 @@ export function buildPodcastSeriesJsonLd(input: {
     publisher: {
       "@type": "Organization",
       "@id": organizationId,
-      name: PUBLISHER_NAME
+      name: SITE_NAME,
+      url: canonicalUrl("/"),
+      logo: { "@type": "ImageObject", url: publisherLogo }
     }
   };
   const breadcrumbs = buildBreadcrumbJsonLd([

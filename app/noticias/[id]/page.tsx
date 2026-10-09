@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { permanentRedirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { supabaseServer } from "@/lib/supabaseServer";
@@ -314,7 +314,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const directCoverImage = item?.cover_url && /^https?:\/\//i.test(item.cover_url) ? item.cover_url : null;
   const socialImage = directCoverImage ?? canonicalUrl(`${canonical}/opengraph-image?v=${ogVersion}`);
   const seo = newsSeoTemplate(item?.title ?? "Noticia", item?.summary ?? "Noticias Sin Pelos");
-  const metadata = buildSeoMetadata({ title: seo.title, description: seo.description, path: canonical, image: socialImage, type: "article" });
+  const metadata = buildSeoMetadata({ title: seo.title, description: seo.description, path: canonical, image: socialImage, type: "article", noindex: !item });
   return {
     ...metadata,
     openGraph: { ...metadata.openGraph, images: [{ url: socialImage, ...(directCoverImage ? {} : { width: 1200, height: 630 }), alt: item?.title ?? seo.title }] },
@@ -328,6 +328,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
   const copy = COPY[lang];
   const item = await loadItem(supabase, params.id);
   const requestedKey = normalizeNewsKey(params.id);
+  if (!item) notFound();
 
   if (item?.slug && requestedKey && item.slug !== requestedKey) {
     permanentRedirect(newsHref(item));
