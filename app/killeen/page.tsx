@@ -3,10 +3,11 @@ import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { getPublishedEpisodes } from "@/lib/seo/content";
+import { supabaseService } from "@/lib/supabaseService";
 import { getYouTubeVideoId } from "@/lib/youtube";
 import { CANONICAL_SITE_URL } from "@/lib/seo/constants";
 
-export const revalidate = 21600;
+export const revalidate = 120; // Editorial changes appear via ISR without a deployment.
 
 export const metadata: Metadata = {
   title: "Podcast de Killeen y Central Texas | Entrevistas Sin Pelos",
@@ -59,6 +60,7 @@ const curated: LocalEpisode[] = [
   { section: "militar", number: 95, id: "e9ZU_1UU3iA", title: "SGM Edgar Fuentes: 31 años de Army", summary: "Servicio militar, decisiones de carrera y transición al retiro." }
 ];
 
+// Categories and copy are presentation-only; the episode list and order come from Supabase.
 const sections: Array<{ id: SectionName; title: string; subtitle: string }> = [
   { id: "comunidad", title: "Killeen: gobierno, crecimiento y comunidad", subtitle: "Conversaciones sobre decisiones municipales, participación cívica y el futuro de nuestra ciudad." },
   { id: "negocios", title: "Negocios, vivienda y emprendimiento", subtitle: "Historias de personas que montaron negocios, trabajaron en comercio y compartieron lecciones de vivienda y trabajo en Texas." },
@@ -67,15 +69,55 @@ const sections: Array<{ id: SectionName; title: string; subtitle: string }> = [
 ];
 
 type MoreEpisode = { slug: string; title: string; description: string; imageUrl: string | null };
+
+const allowedSections = new Set<SectionName>(["comunidad", "negocios", "cultura", "militar"]);
+
+/**
+ * The editorial catalog is stored in public.admin_settings, protected by RLS.
+ * Never access it from the browser: this query is executed only on the server.
+ * ChatGPT/Supabase can update the row without a GitHub commit or Vercel build.
+ */
+async function getConfiguredEpisodes(): Promise<LocalEpisode[]> {
+  try {
+    const { data, error } = await supabaseService()
+      .from("admin_settings")
+      .select("value")
+      .eq("key", "seo_killeen_episode_catalog")
+      .maybeSingle();
+    if (error) return curated;
+    const rows = (data as { value?: { items?: unknown } } | null)?.value?.items;
+    if (!Array.isArray(rows)) return curated;
+    const seen = new Set<string>();
+    const selected: LocalEpisode[] = [];
+    for (const row of rows) {
+      if (!row || typeof row !== "object") continue;
+      const item = row as Record<string, unknown>;
+      const section = String(item.section || "") as SectionName;
+      const id = String(item.id || "").trim();
+      const number = Number(item.number);
+      const title = String(item.title || "").trim();
+      const summary = String(item.summary || "").trim();
+      if (!allowedSections.has(section) || !/^[A-Za-z0-9_-]{11}$/.test(id)
+        || !Number.isInteger(number) || number < 1
+        || !title || !summary || seen.has(id)) continue;
+      seen.add(id);
+      selected.push({ section, number, id, title, summary });
+      if (selected.length >= 200) break;
+    }
+    return selected.length ? selected : curated;
+  } catch {
+    return curated;
+  }
+}
 const localTitlePattern = /killeen|central texas|copperas cove|fort cavazos|fort hood|bell county|harker heights|temple,? texas|\btexas\b/i;
 function safeId(episode: { slug: string; youtube_url: string | null }) {
   return getYouTubeVideoId(episode.youtube_url) || (/^[A-Za-z0-9_-]{11}$/.test(String(episode.slug || "")) ? String(episode.slug) : "");
 }
 
-async function findOtherLocalEpisodes(): Promise<MoreEpisode[]> {
+async function findOtherLocalEpisodes(selected: LocalEpisode[]): Promise<MoreEpisode[]> {
   try {
     const all = await getPublishedEpisodes(1200);
-    const known = new Set(curated.map(row => row.id));
+    const known = new Set(selected.map(row => row.id));
     const already = new Set<string>();
     const matches: MoreEpisode[] = [];
     for (const episode of all) {
@@ -103,7 +145,8 @@ async function findOtherLocalEpisodes(): Promise<MoreEpisode[]> {
 }
 
 const pageUrl = CANONICAL_SITE_URL + "/killeen";
-const structuredData = {
+function structuredData(selected: LocalEpisode[]) {
+  return {
   "@context": "https://schema.org",
   "@graph": [
     {
@@ -116,8 +159,8 @@ const structuredData = {
       isPartOf: { "@type": "WebSite", name: "Sin Pelos en el Micrófono", url: CANONICAL_SITE_URL },
       mainEntity: {
         "@type": "ItemList",
-        numberOfItems: curated.length,
-        itemListElement: curated.map((episode, index) => ({
+        numberOfItems: selected.length,
+        itemListElement: selected.map((episode, index) => ({
           "@type": "ListItem",
           position: index + 1,
           name: episode.title,
@@ -133,10 +176,12 @@ const structuredData = {
       ]
     }
   ]
-};
+  };
+}
 
 export default async function KilleenPage() {
-  const additional = await findOtherLocalEpisodes();
+  const selected = await getConfiguredEpisodes();
+  const additional = await findOtherLocalEpisodes(selected);
   return (
     <main className="app-enter">
       <Navbar />
@@ -151,7 +196,7 @@ export default async function KilleenPage() {
               y la comunidad militar. Nuestra conexión entre Puerto Rico y Texas está en estas conversaciones.
             </p>
             <p className="muted">
-              Aquí reunimos {curated.length} entrevistas y capítulos seleccionados relacionados con Killeen
+              Aquí reunimos {selected.length} entrevistas y capítulos seleccionados relacionados con Killeen
               y Central Texas, con enlaces al episodio completo. No es una lista de negocios recomendados:
               es un archivo editorial de las conversaciones del programa.
             </p>
@@ -171,7 +216,7 @@ export default async function KilleenPage() {
             </div>
           </nav>
           {sections.map(section => {
-            const episodes = curated.filter(item => item.section === section.id);
+            const episodes = selected.filter(item => item.section === section.id);
             return (
               <section id={section.id} aria-labelledby={`title-${section.id}`} key={section.id} style={{ marginBottom: 35, scrollMarginTop: 100 }}>
                 <h2 id={`title-${section.id}`} className="section-title">{section.title}</h2>
@@ -240,7 +285,7 @@ export default async function KilleenPage() {
         </div>
       </section>
       <Footer />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData(selected)) }} />
     </main>
   );
 }
