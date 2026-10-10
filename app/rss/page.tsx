@@ -10,7 +10,8 @@ export const fetchCache = "force-no-store";
 
 export const metadata: Metadata = {
   title: "Podcast (Audio)",
-  description: "Escucha Sin Pelos En El Micrófono en el reproductor oficial."
+  description: "Escucha Sin Pelos En El Micrófono en el reproductor oficial.",
+  alternates: { canonical: "/rss" }
 };
 
 export default function RssPlayerPage() {

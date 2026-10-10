@@ -15,7 +15,6 @@ export const PRIVATE_PATH_EXACT = new Set<string>(["/entrar", "/unirme"]);
 
 export const PUBLIC_CORE_PAGES = [
   "/",
-  "/feed",
   "/noticias",
   "/podcast",
   "/blog",

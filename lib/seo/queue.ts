@@ -67,11 +67,24 @@ function shouldRetry(row: SeoQueueRow) {
   return Date.now() - updated >= backoffMinutes * 60 * 1000;
 }
 
-async function isUrlInSitemap(sitemapUrl: string, targetUrl: string) {
-  const res = await fetch(sitemapUrl, { cache: "no-store" });
-  if (!res.ok) return false;
-  const xml = await res.text();
-  return xml.includes(targetUrl);
+async function isUrlInSitemap(
+  sitemapUrl: string,
+  targetUrl: string,
+  cache: Map<string, Promise<string>>
+) {
+  let xmlPromise = cache.get(sitemapUrl);
+  if (!xmlPromise) {
+    xmlPromise = (async () => {
+      const response = await fetch(sitemapUrl, { cache: "no-store" });
+      if (!response.ok) throw new Error(`Sitemap unavailable (${response.status}): ${sitemapUrl}`);
+      return response.text();
+    })();
+    cache.set(sitemapUrl, xmlPromise);
+  }
+  const xml = await xmlPromise;
+  // Match a complete <loc>, not an arbitrary substring of another URL.
+  const escaped = targetUrl.replace(/&/g, "&amp;");
+  return xml.includes(`<loc>${escaped}</loc>`);
 }
 
 export async function processSeoQueue(limit = 50) {
@@ -86,6 +99,17 @@ export async function processSeoQueue(limit = 50) {
   if (query.error) throw new Error(query.error.message);
   const eligible = ((query.data ?? []) as SeoQueueRow[]).filter(shouldRetry).slice(0, limit);
 
+  const sitemapCache = new Map<string, Promise<string>>();
+  const gscSubmissions = new Map<string, Promise<unknown>>();
+  // Search Console already has these sitemaps registered. A URL is "submitted"
+  // when it is in a registered sitemap; direct API re-submission is optional.
+  // Do not require service-account credentials for every URL in the sitemap.
+  const canResubmitGsc = Boolean(
+    process.env.GSC_SITE_URL?.trim() &&
+    process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim() &&
+    process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.trim()
+  );
+
   let processed = 0;
   let submitted = 0;
   let failed = 0;
@@ -96,24 +120,31 @@ export async function processSeoQueue(limit = 50) {
     const attempts = Number(row.attempts ?? 0) + 1;
     const sitemapUrl = sitemapForType(row.type);
     try {
-      const inSitemap = await isUrlInSitemap(sitemapUrl, row.url);
+      const inSitemap = await isUrlInSitemap(sitemapUrl, row.url, sitemapCache);
       if (!inSitemap) {
         await service
           .from("seo_queue")
           .update({
-            status: "error",
+            status: attempts >= 6 ? "skipped" : "error",
             attempts,
             last_error: `URL no encontrada en ${sitemapUrl}`,
             updated_at: new Date().toISOString()
           })
           .eq("id", row.id);
-        failed += 1;
+        if (attempts >= 6) skipped += 1;
+        else failed += 1;
         continue;
       }
 
-      try {
-        await submitGscSitemap(sitemapUrl);
-      } catch (e: any) {
+      if (canResubmitGsc) {
+        try {
+          let resubmission = gscSubmissions.get(sitemapUrl);
+          if (!resubmission) {
+            resubmission = submitGscSitemap(sitemapUrl);
+            gscSubmissions.set(sitemapUrl, resubmission);
+          }
+          await resubmission;
+        } catch (e: any) {
         await service
           .from("seo_queue")
           .update({
@@ -123,8 +154,9 @@ export async function processSeoQueue(limit = 50) {
             updated_at: new Date().toISOString()
           })
           .eq("id", row.id);
-        failed += 1;
-        continue;
+          failed += 1;
+          continue;
+        }
       }
 
       await service

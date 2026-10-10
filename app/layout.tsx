@@ -66,6 +66,29 @@ const organizationSchema = {
   ]
 };
 
+const structuredData = [
+  organizationSchema,
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${siteUrl}/#website`,
+    url: siteUrl,
+    name: "Sin Pelos en el Micrófono",
+    inLanguage: "es",
+    publisher: { "@id": `${siteUrl}/#organization` }
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "PodcastSeries",
+    "@id": `${siteUrl}/podcast#series`,
+    name: "Sin Pelos en el Micrófono",
+    url: `${siteUrl}/podcast`,
+    description: "Conversaciones de Bebo y Bito con historias de Puerto Rico y Texas.",
+    inLanguage: "es",
+    publisher: { "@id": `${siteUrl}/#organization` }
+  }
+];
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "Sin Pelos en el Micrófono | Podcast de Bebo y Bito",
@@ -132,7 +155,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div id="main-content">{children}</div>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
       </body>
     </html>

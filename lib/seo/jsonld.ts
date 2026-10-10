@@ -28,7 +28,8 @@ function editorialAuthor(authorName?: string | null) {
     return {
       "@type": "Organization",
       name: "Redacción Sin Pelos",
-      url: canonicalUrl("/noticias")
+      url: canonicalUrl("/noticias"),
+      logo: { "@type": "ImageObject", url: publisherLogo }
     };
   }
   return {

@@ -59,6 +59,10 @@ function auditHtml(url: string, status: number, html: string, xRobots: string, r
   const issues: AuditIssue[] = [];
   const pathname = strip(url);
 
+  // Redirects (e.g. /feed -> /podcast) are not HTML landing pages.
+  // Do not flag missing JSON-LD or canonical on a 308 response.
+  if (status >= 300 && status < 400) return issues;
+
   if (status >= 400) {
     issues.push({
       url,
@@ -95,7 +99,7 @@ function auditHtml(url: string, status: number, html: string, xRobots: string, r
     });
   }
 
-  if (!hasTag(html, /<script[^>]*type=["']application\/ld\+json["']/i)) {
+  if (!hasTag(html, /<script\b[^>]*\btype\s*=\s*["']application\/ld\+json["']/i)) {
     issues.push({ url, issueType: "missing_schema", details: {} });
   }
 
