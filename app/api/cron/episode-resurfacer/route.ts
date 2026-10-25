@@ -1,20 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { scheduleDailyEpisodeResurface } from "@/lib/episodeResurfacer";
 import { isCronAuthorized } from "@/lib/jobs/cronAuth";
-import { supabaseService } from "@/lib/supabaseService";
-
+// Retired by the Google migration. Keep the authenticated endpoint fail-closed
+// so an old external scheduler cannot revive Supabase jobs or duplicate posts.
 export async function POST(request: NextRequest) {
-  if (!isCronAuthorized(request)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized cron call." }, { status: 401 });
-  }
-
-  try {
-    const service = supabaseService();
-    const result = await scheduleDailyEpisodeResurface(service);
-    return NextResponse.json(result);
-  } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message ?? "Unknown error" }, { status: 500 });
-  }
+  if (!isCronAuthorized(request)) return NextResponse.json({error:"Unauthorized cron call."},{status:401});
+  return NextResponse.json({backend:"google_workspace",retired:true,error:"This legacy scheduler was retired. Use the private Google publisher and Sin Pelos Social Manager."},{status:410});
 }
-
-export const GET = POST;
+export const GET=POST;

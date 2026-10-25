@@ -1,3 +1,2 @@
-import {requireAdminPageOrRedirect} from '@/lib/adminAuth';
-import EditorialPanel from '@/components/admin/DriveEditorialPanel';
-export default async function Page(){await requireAdminPageOrRedirect('/admin/editorial-drive');return <EditorialPanel/>;}
+import { redirect } from "next/navigation";
+export default function Page(){ redirect('https://sin-pelos-social-manager.sinpelos.chatgpt.site/editorial'); }

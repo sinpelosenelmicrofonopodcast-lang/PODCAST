@@ -1,30 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseService } from "@/lib/supabaseService";
 import { isCronAuthorized } from "@/lib/jobs/cronAuth";
-import { aggregateAnalytics } from "@/lib/analytics/aggregate";
-
+// Retired by the Google migration. Keep the authenticated endpoint fail-closed
+// so an old external scheduler cannot revive Supabase jobs or duplicate posts.
 export async function POST(request: NextRequest) {
-  if (!isCronAuthorized(request)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized cron call." }, { status: 401 });
-  }
-
-  try {
-    const service = supabaseService();
-    const hourly = await aggregateAnalytics(service, 1);
-    const sixHours = await aggregateAnalytics(service, 6);
-    const daily = await aggregateAnalytics(service, 24);
-
-    return NextResponse.json({
-      ok: true,
-      windows: {
-        "1h": hourly,
-        "6h": sixHours,
-        "24h": daily
-      }
-    });
-  } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message ?? "Unknown error" }, { status: 500 });
-  }
+  if (!isCronAuthorized(request)) return NextResponse.json({error:"Unauthorized cron call."},{status:401});
+  return NextResponse.json({backend:"google_workspace",retired:true,error:"This legacy scheduler was retired. Use the private Google publisher and Sin Pelos Social Manager."},{status:410});
 }
-
-export const GET = POST;
+export const GET=POST;
