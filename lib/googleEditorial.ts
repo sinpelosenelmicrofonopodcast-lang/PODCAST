@@ -35,7 +35,9 @@ let loading: Promise<Record<string, Row[]>> | undefined;
 export async function googleCatalog() {
   if (cached && cached.until > Date.now()) return cached.data;
   if (!loading) loading = (async () => {
-    const response = await fetch(feed, { next: { revalidate: 60 }, signal: AbortSignal.timeout(20000) });
+    // Keep the bounded in-process cache above; avoid a second, region-dependent
+    // persistent snapshot for the publication and confirmation source of truth.
+    const response = await fetch(feed, { cache: "no-store", signal: AbortSignal.timeout(20000) });
     if (!response.ok) throw new Error("Google editorial feed unavailable");
     const data = parseCatalog(await response.text());
     cached = { data, until: Date.now() + 60000 }; return data;

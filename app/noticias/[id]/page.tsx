@@ -16,6 +16,7 @@ import { buildNewsArticleJsonLd, jsonLdScript } from "@/lib/seo/jsonld";
 import { canonicalUrl } from "@/lib/seo/constants";
 import { buildRenderableImageUrl, normalizeImageUrl } from "@/lib/imageUrl";
 import { cleanNewsCategories } from "@/lib/newsCategories";
+import { newsSources } from "@/lib/newsSources";
 
 export const revalidate = 180;
 
@@ -349,7 +350,8 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
     : [await commentsPromise, [], [], null, null];
 
   const comments = ((commentsResult as any)?.data ?? []) as CommentRow[];
-  const bodyBlocks = parseContentBlocks(String(item?.analysis ?? ""));
+  const { body, sourceUrls } = newsSources(String(item?.analysis ?? ""), String(item?.source_url ?? ""));
+  const bodyBlocks = parseContentBlocks(body);
   const keyPoints = extractKeyPoints(String(item?.summary ?? ""), bodyBlocks);
   const paragraphIndexes = bodyBlocks.reduce<number[]>((acc, block, idx) => {
     if (block.type === "paragraph") acc.push(idx);
@@ -431,13 +433,13 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
                     )) : <p className="muted">{item.summary}</p>}
                   </div>
 
-                  {item.source_url ? (
+                  {sourceUrls.length > 0 ? (
                     <section className="news-source-cta-wrap">
                       <div className="news-source-label">{copy.source}</div>
-                      <a className="news-source-cta" href={item.source_url} target="_blank" rel="noreferrer" aria-label={copy.sourceCta}>
+                      {sourceUrls.map(url => <a key={url} className="news-source-cta" href={url} target="_blank" rel="noreferrer" aria-label={copy.sourceCta}>
                         <span>{copy.sourceCta}</span>
                         <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M14 4h6v6h-2V7.41l-7.29 7.3-1.42-1.42 7.3-7.29H14V4ZM5 6h6v2H7v10h10v-4h2v6H5V6Z" fill="currentColor" /></svg>
-                      </a>
+                      </a>)}
                     </section>
                   ) : null}
                 </article>
