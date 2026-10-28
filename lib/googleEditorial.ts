@@ -80,7 +80,12 @@ export class GoogleEditorialQuery {
       rows = rows.slice().sort((a, b) => { for (const o of this.orders) { const d = a[o.key] == b[o.key] ? 0 : a[o.key] == null ? 1 : b[o.key] == null ? -1 : a[o.key] < b[o.key] ? -1 : 1; if (d) return o.ascending ? d : -d; } return 0; }).slice(this.offset, this.end + 1);
       if (this.columns !== '*') { const keys = this.columns.split(',').map(x => x.trim()); rows = rows.map(r => Object.fromEntries(keys.map(k => [k, r[k] ?? null]))); }
       return { data: this.head ? null : this.singular ? rows[0] ?? null : rows, count, error: null };
-    } catch (e) { return { data: null, count: null, error: {message: (e as Error).message, code: 'GOOGLE_EDITORIAL'} }; }
+    } catch (e) {
+      // Next.js uses this signal to opt a prerendered route into runtime data.
+      // Converting it into a query error makes sitemap generation fail instead.
+      if ((e as { digest?: string })?.digest === 'DYNAMIC_SERVER_USAGE') throw e;
+      return { data: null, count: null, error: {message: (e as Error).message, code: 'GOOGLE_EDITORIAL'} };
+    }
   }
   then(onfulfilled?: any, onrejected?: any) { return this.execute().then(onfulfilled, onrejected); }
 }
