@@ -601,3 +601,40 @@ h1,h2,h3,h4,.section-title {
 @media (max-width: 390px) {
   .spm-brand-hero-copy h1 { font-size: clamp(36px, 10.8vw, 44px); }
 }
+
+
+/* Preserve the hero's brand artwork when an older device cannot load the PNG. */
+.spm-hero-logo-shell .spm-hero-hosts {
+  position: relative;
+  z-index: 2;
+  width: 84%;
+  height: 84%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.spm-hero-logo-shell .spm-hero-hosts img {
+  width: 48%;
+  height: 82%;
+  display: block;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 102, 0, .45);
+  filter: drop-shadow(0 10px 24px rgba(0,0,0,.4));
+}
+.spm-hero-logo-shell .spm-hero-hosts img[hidden] { display: none; }
+.spm-hero-hosts strong {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(27px, 4vw, 44px);
+  line-height: 1;
+  letter-spacing: 2px;
+  color: #fff;
+  text-shadow: 0 3px 14px #000, 0 0 22px rgba(255, 102, 0, .7);
+}
