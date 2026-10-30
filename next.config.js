@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Legacy cached images should always resolve to the official brand asset.
+  async redirects() {
+    return [{ source: "/logo.png", destination: "/brand/spm-official-logo.png", permanent: true }];
+  },
   experimental: {
     typedRoutes: true
   },
