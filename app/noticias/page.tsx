@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
+import { SafeImage } from "@/components/home/SafeImage";
 import { Footer } from "@/components/Footer";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { DesktopSideAdSlot } from "@/components/promotions/DesktopSideAdSlot";
@@ -236,7 +237,7 @@ export default async function NoticiasPage({
               {pageItems.map((item, index) => (
                 <article className={`card news-refresh-card${index === 0 && page === 1 ? " is-lead" : ""}`} key={item.id}>
                   <Link className="news-refresh-media" href={newsHref(item)} aria-label={`Leer ${item.title}`}>
-                    {item.cover_url ? <img src={item.cover_url} alt={item.title} loading={index === 0 ? "eager" : "lazy"} /> : <div className="news-refresh-fallback" />}
+                    {item.cover_url ? <SafeImage src={item.cover_url} alt={item.title} loading={index === 0 ? "eager" : "lazy"} /> : <div className="news-refresh-fallback" />}
                   </Link>
                   <div className="news-refresh-card-body">
                     <div className="news-refresh-meta">
