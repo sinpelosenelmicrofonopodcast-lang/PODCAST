@@ -1,7 +1,11 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 
 export function BrandHero() {
+  const [logoBroken, setLogoBroken] = useState(false);
+
   return (
     <section className="spm-brand-hero">
       <div className="spm-hero-noise" aria-hidden="true" />
@@ -37,7 +41,24 @@ export function BrandHero() {
           <div className="spm-hero-wordmark" aria-hidden="true">SIN<br />PELOS</div>
           <div className="spm-hero-logo-shell">
             <div className="spm-hero-logo-glow" aria-hidden="true" />
-            <Image src="/logo.png" alt="Sin Pelos en el Micrófono" width={360} height={360} priority />
+            {logoBroken ? (
+              <div className="spm-hero-hosts" aria-label="Bito y Bebo, Sin Pelos en el Micrófono">
+                <img src="/images/hosts/bito-sin-pelos-en-el-microfono.webp" alt="Bito" width={180} height={230} decoding="async" onError={(event) => { event.currentTarget.hidden = true; }} />
+                <img src="/images/hosts/bebo-sin-pelos-en-el-microfono.webp" alt="Bebo" width={180} height={230} decoding="async" onError={(event) => { event.currentTarget.hidden = true; }} />
+                <strong>SIN PELOS</strong>
+              </div>
+            ) : (
+              <img
+                src="/logo.png?v=20261030"
+                alt="Sin Pelos en el Micrófono"
+                width={360}
+                height={360}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                onError={() => setLogoBroken(true)}
+              />
+            )}
           </div>
           <div className="spm-hero-quote">
             <span>“</span>
