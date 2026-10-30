@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { usePathname } from "next/navigation";
 import { getSessionId, trackPromoEvent } from "@/lib/promoTracking";
 import { promoSectionFromPath } from "@/lib/promoSection";
+import { buildRenderableImageUrl } from "@/lib/imageUrl";
 
 type Promo = {
   id: string;
@@ -16,7 +17,7 @@ type Promo = {
 
 const HOUSE_PROMO = {
   title: "¿Quieres tu marca aquí? Anúnciate con Sin Pelos.",
-  image_url: "/logo.png",
+  image_url: "/brand/spm-official-logo.png",
   cta_label: "Anúnciate",
   cta_url: "/publicidad",
   promo_type: "internal" as const
@@ -90,7 +91,7 @@ export function TopBannerPromo() {
   const clickable = Boolean(display.cta_url);
   const ctaLabel = display.cta_label ?? "Ver";
   const title = display.title ?? "";
-  const imageUrl = display.image_url ?? "/logo.png";
+  const imageUrl = buildRenderableImageUrl(display.image_url ?? "/brand/spm-official-logo.png", display.title);
   const promoType = display.promo_type ?? "sponsor";
 
   const Root: any = clickable ? "a" : "div";

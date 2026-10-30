@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getSessionId, trackPromoEvent } from "@/lib/promoTracking";
 import { promoSectionFromPath } from "@/lib/promoSection";
+import { buildRenderableImageUrl } from "@/lib/imageUrl";
 
 type Promo = {
   id: string;
@@ -135,7 +136,7 @@ export function PromoPopup() {
           <button className="promo-popup-close" type="button" onClick={onClose} aria-label="Cerrar">×</button>
         </div>
         {promo.image_url ? (
-          <div className="promo-popup-media" style={{ backgroundImage: `url(${promo.image_url})` }} aria-hidden="true" />
+          <div className="promo-popup-media" style={{ backgroundImage: `url("${buildRenderableImageUrl(promo.image_url, promo.title)}")` }} aria-hidden="true" />
         ) : (
           <div className="promo-popup-media promo-popup-media-fallback" aria-hidden="true" />
         )}

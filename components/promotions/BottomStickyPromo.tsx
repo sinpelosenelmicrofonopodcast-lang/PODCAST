@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getSessionId, trackPromoEvent } from "@/lib/promoTracking";
 import { promoSectionFromPath } from "@/lib/promoSection";
+import { buildRenderableImageUrl } from "@/lib/imageUrl";
 
 type Promo = {
   id: string;
@@ -115,7 +116,7 @@ export function BottomStickyPromo() {
       <div className="promo-bottom-inner">
         <div className="promo-bottom-left">
           <div className="promo-bottom-media" aria-hidden="true">
-            <img src={promo.image_url || "/logo.png"} alt="" width={44} height={44} loading="lazy" decoding="async" />
+            <img src={buildRenderableImageUrl(promo.image_url || "/brand/spm-official-logo.png", promo.title)} alt="" width={44} height={44} loading="lazy" decoding="async" />
           </div>
           <div className="promo-bottom-title clamp-2">{promo.title}</div>
         </div>
