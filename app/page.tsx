@@ -149,6 +149,10 @@ export default async function HomePage() {
         <div className="container">
           <div className="card" style={{padding:"clamp(20px,4vw,34px)"}}>
             <p className="page-kicker">MÁS QUE UN PODCAST · B&B ENTERTAINMENT HUB</p>
+            <div className="spm-hub-brandmarks" aria-label="Marcas de producción">
+              <img src="/brand/bb-entertainment-hub.png" alt="B&B Entertainment Hub" width={160} height={116} loading="lazy" />
+              <Link href="/servicios" aria-label="Servicios de Prime Cut Studios"><img src="/brand/prime-cut-studios.png" alt="Prime Cut Studios" width={196} height={100} loading="lazy" /></Link>
+            </div>
             <h2 className="section-title">¿TIENES UN NEGOCIO O UN PROYECTO?</h2>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,230px),1fr))",gap:14}}>
               <div><h3>Producción audiovisual</h3><p className="muted">Videos, fotos, entrevistas y cobertura de eventos.</p><Link className="button" href="/servicios">SOLICITAR COTIZACIÓN</Link></div>

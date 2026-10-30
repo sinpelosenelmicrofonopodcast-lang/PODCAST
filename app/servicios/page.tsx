@@ -16,7 +16,7 @@ const offers=[
 ];
 export default function ServiciosPage(){return <main className="app-enter"><Navbar/><section className="section"><div className="container" style={{maxWidth:1130}}>
  <header className="page-header-card" style={{padding:"clamp(24px,5vw,62px)",marginBottom:24}}>
-  <p className="page-kicker">B&B ENTERTAINMENT HUB LLC · PRIME CUT STUDIO</p><h1 className="section-title">TU HISTORIA. NUESTRA PRODUCCIÓN.</h1>
+  <p className="page-kicker">B&B ENTERTAINMENT HUB LLC · PRIME CUT STUDIO</p><div className="spm-hub-brandmarks" aria-label="Marcas de producción"><img src="/brand/bb-entertainment-hub.png" alt="B&B Entertainment Hub" width={160} height={116} loading="lazy" /><img src="/brand/prime-cut-studios.png" alt="Prime Cut Studios" width={196} height={100} loading="lazy" /></div><h1 className="section-title">TU HISTORIA. NUESTRA PRODUCCIÓN.</h1>
   <p className="muted" style={{maxWidth:760}}>Producción audiovisual, fotografía y entrevistas para negocios, artistas y eventos. Trabajamos desde Central Texas con proyectos coordinados en Puerto Rico.</p>
   <div style={{display:"flex",gap:10,flexWrap:"wrap"}}><Link href="#cotizar" className="button">SOLICITA TU COTIZACIÓN</Link><Link href="/setup" className="button secondary">EQUIPO DE PRODUCCIÓN</Link></div>
  </header>

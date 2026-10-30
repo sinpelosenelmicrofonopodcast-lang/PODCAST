@@ -565,3 +565,54 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Official first-party brand assets */
+.social-strip-link .social-brand-icon {
+  display: inline-grid;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+}
+.social-strip-link .social-brand-icon img {
+  display: block;
+  max-width: 100%;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.podcast-listen-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.podcast-listen-links .spm-spotify-mark {
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  object-fit: contain;
+}
+.spm-hub-brandmarks,
+.spm-footer-brandmarks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: clamp(14px, 3vw, 28px);
+}
+.spm-hub-brandmarks { margin: 12px 0 18px; }
+.spm-hub-brandmarks img,
+.spm-footer-brandmarks img {
+  display: block;
+  width: auto;
+  height: clamp(66px, 9vw, 95px);
+  max-width: min(45vw, 200px);
+  object-fit: contain;
+}
+.spm-hub-brandmarks a { display: inline-flex; align-items: center; }
+.spm-footer-brandmarks { gap: 14px; margin-bottom: 8px; }
+.spm-footer-brandmarks img { height: 70px; max-width: 120px; }
+@media (max-width: 600px) {
+  .spm-hub-brandmarks img { height: 66px; max-width: 44vw; }
+  .spm-footer-brandmarks img { height: 62px; max-width: 38vw; }
+}
