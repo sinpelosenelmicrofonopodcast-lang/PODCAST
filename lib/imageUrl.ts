@@ -64,6 +64,7 @@ export function shouldProxyImageUrl(raw: unknown) {
     const host = cleanText(url.hostname).toLowerCase().replace(/^www\./, "");
     return (
       host === "drive.google.com" ||
+      host === "lh3.googleusercontent.com" ||
       host === "docs.google.com" ||
       host === "drive.usercontent.google.com" ||
       host.endsWith(".fbcdn.net") ||

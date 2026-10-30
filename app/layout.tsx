@@ -40,7 +40,7 @@ const TermsConsentPopup = dynamic(() => import("@/components/TermsConsentPopup")
 });
 
 const siteUrl = CANONICAL_SITE_URL;
-const iconImage = `${siteUrl}/logo.png`;
+const iconImage = `${siteUrl}/brand/spm-official-logo.png`;
 const socialImage = `${siteUrl}/og-share.png`;
 const oneSignalAppId = String(process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID ?? process.env.ONESIGNAL_APP_ID ?? "").trim();
 const oneSignalSafariWebId = String(

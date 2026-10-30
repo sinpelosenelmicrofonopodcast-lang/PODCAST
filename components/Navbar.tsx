@@ -34,7 +34,7 @@ export function Navbar() {
   const pathname = usePathname() ?? "/";
   const [nickname, setNickname] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [avatarSrc, setAvatarSrc] = useState<string>("/logo.png");
+  const [avatarSrc, setAvatarSrc] = useState<string>("/brand/spm-official-logo.png");
   const [isAdmin, setIsAdmin] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
   const [lang, setLang] = useState<AppLang>("es");
@@ -120,7 +120,7 @@ export function Navbar() {
   }, [pathname]);
 
   useEffect(() => {
-    setAvatarSrc(avatarUrl || "/logo.png");
+    setAvatarSrc(avatarUrl || "/brand/spm-official-logo.png");
   }, [avatarUrl]);
 
   useEffect(() => {
@@ -333,7 +333,7 @@ export function Navbar() {
                   height={28}
                   loading="lazy"
                   decoding="async"
-                  onError={() => setAvatarSrc("/logo.png")}
+                  onError={() => setAvatarSrc("/brand/spm-official-logo.png")}
                 />
               </div>
               <span className="muted nav-hello">{t.hello}, {nickname}</span>

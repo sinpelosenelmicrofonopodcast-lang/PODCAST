@@ -228,6 +228,12 @@ async function legacyEditorialRedirect(request: NextRequest) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  // Keep existing bookmarks and cached HTML working after the static logo moved.
+  if (pathname === "/logo.png") {
+    const target = request.nextUrl.clone();
+    target.pathname = "/brand/spm-official-logo.png";
+    return NextResponse.redirect(target, 307);
+  }
   if (isAssetPath(pathname)) return NextResponse.next();
 
   // Vercel invokes cron routes on the deployment hostname. Let each route

@@ -14,6 +14,7 @@ import { YouTubeInlinePlayer } from "@/components/YouTubeInlinePlayer";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { clampMetaDescription, estimateReadingTimeMinutes } from "@/lib/blogSeo";
 import { parseBlogBlocks } from "@/lib/blogContent";
+import { buildRenderableImageUrl } from "@/lib/imageUrl";
 import { getYouTubeVideoId } from "@/lib/youtube";
 
 export const revalidate = 300;
@@ -253,7 +254,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
     if (b.type === "image")
       return (
         <figure key={`img-${idx}`} className="mag-inline-image">
-          <img src={String(b.url ?? "")} alt={String(b.alt ?? data.title)} loading="lazy" />
+          <img src={buildRenderableImageUrl(String(b.url ?? ""), String(b.alt ?? data.title))} alt={String(b.alt ?? data.title)} loading="lazy" />
           {b.alt ? <figcaption>{String(b.alt)}</figcaption> : null}
         </figure>
       );
@@ -321,7 +322,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
         style={
           data.cover_url
             ? ({
-                ["--hero-bg" as any]: `url(${data.cover_url})`
+                ["--hero-bg" as any]: `url("${buildRenderableImageUrl(data.cover_url, data.title)}")`
               } as any)
             : undefined
         }
@@ -348,7 +349,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
             </div>
             {data.cover_url ? (
               <div className="mag-post-cover">
-                <img src={data.cover_url} alt={data.title} loading="eager" />
+                <img src={buildRenderableImageUrl(data.cover_url, data.title)} alt={data.title} loading="eager" />
               </div>
             ) : null}
 
@@ -431,7 +432,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
                 {related.map((p: any) => (
                   <article key={p.id} className="mag-card">
                     <Link className="mag-card-media" href={postHref(p)} aria-label={p.title}>
-                      {p.cover_url ? <img src={p.cover_url} alt={p.title} loading="lazy" /> : <div className="mag-card-fallback" />}
+                      {p.cover_url ? <img src={buildRenderableImageUrl(p.cover_url, p.title)} alt={p.title} loading="lazy" /> : <div className="mag-card-fallback" />}
                     </Link>
                     <div className="mag-card-body">
                       <div className="mag-card-top">

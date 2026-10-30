@@ -7,7 +7,7 @@
   "theme_color": "#0b0b0c",
   "icons": [
     {
-      "src": "/logo.png",
+      "src": "/brand/spm-official-logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }

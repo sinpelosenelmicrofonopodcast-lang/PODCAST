@@ -6,6 +6,7 @@ import { ShareButtons } from "@/components/ShareButtons";
 import { MidContentAdSlot } from "@/components/promotions/MidContentAdSlot";
 import { NewsletterForm } from "@/components/newsletter/NewsletterForm";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { buildRenderableImageUrl } from "@/lib/imageUrl";
 import { clampMetaDescription, estimateReadingTimeMinutes } from "@/lib/blogSeo";
 import { createClient } from "@supabase/supabase-js";
 
@@ -276,7 +277,7 @@ export default async function BlogIndexPage({
               {featured ? (
                 <article className="mag-hero">
                   <Link href={postHref(featured)} className="mag-hero-media" aria-label={featured.title}>
-                    {featured.cover_url ? <img src={featured.cover_url} alt={featured.title} loading="eager" /> : <div className="mag-hero-fallback" />}
+                    {featured.cover_url ? <img src={buildRenderableImageUrl(featured.cover_url, featured.title)} alt={featured.title} loading="eager" /> : <div className="mag-hero-fallback" />}
                     <div className="mag-hero-overlay" />
                     <div className="mag-hero-content">
                       <div className="mag-hero-top">
@@ -317,7 +318,7 @@ export default async function BlogIndexPage({
                       {idx === 4 ? <MidContentAdSlot /> : null}
                       <article className="mag-card">
                         <Link className="mag-card-media" href={postHref(post)} aria-label={post.title}>
-                          {post.cover_url ? <img src={post.cover_url} alt={post.title} loading="lazy" /> : <div className="mag-card-fallback" />}
+                          {post.cover_url ? <img src={buildRenderableImageUrl(post.cover_url, post.title)} alt={post.title} loading="lazy" /> : <div className="mag-card-fallback" />}
                         </Link>
                         <div className="mag-card-body">
                           <div className="mag-card-top">

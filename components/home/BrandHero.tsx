@@ -49,7 +49,7 @@ export function BrandHero() {
               </div>
             ) : (
               <img
-                src="/logo.png?v=20261030"
+                src="/brand/spm-official-logo.png?v=20261030"
                 alt="Sin Pelos en el Micrófono"
                 width={360}
                 height={360}

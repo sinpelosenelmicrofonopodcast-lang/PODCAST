@@ -53,7 +53,7 @@ export function Footer() {
       <div className="container footer-grid">
         <div className="footer-brand">
           <div className="spm-footer-brandmarks" aria-label="Sin Pelos y B&B Entertainment Hub">
-            <img src="/logo.png" width={80} height={80} alt="Sin Pelos en el Micrófono" loading="lazy" />
+            <img src="/brand/spm-official-logo.png" width={80} height={80} alt="Sin Pelos en el Micrófono" loading="lazy" />
             <img src="/brand/bb-entertainment-hub.png" width={124} height={92} alt="B&B Entertainment Hub" loading="lazy" />
           </div>
           <p className="footer-kicker">Sin Pelos en el Micrófono</p>
