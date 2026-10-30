@@ -1,6 +1,6 @@
 import { comparePodcastEpisodes } from "@/lib/podcastOrder";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { isFullPodcastEpisode, getYouTubeVideoId } from "@/lib/youtube";
+import { isFullPodcastEpisode, getYouTubeVideoId, fetchLatestYouTubeEpisodeFromFeed } from "@/lib/youtube";
 
 export type SeoPost = {
   id: string;
@@ -317,6 +317,34 @@ export async function getPublishedEpisodes(limit = 100): Promise<SeoEpisode[]> {
     keys.forEach((key) => seenKeys.add(key));
     merged.push(episode);
   });
+
+  // The legacy episode archive is not updated by the retired YouTube cron.
+  // Use the channel's public Atom feed to surface the newest verified public
+  // full episode while preserving the archived catalog and avoiding API quota.
+  // The feed omits private and unlisted uploads; title screening rejects reels.
+  try {
+    const newest = await fetchLatestYouTubeEpisodeFromFeed({ revalidateSeconds: 180 });
+    if (newest && safeTimestamp(newest.publishedAt) > 0 &&
+        safeTimestamp(newest.publishedAt) <= Date.now() &&
+        !seenKeys.has(`yt:${newest.id}`)) {
+      const episode: SeoEpisode = {
+        id: `youtube-${newest.id}`,
+        slug: newest.id,
+        title: newest.title,
+        description: newest.description || null,
+        youtube_url: `https://www.youtube.com/watch?v=${newest.id}`,
+        audio_url: null,
+        thumbnail_url: newest.thumbnailUrl || `https://i.ytimg.com/vi/${newest.id}/hqdefault.jpg`,
+        duration_seconds: null,
+        is_published: true,
+        published_at: newest.publishedAt,
+        updated_at: newest.publishedAt
+      };
+      merged.push(episode);
+    }
+  } catch {
+    // Preserve the stored catalog if YouTube is temporarily unavailable.
+  }
 
   return merged
     .filter((episode) => !episode.published_at || safeTimestamp(episode.published_at) <= Date.now())
