@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SafeImage } from "@/components/home/SafeImage";
 import type { HomeEditorialPost } from "@/lib/homeEditorialQueries";
 
 function href(post: HomeEditorialPost) {
@@ -27,7 +28,7 @@ export function FromMicBlock({ posts }: { posts: HomeEditorialPost[] }) {
         {posts.map((post, index) => (
           <Link className={`from-mic-card ${index === 0 ? "featured" : ""}`} href={href(post)} key={post.id}>
             <div className="from-mic-media">
-              {post.cover_url ? <img src={post.cover_url} alt="" loading="lazy" /> : <div className="from-mic-fallback">SPM</div>}
+              {post.cover_url ? <SafeImage src={post.cover_url} alt={post.title} loading="lazy" /> : <div className="from-mic-fallback">SPM</div>}
               <span>{post.episode_title || "Editorial Sin Pelos"}</span>
             </div>
             <div className="from-mic-copy">
