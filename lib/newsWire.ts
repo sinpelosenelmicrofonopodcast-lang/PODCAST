@@ -73,7 +73,8 @@ function readFeed(xml: string, region: NewsWireItem["region"], defaultSource: st
     }
     if (validUrl.protocol !== "https:" && validUrl.protocol !== "http:") continue;
     const publisher = element(item, "source") || defaultSource;
-    const title = rawTitle.replace(new RegExp(" - " + publisher.replace(/[.*+?^$\\{}()|[\]\\]/g, "\\$&") + "$", "i"), "").trim();
+    const suffix = " - " + publisher;
+    const title = rawTitle.endsWith(suffix) ? rawTitle.slice(0, -suffix.length).trim() : rawTitle;
     if (title.length < 18 || title.length > 260) continue;
     output.push({ title, url: validUrl.toString(), source: publisher.slice(0, 72), region, publishedAt: new Date(stamp).toISOString() });
   }
