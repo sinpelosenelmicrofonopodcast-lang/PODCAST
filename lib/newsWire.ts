@@ -8,12 +8,17 @@ export type NewsWireItem = {
 
 const feeds: Array<{ url: string; region: NewsWireItem["region"]; source: string }> = [
   {
-    url: "https://www.elnuevodia.com/arc/outboundfeeds/rss/category/noticias/?outputType=xml",
+    url: "https://www.elnuevodia.com/arc/outboundfeeds/rss/category/noticias/seguridad/?outputType=xml",
     region: "Puerto Rico",
     source: "El Nuevo Día"
   },
   {
     url: "https://www.elnuevodia.com/arc/outboundfeeds/rss/category/noticias/locales/?outputType=xml",
+    region: "Puerto Rico",
+    source: "El Nuevo Día"
+  },
+  {
+    url: "https://www.elnuevodia.com/arc/outboundfeeds/rss/category/noticias/gobierno/?outputType=xml",
     region: "Puerto Rico",
     source: "El Nuevo Día"
   },
