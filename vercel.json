@@ -1,3 +1,8 @@
 {
-  "crons": []
+  "crons": [],
+  "git": {
+    "deploymentEnabled": {
+      "editorial-archive": false
+    }
+  }
 }
