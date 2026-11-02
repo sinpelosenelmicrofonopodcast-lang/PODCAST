@@ -11,6 +11,7 @@ import { newsHref } from "@/lib/newsRoute";
 import { buildSeoMetadata } from "@/lib/seo/meta";
 import { jsonLdScript } from "@/lib/seo/jsonld";
 import { normalizeImageUrl } from "@/lib/imageUrl";
+import { loadNewsWire } from "@/lib/newsWire";
 
 export const revalidate = 180;
 
@@ -76,6 +77,7 @@ export default async function NoticiasPage({
 }: {
   searchParams: { cat?: string; sort?: string; page?: string };
 }) {
+  const newsWirePromise = loadNewsWire();
   const supabase = supabaseServer();
   const category = normalizeNewsCategory(searchParams?.cat) ?? undefined;
   const sort = searchParams?.sort === "comments" ? "comments" : "latest";
@@ -128,6 +130,7 @@ export default async function NoticiasPage({
     );
   }
 
+  const newsWire = await newsWirePromise;
   const pageItems = uniqueById(items);
   const breakingItems = page === 1 ? pageItems.filter((item) => isBreakingFresh(item.published_at)).slice(0, 5) : [];
   const latestPublished = pageItems[0]?.published_at ?? null;
@@ -225,6 +228,35 @@ export default async function NoticiasPage({
               ))}
             </div>
           </div>
+
+
+          {page === 1 && newsWire.length > 0 ? (
+            <section className="card" aria-label="Radar automático de titulares" style={{ padding: "22px", margin: "20px 0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "baseline", flexWrap: "wrap", marginBottom: "16px" }}>
+                <div>
+                  <p className="page-kicker" style={{ marginBottom: "7px" }}>RADAR · FUENTES EXTERNAS</p>
+                  <h2 style={{ margin: 0 }}>Titulares que se están moviendo</h2>
+                </div>
+                <span className="muted" style={{ fontSize: "13px" }}>Actualización automática cada 10 minutos · enlaces a medios originales</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 265px), 1fr))", gap: "13px" }}>
+                {newsWire.map((item) => (
+                  <article key={item.url} style={{ padding: "16px", border: "1px solid rgba(255,102,0,.25)", borderRadius: "12px", background: "rgba(255,102,0,.045)" }}>
+                    <div style={{ fontSize: "12px", color: "#FFA76D", fontWeight: 800, marginBottom: "9px" }}>{item.region} · {item.source}</div>
+                    <h3 style={{ fontSize: "16px", lineHeight: "1.35", margin: "0 0 12px" }}>
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ color: "inherit" }}>{item.title}</a>
+                    </h3>
+                    <time className="muted" dateTime={item.publishedAt} style={{ fontSize: "12px" }}>
+                      {new Date(item.publishedAt).toLocaleString("es-PR", { day: "2-digit", month: "short", hour: "numeric", minute: "2-digit", timeZone: "America/Puerto_Rico" })} AST
+                    </time>
+                  </article>
+                ))}
+              </div>
+              <p className="muted" style={{ fontSize: "12px", marginTop: "14px" }}>
+                Estos titulares pertenecen a otros medios y se enlazan a sus fuentes. No son artículos originales de Sin Pelos; las noticias propias aparecen más abajo.
+              </p>
+            </section>
+          ) : null}
 
           <MidContentAdSlot placement="section_header" section="noticias" compact />
 
