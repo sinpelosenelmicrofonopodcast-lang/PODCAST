@@ -12,6 +12,7 @@ import { buildSeoMetadata } from "@/lib/seo/meta";
 import { jsonLdScript } from "@/lib/seo/jsonld";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { loadNewsWire } from "@/lib/newsWire";
+import { loadPublishedNewsBridge } from "@/lib/publicNewsBridge";
 
 export const revalidate = 180;
 
@@ -78,6 +79,7 @@ export default async function NoticiasPage({
   searchParams: { cat?: string; sort?: string; page?: string };
 }) {
   const newsWirePromise = loadNewsWire();
+  const publishedBridgePromise = loadPublishedNewsBridge();
   const supabase = supabaseServer();
   const category = normalizeNewsCategory(searchParams?.cat) ?? undefined;
   const sort = searchParams?.sort === "comments" ? "comments" : "latest";
@@ -131,7 +133,10 @@ export default async function NoticiasPage({
   }
 
   const newsWire = await newsWirePromise;
-  const pageItems = uniqueById(items);
+  const bridgedNews = page === 1 ? await publishedBridgePromise : [];
+  const pageItems = page === 1
+    ? uniqueById([...bridgedNews, ...items].sort((a, b) => safeTs(b.published_at) - safeTs(a.published_at))).slice(0, perPage)
+    : uniqueById(items);
   const breakingItems = page === 1 ? pageItems.filter((item) => isBreakingFresh(item.published_at)).slice(0, 5) : [];
   const latestPublished = pageItems[0]?.published_at ?? null;
   const archiveIsCurrent = latestPublished ? Date.now() - safeTs(latestPublished) <= 7 * 24 * 60 * 60 * 1000 : false;
