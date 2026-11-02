@@ -83,3 +83,25 @@ export async function loadPublishedNewsItem(key: string): Promise<PublishedNewsI
   const candidate = decodeURIComponent(String(key ?? "")).trim();
   return items.find((x) => x.id === candidate || x.slug === candidate) ?? null;
 }
+
+/**
+ * Permanent read-only archive: the live feed holds recent items, while every
+ * confirmed article gets its own stable published-only record on a dedicated
+ * Git branch. The branch never triggers a website build.
+ */
+export async function loadArchivedNewsItem(key: string): Promise<PublishedNewsItem | null> {
+  if (!UUID.test(key)) return null;
+  const url = "https://raw.githubusercontent.com/sinpelosenelmicrofonopodcast-lang/PODCAST/editorial-archive/data/news/" + key + ".json";
+  try {
+    const response = await fetch(url, {
+      next: { revalidate: 3600 },
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(4500)
+    });
+    if (!response.ok) return null;
+    const item = await response.json();
+    return parseFeed({ schema: "spm-public-news-v1", items: [item] }).find(x => x.id === key) ?? null;
+  } catch {
+    return null;
+  }
+}
