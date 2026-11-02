@@ -17,6 +17,7 @@ import { canonicalUrl } from "@/lib/seo/constants";
 import { buildRenderableImageUrl, normalizeImageUrl } from "@/lib/imageUrl";
 import { cleanNewsCategories } from "@/lib/newsCategories";
 import { newsSources } from "@/lib/newsSources";
+import { loadPublishedNewsItem } from "@/lib/publicNewsBridge";
 
 export const revalidate = 180;
 
@@ -309,7 +310,7 @@ async function loadSibling(supabase: ReturnType<typeof supabaseServer>, item: Ne
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const item = await loadItem(supabaseServer(), params.id);
+  const item = (await loadPublishedNewsItem(params.id)) ?? (await loadItem(supabaseServer(), params.id));
   const canonical = item ? newsHref(item) : `/noticias/${encodeURIComponent(params.id)}`;
   const ogVersion = encodeURIComponent(String(item?.updated_at ?? item?.published_at ?? "20260321"));
   const directCoverImage = item?.cover_url && /^https?:\/\//i.test(item.cover_url) ? item.cover_url : null;
@@ -327,7 +328,7 @@ export default async function NoticiaDetailPage({ params }: { params: { id: stri
   const supabase = supabaseServer();
   const lang = getServerLang();
   const copy = COPY[lang];
-  const item = await loadItem(supabase, params.id);
+  const item = (await loadPublishedNewsItem(params.id)) ?? (await loadItem(supabase, params.id));
   const requestedKey = normalizeNewsKey(params.id);
   if (!item) notFound();
 
